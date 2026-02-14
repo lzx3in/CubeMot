@@ -1,0 +1,71 @@
+menu "Driver Configuration"
+
+menu "UART Drivers"
+
+config DRIVER_UART_ENABLE
+    bool "UART Driver Support"
+    default y
+    help
+        Enable UART driver framework
+
+config DRIVER_UART1_ENABLE
+    bool "UART1"
+    default n
+    depends on DRIVER_UART_ENABLE
+    help
+        Enable UART1 peripheral
+
+config DRIVER_UART2_ENABLE
+    bool "UART2"
+    default n
+    depends on DRIVER_UART_ENABLE
+    help
+        Enable UART2 peripheral
+
+endmenu
+
+menu "SPI Drivers"
+
+config DRIVER_SPI_ENABLE
+    bool "SPI Driver Support"
+    default n
+    help
+        Enable SPI driver framework
+
+config DRIVER_SPI1_ENABLE
+    bool "SPI1"
+    default n
+    depends on DRIVER_SPI_ENABLE
+    help
+        Enable SPI1 peripheral
+
+endmenu
+
+menu "I2C Drivers"
+
+config DRIVER_I2C_ENABLE
+    bool "I2C Driver Support"
+    default n
+    help
+        Enable I2C driver framework
+
+config DRIVER_I2C1_ENABLE
+    bool "I2C1"
+    default n
+    depends on DRIVER_I2C_ENABLE
+    help
+        Enable I2C1 peripheral
+
+endmenu
+
+menu "Timer Drivers"
+
+config DRIVER_TIMER_ENABLE
+    bool "Timer Driver Support"
+    default n
+    help
+        Enable Timer driver framework
+
+endmenu
+
+endmenu

@@ -1,0 +1,22 @@
+menu "Board Selection"
+
+choice
+    prompt "Target Board"
+    default BOARD_NUCLEO_G431RB
+    help
+        Select the target development board
+
+config BOARD_NUCLEO_G431RB
+    bool "NUCLEO-G431RB"
+    select MCU_STM32G4
+    help
+        STM32 NUCLEO-G431RB development board
+
+endchoice
+
+# Load board-specific configuration based on selection
+if BOARD_NUCLEO_G431RB
+source "boards/nucleo_g431rb/Kconfig"
+endif
+
+endmenu

@@ -1,0 +1,73 @@
+menu "Application Configuration"
+
+menu "Motor Control"
+
+config APP_MOTOR_CONTROL_ENABLE
+    bool "Motor Control Application"
+    default y
+    help
+        Enable motor control application
+
+config APP_MOTOR_TYPE
+    int "Motor Type"
+    default 1
+    range 1 3
+    depends on APP_MOTOR_CONTROL_ENABLE
+    help
+        Motor type: 1=BLDC, 2=PMSM, 3=ACIM
+
+config APP_CONTROL_MODE
+    int "Control Mode"
+    default 0
+    range 0 2
+    depends on APP_MOTOR_CONTROL_ENABLE
+    help
+        Control mode: 0=Speed, 1=Torque, 2=Position
+
+endmenu
+
+menu "User Interface"
+
+config APP_UI_ENABLE
+    bool "User Interface"
+    default n
+    help
+        Enable user interface support
+
+choice
+    prompt "UI Type"
+    depends on APP_UI_ENABLE
+    default APP_UI_SERIAL
+
+config APP_UI_SERIAL
+    bool "Serial Console"
+    help
+        Use serial console as user interface
+
+config APP_UI_DISPLAY
+    bool "LCD Display"
+    help
+        Use LCD display as user interface
+
+endchoice
+
+endmenu
+
+menu "Diagnostics"
+
+config APP_DIAG_ENABLE
+    bool "Diagnostics"
+    default y
+    help
+        Enable diagnostic features
+
+config APP_DIAG_LED_HEARTBEAT
+    bool "LED Heartbeat"
+    default y
+    depends on APP_DIAG_ENABLE
+    help
+        Enable LED heartbeat indicator
+
+endmenu
+
+endmenu

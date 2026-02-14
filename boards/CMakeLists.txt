@@ -1,0 +1,10 @@
+if(NOT DEFINED BOARD)
+    message(FATAL_ERROR "BOARD variable not set. Use -DBOARD=<board_name>")
+endif()
+
+set(BOARD_CMAKE_FILE ${CMAKE_CURRENT_LIST_DIR}/${BOARD}/CMakeLists.txt)
+if(EXISTS ${BOARD_CMAKE_FILE})
+    include(${BOARD_CMAKE_FILE})
+else()
+    message(FATAL_ERROR "Board CMake file not found: ${BOARD_CMAKE_FILE}")
+endif()

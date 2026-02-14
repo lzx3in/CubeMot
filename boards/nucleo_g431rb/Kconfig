@@ -1,0 +1,89 @@
+menu "NUCLEO-G431RB Board Configuration"
+
+config BOARD_NAME
+    string "Board Name"
+    default "NUCLEO_G431RB"
+
+menu "LED Configuration"
+
+config BOARD_HAS_LED1
+    bool "LED1 Support"
+    default y
+    help
+        Enable LED1 support on this board
+
+choice BOARD_LED1_PORT
+    prompt "LED1 GPIO Port"
+    depends on BOARD_HAS_LED1
+    default BOARD_LED1_PORT_GPIOA
+    help
+        Select the GPIO port for LED1
+
+config BOARD_LED1_PORT_GPIOA
+    bool "GPIOA"
+
+config BOARD_LED1_PORT_GPIOB
+    bool "GPIOB"
+
+config BOARD_LED1_PORT_GPIOC
+    bool "GPIOC"
+
+config BOARD_LED1_PORT_GPIOD
+    bool "GPIOD"
+
+config BOARD_LED1_PORT_GPIOE
+    bool "GPIOE"
+
+config BOARD_LED1_PORT_GPIOF
+    bool "GPIOF"
+
+config BOARD_LED1_PORT_GPIOG
+    bool "GPIOG"
+
+config BOARD_LED1_PORT_GPIOH
+    bool "GPIOH"
+
+config BOARD_LED1_PORT_GPIOI
+    bool "GPIOI"
+
+config BOARD_LED1_PORT_GPIOJ
+    bool "GPIOJ"
+
+config BOARD_LED1_PORT_GPIOK
+    bool "GPIOK"
+
+endchoice
+
+config BOARD_LED1_PORT
+    int
+    default 0 if BOARD_LED1_PORT_GPIOA
+    default 1 if BOARD_LED1_PORT_GPIOB
+    default 2 if BOARD_LED1_PORT_GPIOC
+    default 3 if BOARD_LED1_PORT_GPIOD
+    default 4 if BOARD_LED1_PORT_GPIOE
+    default 5 if BOARD_LED1_PORT_GPIOF
+    default 6 if BOARD_LED1_PORT_GPIOG
+    default 7 if BOARD_LED1_PORT_GPIOH
+    default 8 if BOARD_LED1_PORT_GPIOI
+    default 9 if BOARD_LED1_PORT_GPIOJ
+    default 10 if BOARD_LED1_PORT_GPIOK
+
+config BOARD_LED1_PIN
+    int "LED1 GPIO Pin Number"
+    depends on BOARD_HAS_LED1
+    default 5
+    range 0 15
+    help
+        Select the GPIO pin number for LED1 (0-15)
+
+config BOARD_HAS_LED2
+    bool "LED2 Support"
+    default n
+
+config BOARD_HAS_LED3
+    bool "LED3 Support"
+    default n
+
+endmenu
+
+endmenu

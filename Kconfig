@@ -1,0 +1,17 @@
+mainmenu "CubeMot Configuration"
+
+# Project General Options
+config PROJECT_NAME
+    string "Project Name"
+    default "CubeMot"
+
+config PROJECT_VERSION
+    string "Project Version"
+    default "1.0.0"
+
+# Load board selection menu
+source "boards/Kconfig"
+
+# Load feature module configurations
+source "drivers/Kconfig"
+source "application/Kconfig"

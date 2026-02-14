@@ -13,3 +13,4 @@ boards/system_config.h
 boards/board_config.h
 application/app_config.h
 drivers/driver_config.h
+middlewares/middleware_config.h

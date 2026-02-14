@@ -1,0 +1,9 @@
+---
+description: 
+alwaysApply: true
+enabled: true
+updatedAt: 2026-02-10T15:09:36.939Z
+provider: 
+---
+
+新增项目文档优先使用Asciidoc格式（.adoc），以保持一致性和可维护性。特殊情况或外部协作需求可使用其他格式。

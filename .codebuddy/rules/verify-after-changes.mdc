@@ -1,0 +1,9 @@
+---
+description: 
+alwaysApply: true
+enabled: true
+updatedAt: 2026-02-10T15:09:36.940Z
+provider: 
+---
+
+任何代码或配置文件修改后，都应运行验证步骤（构建、测试或检查）确认改动生效。验证范围可根据修改内容调整，但不能省略验证环节。

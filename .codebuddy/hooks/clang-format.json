@@ -1,0 +1,53 @@
+{
+  "name": "clang-format-auto-format",
+  "description": "在保存C/C++文件时自动运行clang-format进行代码格式化",
+  "version": "1.0.0",
+  "trigger": {
+    "events": ["file_saved"],
+    "file_patterns": [
+      "**/*.c",
+      "**/*.h",
+      "**/*.cpp",
+      "**/*.hpp",
+      "**/*.cc",
+      "**/*.hh",
+      "**/*.cxx",
+      "**/*.hxx",
+      "**/*.C",
+      "**/*.H"
+    ]
+  },
+  "action": {
+    "type": "shell_command",
+    "command": "clang-format",
+    "args": [
+      "--style=file",
+      "-i",
+      "${file}"
+    ],
+    "working_directory": "${project_root}",
+    "timeout_ms": 5000
+  },
+  "conditions": {
+    "excluded_paths": [
+      "**/stm32cubemx_generated/**",
+      "**/build/**",
+      "**/build-*/**",
+      "**/target/**",
+      "**/external/**",
+      "**/vendor/**"
+    ],
+    "required_files": [
+      ".clang-format"
+    ]
+  },
+  "error_handling": {
+    "on_failure": "warn",
+    "message": "clang-format格式化失败: ${error}",
+    "log_errors": true
+  },
+  "performance": {
+    "debounce_ms": 100,
+    "max_concurrent": 2
+  }
+}

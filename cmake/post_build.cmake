@@ -46,9 +46,18 @@ add_custom_command(TARGET ${CMAKE_PROJECT_NAME} POST_BUILD
     COMMENT "Copying map file from build/ to target/"
 )
 
+# Copy elf file from build/ to target/
+add_custom_command(TARGET ${CMAKE_PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy
+        ${CMAKE_BINARY_DIR}/${CMAKE_PROJECT_NAME}.elf
+        ${TARGET_OUTPUT_DIR}/${CMAKE_PROJECT_NAME}.elf
+    COMMENT "Copying elf file from build/ to target/"
+)
+
 # Clean only target/ directory files (build/ directory not affected)
 set_target_properties(${CMAKE_PROJECT_NAME} PROPERTIES
     ADDITIONAL_CLEAN_FILES "
+        ${TARGET_OUTPUT_DIR}/${CMAKE_PROJECT_NAME}.elf;
         ${TARGET_OUTPUT_DIR}/${CMAKE_PROJECT_NAME}.map;
         ${TARGET_OUTPUT_DIR}/${CMAKE_PROJECT_NAME}.bin;
         ${TARGET_OUTPUT_DIR}/${CMAKE_PROJECT_NAME}.hex;

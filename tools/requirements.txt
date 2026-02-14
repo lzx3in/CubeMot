@@ -1,0 +1,2 @@
+# Python library and CLI tools for Kconfig
+kconfiglib>=14.1.0

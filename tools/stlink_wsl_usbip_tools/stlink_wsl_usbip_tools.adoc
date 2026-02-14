@@ -1,0 +1,538 @@
+= ST-Link WSL USB/IP Tools Documentation
+
+== Overview
+
+This document describes the automated tools for managing ST-Link debug probe connectivity between Windows and WSL2 for STM32 development. These tools replace the manual setup process and provide a streamlined workflow for attaching, detaching, and validating ST-Link devices.
+
+== Tool Architecture
+
+The ST-Link WSL USB/IP management consists of two complementary scripts:
+
+1. *Windows PowerShell Manager* (`stlink-wsl-usbip-manager.ps1`)
+   - Runs on Windows with Administrator privileges
+   - Handles device discovery, attachment, and detachment
+   - Provides interactive menu-driven interface
+
+2. *WSL Validation Script* (`stlink-wsl-usbip-validator.sh`)
+   - Runs inside WSL2 environment
+   - Validates USB/IP prerequisites and environment
+   - Verifies device connectivity and enumerates USB devices
+
+These tools work together to provide a complete solution for ST-Link device management in WSL2.
+
+== Prerequisites
+
+=== Windows Side
+
+- Windows 10/11 with WSL2 enabled
+- usbipd-win installed (v4.0.0 or later)
+- PowerShell with Administrator privileges
+
+*Install usbipd-win:*
+
+[source,powershell]
+----
+winget install --interactive --exact dorssel.usbipd-win
+----
+
+=== WSL Side
+
+- Ubuntu 20.04/22.04 or compatible WSL2 distribution
+- USB/IP kernel modules enabled
+- usbutils package for device enumeration
+
+*Install WSL dependencies:*
+
+[source,bash]
+----
+sudo apt-get update
+sudo apt-get install -y usbutils linux-tools-generic hwdata
+sudo update-alternatives --install /usr/local/bin/usbip usbip /usr/lib/linux-tools/*-generic/usbip 20
+----
+
+== Tool 1: ST-Link WSL USB/IP Manager (Windows)
+
+=== Purpose
+
+Interactive PowerShell script that discovers ST-Link devices attached to Windows and manages their attachment to WSL2.
+
+=== Usage
+
+*Execution:*
+
+1. Right-click PowerShell → "Run as Administrator"
+2. Navigate to the script directory
+3. Execute the script:
+
+[source,powershell]
+----
+.\stlink-wsl-usbip-manager.ps1
+----
+
+*Workflow:*
+
+1. *Device Discovery*: Script automatically scans for ST-Link devices
+   - Supports single or multiple device detection
+   - Displays device information (BUSID, VID:PID, State)
+
+2. *Selection*: For multiple devices, prompts for selection
+   - Enter the number corresponding to your device
+
+3. *Action Selection*: Choose operation
+   - `[A]ttach` - Connect device to WSL2
+   - `[D]etach` - Disconnect device from WSL2
+   - `[C]ancel` - Exit without changes
+
+4. *Verification*: Provides post-operation verification steps
+
+=== Example Session
+
+....
+===================================
+ST-Link USB/IP WSL Device Manager
+===================================
+
+✓ usbipd is available
+
+Scanning for ST-Link debug probes...
+Detected 1 ST-Link device:
+2-1    0483:374b  ST-Link debug probe                      Not attached
+
+Select operation: [A]ttach, [D]etach, or [C]ancel: A
+
+Attaching ST-Link to WSL...
+✓ Successfully attached to WSL!
+
+Verification steps in WSL:
+1. Execute: lsusb
+2. Verify: STMicroelectronics ST-Link
+
+Option A - Quick verification:
+   Run: lsusb | grep ST-Link
+
+Option B - Full validation:
+   Run: stlink-wsl-usbip-validator.sh
+   (Validates environment, drivers, and connectivity)
+....
+
+=== Troubleshooting
+
+[cols=",",options="header"]
+|===
+| Issue | Solution
+
+| `usbipd command not found`
+| Install usbipd-win: `winget install dorssel.usbipd-win`
+
+| No ST-Link devices detected
+| - Check USB connection
+- Try different USB port
+- Update ST-Link firmware
+- Run `usbipd list` to see all devices
+
+| `Access denied` error
+| Ensure PowerShell is running as Administrator
+
+| Attachment fails
+| - Detach and reattach
+- Check WSL is running: `wsl -l -v`
+- Restart usbipd service: `Restart-Service usbipd`
+|===
+
+== Tool 2: ST-Link WSL USB/IP Validator (WSL)
+
+=== Purpose
+
+Bash script that validates the WSL2 environment for USB/IP functionality and verifies ST-Link device connectivity.
+
+=== Usage
+
+*Execution:*
+
+[source,bash]
+----
+# Make executable (first time only)
+chmod +x stlink-wsl-usbip-validator.sh
+
+# Run the validator
+./stlink-wsl-usbip-validator.sh
+
+# Run in quiet mode (for scripts)
+./stlink-wsl-usbip-validator.sh --quiet
+
+# Get JSON output (for programmatic use)
+./stlink-wsl-usbip-validator.sh --json
+
+# Show help
+./stlink-wsl-usbip-validator.sh --help
+----
+
+*Validation Checks:*
+
+1. *WSL Environment Verification*
+   - Confirms running in WSL2
+   - Checks kernel version compatibility
+
+2. *USB/IP Client Check*
+   - Validates `usbip` command availability
+   - Provides installation instructions if missing
+
+3. *Kernel Module Validation*
+   - Checks for `usbip_host` module
+   - Attempts to load module if not present
+   - Validates module dependencies
+
+4. *USB Device Enumeration*
+   - Lists all USB devices visible in WSL
+   - Highlights ST-Link devices if present
+
+=== Scriptable API
+
+The validator can be called from other scripts:
+
+[source,bash]
+----
+# Method 1: Direct execution with quiet mode
+if ./stlink-wsl-usbip-validator.sh --quiet; then
+    echo "Environment ready"
+else
+    echo "Environment issues detected"
+fi
+
+# Method 2: JSON output for parsing
+RESULT_JSON=$(./stlink-wsl-usbip-validator.sh --json)
+
+# Method 3: Source and call functions
+source ./stlink-wsl-usbip-validator.sh
+
+# Call validation function
+if validate_stlink_environment; then
+    echo "Environment is ready for ST-Link"
+fi
+
+# Get results without side effects
+check_stlink_environment
+RESULT=$?
+----
+
+=== Example Output
+
+*Interactive Mode (default):*
+
+....
+===================================
+ST-Link WSL USB/IP Environment Validator
+===================================
+
+1. Checking WSL Environment...
+   ✓ Running in WSL2 environment
+
+2. Checking USB/IP Client...
+   ✓ usbip client is available
+
+3. Checking USB/IP Kernel Modules...
+   ✓ usbip_host kernel module is loaded
+
+4. Enumerating USB Devices in WSL:
+Bus 002 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
+Bus 001 Device 002: ID 0483:374b STMicroelectronics ST-Link V3
+Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+
+===================================
+Next Steps:
+===================================
+
+Option 1 - Automated (Recommended):
+  Run in Windows PowerShell (as Administrator):
+  stlink-wsl-usbip-manager.ps1
+
+Option 2 - Manual:
+  Run in Windows PowerShell/CMD (as Administrator):
+    usbipd list
+
+  Locate your ST-Link device (typically Vendor ID: 0483, Product ID: 374b)
+
+  Attach it to WSL with:
+    usbipd attach --wsl --busid=<BUS-ID>
+
+  Example: usbipd attach --wsl --busid=2-1
+
+After attaching, re-run this script or use 'lsusb' to verify connectivity.
+===================================
+....
+
+*JSON Mode (`--json`):*
+
+[source,json]
+----
+{
+  "success": true,
+  "checks": {
+    "wsl_environment": true,
+    "usbip_client": true,
+    "usbip_host_module": true,
+    "lsusb_available": true,
+    "stlink_device_found": 1
+  },
+  "errors": []
+}
+----
+
+*Quiet Mode (`--quiet`):*
+
+....
+# No output, just exit code
+$ ./stlink-wsl-usbip-validator.sh --quiet
+$ echo $?
+0  # Success
+....
+
+== Complete Workflow
+
+=== Scenario 1: First-Time Setup
+
+*Step 1 - Validate WSL Environment:*
+
+[source,bash]
+----
+# In WSL terminal
+./stlink-wsl-usbip-validator.sh
+----
+
+Expected result: All checks pass except device enumeration (no device attached yet)
+
+*Step 2 - Attach Device from Windows:*
+
+[source,powershell]
+----
+# In PowerShell (Administrator)
+.\stlink-wsl-usbip-manager.ps1
+----
+
+- Select `[A]ttach` when prompted
+- Note the verification steps displayed
+
+*Step 3 - Verify in WSL:*
+
+[source,bash]
+----
+# In WSL terminal
+./stlink-wsl-usbip-validator.sh
+----
+
+Expected result: ST-Link device appears in USB enumeration
+
+*Step 4 - Verify Device Access:*
+
+[source,bash]
+----
+# Quick verification
+lsusb | grep ST-Link
+
+# Full device details
+lsusb -v -d 0483:374b
+----
+
+Expected result: Device information is displayed without errors
+
+=== Scenario 2: Daily Development Cycle
+
+*Morning - Attach Device:*
+
+[source,powershell]
+----
+# Quick attach without full validation
+.\stlink-wsl-usbip-manager.ps1
+# Select A for Attach
+----
+
+*During Development - Validate as Needed:*
+
+[source,bash]
+----
+# Verify connectivity if issues arise
+./stlink-wsl-usbip-validator.sh
+----
+
+*Evening - Detach Device:*
+
+[source,powershell]
+----
+# Detach when done
+.\stlink-wsl-usbip-manager.ps1
+# Select D for Detach
+----
+
+=== Scenario 3: Troubleshooting Connectivity Issues
+
+*Symptom: Device not visible in WSL*
+
+1. *Run Validator:*
++
+[source,bash]
+----
+./stlink-wsl-usbip-validator.sh
+----
++
+- Check kernel module status
+- Verify usbip client installation
+
+2. *Check Windows Attachment:*
++
+[source,powershell]
+----
+# In PowerShell
+usbipd list
+----
++
+- Look for ST-Link device state
+- Should show "Attached" if connected to WSL
+
+3. *Reattach if Needed:*
++
+[source,powershell]
+----
+.\stlink-wsl-usbip-manager.ps1
+# Select D then A to detach and reattach
+----
+
+4. *Verify in WSL:*
++
+[source,bash]
+----
+lsusb | grep ST-Link
+----
+
+== Integration with Development Tools
+
+=== Using with Debug Probes
+
+After successful attachment and validation, your ST-Link device is ready for use with development tools:
+
+[source,bash]
+----
+# The ST-Link device should now be accessible in WSL
+# Use it with OpenOCD, STM32CubeProgrammer, or other tools as needed
+
+# Verify device is accessible
+lsusb | grep -i st-link
+
+# Check device permissions
+ls -la /dev/bus/usb/*/*
+----
+
+=== Common Development Workflows
+
+Once the device is attached and validated:
+
+1. *Device Programming*: Use OpenOCD, STM32CubeProgrammer, or your preferred tool
+2. *Debugging*: Connect your debugger (GDB, etc.) to the ST-Link
+3. *Testing*: Run your test suite against the connected hardware
+
+=== Before Starting Development
+
+Always ensure:
+
+1. Device is attached using `stlink-wsl-usbip-manager.ps1`
+2. Environment is validated using `stlink-wsl-usbip-validator.sh`
+3. Device appears in `lsusb` output
+4. User has appropriate permissions to access the USB device
+
+== Troubleshooting Guide
+
+=== Common Issues and Solutions
+
+[cols=",",options="header"]
+|===
+| Symptom | Cause | Solution
+
+| `usbipd not found` (Windows)
+| usbipd-win not installed
+| Install via winget: `winget install dorssel.usbipd-win`
+
+| `usbip not found` (WSL)
+| linux-tools not installed
+| `sudo apt-get install linux-tools-generic hwdata`
+
+| `usbip_host module not loaded`
+| Module not auto-loaded
+| `sudo modprobe usbip_host` or install `linux-modules-extra`
+
+| Device appears in `usbipd list` but not in WSL
+| Attachment failed
+| Use manager script to detach and reattach
+
+| `lsusb` shows device but OpenOCD fails
+| Permissions or firmware
+| Check udev rules, update ST-Link firmware
+
+| Device disconnects randomly
+| USB power management
+| Disable USB selective suspend in Windows power settings
+|===
+
+=== Log Collection
+
+*Windows Logs:*
+
+[source,powershell]
+----
+# Check usbipd service status
+Get-Service usbipd
+
+# View usbipd events
+Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='usbipd'}
+----
+
+*WSL Logs:*
+
+[source,bash]
+----
+# Check kernel messages
+dmesg | grep -i usbip
+
+# Check usbip debug info
+sudo usbip list -l
+
+# View device details
+lsusb -v -d 0483:374b
+----
+
+== Advanced Usage
+
+=== Command-Line Operation (Windows Manager)
+
+The PowerShell manager can be automated with command-line arguments:
+
+[source,powershell]
+----
+# Non-interactive attach (requires known BUSID)
+usbipd attach --wsl --busid=2-1
+
+# Non-interactive detach
+usbipd detach --busid=2-1
+
+# List all devices (parseable format)
+usbipd list
+----
+
+=== Custom udev Rules
+
+For persistent device permissions, create udev rules:
+
+[source,bash]
+----
+sudo tee /etc/udev/rules.d/49-stlinkv3.rules > /dev/null << 'EOF'
+# ST-Link V3 (including V3E)
+SUBSYSTEMS=="usb", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="374?", MODE:="0666", GROUP="plugdev", TAG+="uaccess"
+EOF
+
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+----
+
+== References
+
+- https://github.com/dorssel/usbipd-win[usbipd-win GitHub Repository]
+- https://learn.microsoft.com/en-us/windows/wsl/connect-usb[Microsoft WSL USB Support Documentation]
+- https://www.st.com/resource/en/user_manual/um1075-stlinkv3-debuggerprobe-programmer-stmicroelectronics.pdf[STM32 ST-Link User Manual]

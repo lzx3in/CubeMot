@@ -49,3 +49,7 @@ target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE
     drivers
     ${TOOLCHAIN_LINK_LIBRARIES}
 )
+
+# Generate binary, hex, and map files in target/ directory
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/post_build.cmake)
+

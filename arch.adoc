@@ -1,0 +1,30 @@
+== 系统分层架构
+
+[graphviz]
+....
+digraph generic_embedded_control_architecture {
+    // 节点样式
+    node [shape=box, style=filled]
+    
+    // 节点定义（按软件→系统→硬件层次配色）
+    application [label="应用程序(Application)\n(业务逻辑实现)", fillcolor="#FFE082"]
+    core_module [label="核心模块(Core Module)\n(算法实现/状态管理)", fillcolor="#FFCC80"]
+    middleware [label="中间件(Middleware)\n(通信协议/参数系统/日志)", fillcolor="#FFAB91"]
+    osal [label="系统抽象层(OSAL)\n(统一操作系统接口)", fillcolor="#D1C4E9"]
+    rtos [label="实时操作系统(RTOS)\n(FreeRTOS)", fillcolor="#CE93D8"]
+    driver [label="驱动(Driver)\n(抽象出硬件无关的设备操作接口)\n(如系统状态指示灯专用操作接口)", fillcolor="#90CAF9"]
+    board_support_pkg [label="板级支持包(BSP)\n(硬件资源配置，早于业务逻辑的板级初始化)", fillcolor="#80CBC4"]
+    hardware_abstraction [label="硬件抽象层(HAL)\n(MCU寄存器封装，屏蔽芯片差异)\n(如GPIO通用操作接口)", fillcolor="#B0BEC5"]
+    hardware_platform [label="硬件平台(Hardware Platform)", fillcolor="#E0E0E0"]
+
+    // 依赖关系（不区分强弱依赖）
+    application -> {core_module middleware osal driver}
+    core_module -> {osal middleware driver}
+    middleware -> {osal driver}
+    osal -> {rtos hardware_abstraction}
+    rtos -> hardware_abstraction
+    driver -> {osal hardware_abstraction}
+    board_support_pkg -> {driver hardware_abstraction}
+    hardware_abstraction -> hardware_platform
+}
+....

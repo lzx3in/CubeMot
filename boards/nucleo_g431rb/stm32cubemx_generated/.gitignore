@@ -1,0 +1,4 @@
+cmake/
+.mxproject
+CMakeLists.txt
+CMakePresets.json

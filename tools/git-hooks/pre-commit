@@ -14,9 +14,7 @@ echo "Checking code format for staged file(s)..."
 # in those directories with the following content:
 #     DisableFormat: true
 
-output=$(git clang-format --staged --diff --style=file --extensions c,h,cpp,hpp,cc,cxx,c++,h++,hh 2>&1 || true)
-
-if echo "$output" | grep -q "diff --git"; then
+if ! output=$(git clang-format --staged --diffstat --style=file --extensions c,h,cpp,hpp,cc,cxx,c++,h++,hh 2>&1); then
     echo "❌ Code format check failed! The following files require formatting:" >&2
     echo "$output" >&2
     echo "" >&2

@@ -14,3 +14,7 @@ boards/board_config.h
 application/app_config.h
 drivers/driver_config.h
 middlewares/middleware_config.h
+
+# AI assistant files
+.codebuddy/plans/
+CODEBUDDY.md

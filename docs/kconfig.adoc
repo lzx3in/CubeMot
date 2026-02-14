@@ -1,0 +1,747 @@
+= KConfig 配置系统
+
+本文档描述 CubeMot 项目的 KConfig 配置系统，包括分层架构、使用方法和集成方式。
+
+== 概述
+
+KConfig 提供了灵活的项目配置方式：
+
+- 图形菜单配置（menuconfig）
+- 文本配置文件（.config）
+- 自动生成的头文件（board_config.h）
+- 多板卡支持
+- 编译时配置检查
+
+KConfig 生成 `board_config.h`，提供编译时配置：
+
+[source,c]
+----
+#define BOARD_NAME "NUCLEO-G431RB"
+#define BOARD_HAS_LED1  1
+#define BOARD_LED1_PORT GPIOA
+#define BOARD_LED1_PIN  0x20
+#define BOARD_LED_COUNT 1
+----
+
+== 分层架构设计
+
+CubeMot 采用分层模块化 KConfig 架构，将配置系统分为以下层次：
+
+* **根配置入口**：`Kconfig` - 项目通用选项和模块加载
+* **板卡配置**：`boards/Kconfig` + `boards/<BOARD>/Kconfig` - 板卡选择和外设配置
+* **驱动配置**：`drivers/Kconfig` - UART、SPI、I2C 等驱动选项
+* **中间件配置**：`middlewares/Kconfig` - RTOS、通信协议等中间件
+* **应用配置**：`application/Kconfig` - 应用层功能选项
+
+=== 目录结构
+
+----
+CubeMot/
+├── Kconfig                          # 根配置入口
+├── boards/
+│   ├── Kconfig                      # 板卡选择菜单
+│   └── nucleo_g431rb/               # 板卡特定配置
+│       └── Kconfig
+├── drivers/
+│   └── Kconfig                      # 驱动配置
+├── middlewares/
+│   └── Kconfig                      # 中间件配置
+├── application/
+│   └── Kconfig                      # 应用配置
+├── cmake/
+│   └── kconfig.cmake               # CMake 集成
+├── tools/
+│   └── gen_board_config.py         # 配置生成脚本
+└── boards/
+    └── board_config.h              # 生成的配置头文件
+----
+
+=== 配置优先级
+
+配置系统支持自动生成 `.config` 文件：
+
+- **板卡特定 defconfig**：`boards/<BOARD>/defconfig`（优先级最高）
+- **KConfig 默认配置**：从 KConfig 文件提取的默认值
+- **手动创建的 `.config`**：用户通过 KConfig 工具或编辑器创建
+
+=== 配置加载流程
+
+配置加载和生成流程如下：
+
+1. **自动生成阶段**（如 `.config` 不存在）：
+   - CMake 检查板卡是否有 `defconfig` 文件
+   - 如有 `defconfig`，使用该文件生成 `.config`
+   - 如无 `defconfig`，从 KConfig 默认配置生成 `.config`
+
+2. **验证阶段**：
+   - 验证 `.config` 文件存在于项目根目录
+
+3. **生成头文件阶段**：
+   - `tools/gen_config.py` 从 `.config` 生成多个配置头文件
+   - `boards/board_config.h` - 板级配置
+   - `core_system/system_config.h` - 系统配置
+   - `drivers/drivers_config.h` - 驱动配置
+   - `middlewares/middlewares_config.h` - 中间件配置
+   - `application/app_config.h` - 应用配置
+
+4. **使用阶段**：
+   - 源代码通过 `#include "boards/board_config.h"` 等使用配置
+
+== 使用方法
+
+=== 1. 初始配置（自动生成）
+
+首次构建时，系统会自动生成配置：
+
+[source,bash]
+----
+# 直接运行 cmake，.config 会自动生成
+cmake -G Ninja -DCMAKE_TOOLCHAIN_FILE=cmake/starm_clang_toolchain.cmake \
+  -DCMAKE_BUILD_TYPE=Debug -DBOARD=nucleo_g431rb -B build/Debug
+----
+
+自动生成流程：
+1. 检测 `.config` 是否存在
+2. 如不存在，检查板卡是否有 `defconfig`
+3. 从 `defconfig` 或 KConfig 默认配置生成 `.config`
+4. 生成所有配置头文件
+
+=== 2. 自定义配置
+
+如需自定义配置，使用以下方法：
+
+方案 A：使用 KConfig 工具（推荐）
+
+安装 Kconfiglib 后，会自动提供完整的 KConfig 工具集，包括 menuconfig、guiconfig、oldconfig、savedefconfig 等。
+
+[source,bash]
+----
+# 安装 Kconfiglib
+pip install kconfiglib
+
+# 使用 menuconfig 进行终端图形化配置
+menuconfig Kconfig
+
+# 或使用 guiconfig 进行图形界面配置
+guiconfig Kconfig
+
+# 保存配置到 .config 文件后，重新构建
+rm -rf build/
+cmake -G Ninja -DCMAKE_TOOLCHAIN_FILE=cmake/starm_clang_toolchain.cmake \
+  -DCMAKE_BUILD_TYPE=Debug -DBOARD=nucleo_g431rb -B build/Debug
+cmake --build build/Debug
+----
+
+方案 B：手动编辑 .config
+
+[source,bash]
+----
+vim .config
+----
+
+配置完成后，清理构建目录并重新运行 CMake：
+
+[source,bash]
+----
+rm -rf build/
+cmake -G Ninja -DCMAKE_TOOLCHAIN_FILE=cmake/starm_clang_toolchain.cmake \
+  -DCMAKE_BUILD_TYPE=Debug -DBOARD=nucleo_g431rb -B build/Debug
+cmake --build build/Debug
+----
+
+=== 3. 生成配置头文件
+
+方式一：手动生成（调试用）
+
+[source,bash]
+----
+python3 tools/gen_config.py .config
+----
+
+方式二：集成到构建系统（CMake 自动处理）
+
+CMake 自动调用 `tools/gen_config.py` 生成所有配置头文件，无需手动执行。
+
+生成的头文件包括：
+- `boards/board_config.h` - 板级配置
+- `core_system/system_config.h` - 系统配置
+- `drivers/drivers_config.h` - 驱动配置
+- `middlewares/middlewares_config.h` - 中间件配置
+- `application/app_config.h` - 应用配置
+
+=== 3. 在应用中使用
+
+应用代码可以在编译时检查资源：
+
+[source,c]
+----
+#include "boards/board_config.h"
+
+#if BOARD_HAS_LED1
+    // LED1 特定代码
+    // 可以使用 BOARD_LED1_PORT 和 BOARD_LED1_PIN
+#endif
+----
+
+== 板卡配置
+
+=== 板卡选择
+
+板卡选择在 `boards/Kconfig` 中定义：
+
+[source,kconfig]
+----
+menu "Board Selection"
+
+choice
+    prompt "Target Board"
+    default BOARD_NUCLEO_G431RB
+    help
+        选择目标开发板
+
+config BOARD_NUCLEO_G431RB
+    bool "NUCLEO-G431RB"
+    select MCU_STM32G4
+    help
+        STM32 NUCLEO-G431RB 开发板
+
+endchoice
+
+# 根据选择的板卡加载对应配置
+if BOARD_NUCLEO_G431RB
+source "boards/nucleo_g431rb/Kconfig"
+endif
+
+endmenu
+----
+
+=== 板卡特定配置
+
+每个板卡的特定配置位于 `boards/<BOARD>/Kconfig`，包含该板卡的外设、引脚定义等：
+
+[source,kconfig]
+----
+menu "NUCLEO-G431RB Board Configuration"
+
+config BOARD_NAME
+    string "Board Name"
+    default "NUCLEO-G431RB"
+
+menu "LED Configuration"
+
+config BOARD_HAS_LED1
+    bool "LED1 Support"
+    default y
+    help
+        在此板上启用 LED1 支持
+
+choice BOARD_LED1_PORT
+    prompt "LED1 GPIO Port"
+    depends on BOARD_HAS_LED1
+    default BOARD_LED1_PORT_GPIOA
+    help
+        选择 LED1 的 GPIO 端口
+
+config BOARD_LED1_PORT_GPIOA
+    bool "GPIOA"
+
+config BOARD_LED1_PORT_GPIOB
+    bool "GPIOB"
+
+config BOARD_LED1_PORT_GPIOC
+    bool "GPIOC"
+
+config BOARD_LED1_PORT_GPIOD
+    bool "GPIOD"
+
+config BOARD_LED1_PORT_GPIOE
+    bool "GPIOE"
+
+config BOARD_LED1_PORT_GPIOF
+    bool "GPIOF"
+
+config BOARD_LED1_PORT_GPIOG
+    bool "GPIOG"
+
+config BOARD_LED1_PORT_GPIOH
+    bool "GPIOH"
+
+config BOARD_LED1_PORT_GPIOI
+    bool "GPIOI"
+
+config BOARD_LED1_PORT_GPIOJ
+    bool "GPIOJ"
+
+config BOARD_LED1_PORT_GPIOK
+    bool "GPIOK"
+
+endchoice
+
+config BOARD_LED1_PORT
+    int
+    default 0 if BOARD_LED1_PORT_GPIOA
+    default 1 if BOARD_LED1_PORT_GPIOB
+    default 2 if BOARD_LED1_PORT_GPIOC
+    default 3 if BOARD_LED1_PORT_GPIOD
+    default 4 if BOARD_LED1_PORT_GPIOE
+    default 5 if BOARD_LED1_PORT_GPIOF
+    default 6 if BOARD_LED1_PORT_GPIOG
+    default 7 if BOARD_LED1_PORT_GPIOH
+    default 8 if BOARD_LED1_PORT_GPIOI
+    default 9 if BOARD_LED1_PORT_GPIOJ
+    default 10 if BOARD_LED1_PORT_GPIOK
+
+config BOARD_LED1_PIN
+    hex "LED1 GPIO Pin"
+    default 0x20  # GPIO_PIN_5
+    depends on BOARD_HAS_LED1
+
+endmenu
+
+endmenu
+----
+
+== 驱动配置
+
+驱动配置位于 `drivers/Kconfig`，按驱动类型分组：
+
+[source,kconfig]
+----
+menu "Driver Configuration"
+
+menu "UART Drivers"
+
+config DRIVER_UART_ENABLE
+    bool "UART Driver Support"
+    default y
+
+config DRIVER_UART1_ENABLE
+    bool "UART1"
+    default n
+    depends on DRIVER_UART_ENABLE
+
+endmenu
+
+menu "SPI Drivers"
+
+config DRIVER_SPI_ENABLE
+    bool "SPI Driver Support"
+    default n
+
+endmenu
+
+endmenu
+----
+
+== 中间件配置
+
+中间件配置位于 `middlewares/Kconfig`：
+
+[source,kconfig]
+----
+menu "Middleware Configuration"
+
+menu "RTOS"
+
+config MW_RTOS_ENABLE
+    bool "RTOS Support"
+    default n
+
+choice
+    prompt "RTOS Selection"
+    depends on MW_RTOS_ENABLE
+    default MW_RTOS_FREERTOS
+
+config MW_RTOS_FREERTOS
+    bool "FreeRTOS"
+
+endchoice
+
+endmenu
+
+endmenu
+----
+
+== 应用配置
+
+应用配置位于 `application/Kconfig`：
+
+[source,kconfig]
+----
+menu "Application Configuration"
+
+menu "Motor Control"
+
+config APP_MOTOR_CONTROL_ENABLE
+    bool "Motor Control Application"
+    default y
+
+config APP_MOTOR_TYPE
+    int "Motor Type"
+    default 1
+    range 1 3
+
+endmenu
+
+endmenu
+----
+
+== 添加新板卡
+
+按照以下步骤添加新板卡：
+
+=== 1. 创建板卡目录
+
+[source,bash]
+----
+mkdir boards/stm32f407
+----
+
+=== 2. 创建板卡 Kconfig
+
+创建 `boards/stm32f407/Kconfig`：
+
+[source,kconfig]
+----
+menu "STM32F407 Board Configuration"
+
+config BOARD_NAME
+    string "Board Name"
+    default "STM32F407"
+
+# 添加板卡特定配置...
+
+endmenu
+----
+
+=== 3. 更新板卡选择菜单
+
+修改 `boards/Kconfig`，添加新板卡选项：
+
+[source,kconfig]
+----
+config BOARD_STM32F407
+    bool "STM32F407"
+    select MCU_STM32F4
+    help
+        STM32F407 开发板
+
+# 在文件末尾添加：
+if BOARD_STM32F407
+source "boards/stm32f407/Kconfig"
+endif
+----
+
+=== 4. 添加板卡 CMake 配置
+
+创建板卡构建配置文件（如 `boards/stm32f407/board_config.cmake`）：
+
+[source,cmake]
+----
+# STM32F407 Board Configuration
+set(MCU_FAMILY STM32F4)
+set(MCU_TYPE STM32F407VG)
+set(MCU_LINKER_SCRIPT STM32F407VGTx_FLASH.ld)
+set(MCU_RAM_SIZE 128K)
+set(MCU_FLASH_SIZE 1024K)
+----
+
+=== 5. 创建 defconfig 文件（可选但推荐）
+
+为新板卡创建默认配置：
+
+[source,bash]
+----
+cat > boards/stm32f407/defconfig << 'EOF'
+CONFIG_BOARD_STM32F407=y
+CONFIG_BOARD_NAME="STM32F407"
+# 添加其他默认配置...
+EOF
+----
+
+TIP: 提供 `defconfig` 文件可以简化其他用户的首次构建体验。
+
+=== 6. 使用 KConfig 配置新板卡
+
+使用 Kconfiglib 工具配置并生成 `.config`：
+
+[source,bash]
+----
+# 使用 menuconfig 进行配置
+menuconfig Kconfig
+# 在菜单中选择 "STM32F407"
+# 配置板卡特定选项
+# 保存到 .config
+
+# 或使用 guiconfig
+guiconfig Kconfig
+----
+
+TIP: 安装 Kconfiglib 后会自动提供 menuconfig、guiconfig 等工具，无需安装 kconfig-frontends。
+
+或者，如果创建了 `defconfig`，可以直接构建：
+
+[source,bash]
+----
+# 自动生成 .config 从 defconfig
+cmake -G Ninja -DCMAKE_TOOLCHAIN_FILE=cmake/starm_clang_toolchain.cmake \
+  -DCMAKE_BUILD_TYPE=Debug -DBOARD=stm32f407 -B build/Debug
+cmake --build build/Debug
+----
+
+== CMake 集成
+
+CMake 通过 `cmake/kconfig.cmake` 集成 KConfig：
+
+**职责分离：**
+- **CMake**：检测 `.config` 是否存在，如不存在则自动生成
+- **tools/gen_config.py**：生成 `.config`（从 defconfig 或 KConfig），并转换为多个 C 头文件
+- **构建系统**：跟踪 `.config` 变更，自动更新所有配置头文件
+
+CMake 功能：
+- 自动生成 `.config`（如不存在，从 defconfig 或 KConfig 默认配置）
+- 验证 `.config` 存在
+- 调用 `tools/gen_config.py` 生成所有配置头文件
+- 跟踪 `.config` 文件变更，自动重新生成所有配置头文件
+- 不处理 Kconfig 文件（由 KConfig 工具处理）
+
+CMake 配置示例：
+
+[source,cmake]
+----
+# 自动生成 .config（如果不存在）
+if(NOT EXISTS ${CMAKE_SOURCE_DIR}/.config)
+    message(STATUS "KConfig configuration file (.config) not found.")
+    message(STATUS "Attempting to generate .config automatically...")
+    
+    # 查找板卡的 defconfig 文件
+    set(DEFCONFIG_PATH ${CMAKE_SOURCE_DIR}/boards/${BOARD}/defconfig)
+    
+    if(EXISTS ${DEFCONFIG_PATH})
+        message(STATUS "Found board-specific defconfig: ${DEFCONFIG_PATH}")
+        # 从 defconfig 生成 .config
+        execute_process(
+            COMMAND ${Python3_EXECUTABLE} 
+                    ${CMAKE_SOURCE_DIR}/tools/gen_config.py
+                    --kconfig ${CMAKE_SOURCE_DIR}/Kconfig
+                    --defconfig ${DEFCONFIG_PATH}
+                    --output ${CMAKE_SOURCE_DIR}/.config
+            RESULT_VARIABLE GEN_CONFIG_RESULT
+            OUTPUT_VARIABLE GEN_CONFIG_OUTPUT
+            ERROR_VARIABLE GEN_CONFIG_ERROR
+        )
+    else()
+        message(STATUS "No defconfig found, using KConfig defaults...")
+        # 从 KConfig 默认配置生成 .config
+        execute_process(
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_SOURCE_DIR}/tools/gen_config.py
+                    --kconfig ${CMAKE_SOURCE_DIR}/Kconfig
+                    --output ${CMAKE_SOURCE_DIR}/.config
+            RESULT_VARIABLE GEN_CONFIG_RESULT
+            OUTPUT_VARIABLE GEN_CONFIG_OUTPUT
+            ERROR_VARIABLE GEN_CONFIG_ERROR
+        )
+    endif()
+endif()
+
+# 验证 .config 存在
+if(NOT EXISTS ${CMAKE_SOURCE_DIR}/.config)
+    message(FATAL_ERROR "Failed to generate or find .config file!")
+endif()
+
+# 定义生成的头文件路径
+set(BOARD_CONFIG_H ${CMAKE_SOURCE_DIR}/boards/board_config.h)
+set(SYSTEM_CONFIG_H ${CMAKE_SOURCE_DIR}/core_system/system_config.h)
+set(DRIVERS_CONFIG_H ${CMAKE_SOURCE_DIR}/drivers/drivers_config.h)
+set(MIDDLEWARES_CONFIG_H ${CMAKE_SOURCE_DIR}/middlewares/middlewares_config.h)
+set(APP_CONFIG_H ${CMAKE_SOURCE_DIR}/application/app_config.h)
+
+# 自定义命令：生成所有配置头文件
+add_custom_command(
+    OUTPUT ${BOARD_CONFIG_H} ${SYSTEM_CONFIG_H} ${DRIVERS_CONFIG_H}
+           ${MIDDLEWARES_CONFIG_H} ${APP_CONFIG_H}
+    COMMAND ${CMAKE_COMMAND} -E echo "Generating configuration headers..."
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/gen_config.py
+            ${CMAKE_SOURCE_DIR}/.config
+    DEPENDS ${CMAKE_SOURCE_DIR}/.config
+            ${CMAKE_SOURCE_DIR}/tools/gen_config.py
+    COMMENT "Generating configuration headers from .config"
+    VERBATIM
+)
+
+# 自定义目标驱动生成
+add_custom_target(kconfig_gen ALL
+    DEPENDS ${BOARD_CONFIG_H} ${SYSTEM_CONFIG_H} ${DRIVERS_CONFIG_H}
+            ${MIDDLEWARES_CONFIG_H} ${APP_CONFIG_H}
+)
+
+# 确保 kconfig_gen 在其他目标之前构建
+add_dependencies(${CMAKE_PROJECT_NAME} kconfig_gen)
+----
+
+IMPORTANT: 自动生成仅在没有 `.config` 文件时触发。如果 `.config` 已存在，则直接使用现有配置。
+
+== 配置生成
+
+`tools/gen_config.py` 将 KConfig 配置转换为多个 C 头文件：
+
+**转换规则**：
+- 将 `CONFIG_XXX=y` 转换为 `#define XXX 1`
+- 将 `CONFIG_XXX=n` 转换为 `#define XXX 0`
+- 将字符串和数值配置直接转换为宏定义
+- 自动计算 LED 等资源的数量（如 `BOARD_LED_COUNT`）
+
+**生成的头文件**：
+- `boards/board_config.h` - 板级配置
+- `core_system/system_config.h` - 系统配置
+- `drivers/drivers_config.h` - 驱动配置
+- `middlewares/middlewares_config.h` - 中间件配置
+- `application/app_config.h` - 应用配置
+
+**命令行选项**：
+
+[source,bash]
+----
+# 从 .config 生成所有配置头文件（默认）
+python3 tools/gen_config.py .config
+
+# 从 defconfig 生成 .config
+python3 tools/gen_config.py --kconfig Kconfig --defconfig boards/nucleo_g431rb/defconfig --output .config
+
+# 从 KConfig 默认配置生成 .config
+python3 tools/gen_config.py --kconfig Kconfig --output .config
+----
+
+== 使用 KConfig 工具
+
+项目使用 Kconfiglib 库处理 KConfig 配置。安装 Kconfiglib 后，会自动提供以下命令行工具：
+
+[source,bash]
+----
+# 安装 Kconfiglib
+pip install kconfiglib
+
+# 使用 menuconfig 进行终端图形化配置
+menuconfig Kconfig
+
+# 或使用 guiconfig 进行图形界面配置
+guiconfig Kconfig
+
+# 其他常用工具
+savedefconfig --kconfig Kconfig --out boards/nucleo_g431rb/defconfig .config  # 保存最小配置
+olddefconfig Kconfig  # 使用默认值更新配置
+alldefconfig Kconfig  # 使用所有默认值生成配置
+----
+
+TIP: Kconfiglib 提供完整的 KConfig 工具集，包括 menuconfig、guiconfig、oldconfig、savedefconfig 等，无需安装 kconfig-frontends。
+
+配置完成后，重新构建项目：
+
+[source,bash]
+----
+cmake -DBOARD=nucleo_g431rb -B build
+cmake --build build
+----
+
+== 优势
+
+- **编译时资源检查**：通过 `#if BOARD_HAS_LED1` 在编译时检查
+- **无运行时开销**：生产版本中无需运行时检查
+- **易于扩展**：轻松添加新的板卡变体
+- **配置一致**：统一的配置接口
+- **构建系统集成**：与 CMake 等构建系统无缝集成
+
+== 最佳实践
+
+1. **理解自动生成机制**：
+   - 首次构建时，系统会自动生成 `.config`
+   - 自动生成优先使用板卡的 `defconfig`（如有）
+   - 如无 `defconfig`，则使用 KConfig 默认配置
+   - 自动生成仅在没有 `.config` 时触发
+
+2. **职责分离理解**：
+   - 修改 Kconfig 文件后，必须重新运行 `menuconfig Kconfig` 或 `guiconfig Kconfig` 生成 `.config`
+   - CMake 负责自动生成 `.config`（如不存在）并调用脚本生成配置头文件
+   - `tools/gen_config.py` 负责转换 `.config` 为多个 C 头文件
+   - 不要期望 CMake 会自动处理 Kconfig 文件的变更
+
+3. **为新板卡提供 defconfig**：
+   - 在 `boards/<BOARD>/` 目录创建 `defconfig` 文件
+   - 包含该板卡的推荐默认配置
+   - 简化其他用户的首次构建体验
+
+4. **模块化配置**：将相关配置分组到独立的 menu 中
+5. **依赖管理**：使用 `depends on` 确保配置一致性
+6. **默认值**：为新板卡提供合理的默认值
+7. **文档注释**：为每个配置项添加清晰的 help 文本
+8. **命名规范**：使用统一的命名前缀（`BOARD_`、`DRIVER_`、`MW_`、`APP_`）
+
+== 故障排除
+
+=== 配置未生效
+
+- 检查是否修改了正确的 KConfig 文件
+- 清理构建目录后重新配置：`rm -rf build/*`
+- 确认配置文件被正确加载：查看 CMake 输出中的 "Generating configuration headers"
+- 确认 `.config` 文件已更新（时间戳应为最新）
+
+=== 配置头文件未生成
+
+- 检查 Python 脚本是否可执行：`tools/gen_config.py`
+- 确认配置文件存在：`.config`
+- 检查 CMake 错误输出
+- 确认 Python 版本是否正确（需要 Python 3）
+- 检查 `tools/gen_config.py` 是否有执行权限
+
+=== .config 自动生成失败
+
+- 检查板卡目录下是否有 `defconfig` 文件
+- 确认 `tools/gen_config.py` 可以正常工作：
+  ```bash
+  python3 tools/gen_config.py --help
+  ```
+- 检查 KConfig 文件语法是否正确
+- 查看 CMake 输出中的详细错误信息
+
+=== 添加新配置项
+
+- 在相应的 KConfig 文件中添加配置定义
+- 如有必要，在 `tools/gen_config.py` 中添加转换逻辑
+- 更新文档说明新配置的用途
+- 为新板卡创建 `defconfig` 文件（推荐）
+
+=== 构建时提示找不到板卡
+
+- 检查 `boards/` 目录下是否有对应的板卡目录
+- 确认 `boards/Kconfig` 中是否已添加该板卡选项
+- 验证板卡 CMake 配置文件是否存在
+- 检查板卡是否有 `defconfig` 文件（可选但推荐）
+
+== 相关文件
+
+**KConfig 配置文件：**
+- `Kconfig` - 根配置入口
+- `boards/Kconfig` - 板卡选择配置
+- `boards/<BOARD>/Kconfig` - 板卡特定配置
+- `boards/<BOARD>/defconfig` - 板卡默认配置（可选）
+- `drivers/Kconfig` - 驱动配置
+- `middlewares/Kconfig` - 中间件配置
+- `application/Kconfig` - 应用配置
+
+**构建系统文件：**
+- `cmake/kconfig.cmake` - CMake 集成脚本
+- `tools/gen_config.py` - 配置生成和头文件生成脚本
+- `.config` - KConfig 配置文件（自动生成或手动创建）
+
+**生成的头文件：**
+- `boards/board_config.h` - 板级配置头文件（自动生成）
+- `core_system/system_config.h` - 系统配置头文件（自动生成）
+- `drivers/drivers_config.h` - 驱动配置头文件（自动生成）
+- `middlewares/middlewares_config.h` - 中间件配置头文件（自动生成）
+- `application/app_config.h` - 应用配置头文件（自动生成）
+
+== 参考
+
+- KConfig 语法参考：https://www.kernel.org/doc/Documentation/kbuild/kconfig-language.txt
+- Linux 内核 KConfig 文档：https://www.kernel.org/doc/html/latest/kbuild/index.html

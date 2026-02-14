@@ -1,0 +1,1258 @@
+= CubeMot 构建指导
+:toc: left
+:toclevels: 3
+:icons: font
+:source-highlighter: rouge
+:sectlinks:
+
+== 概述
+
+CubeMot 项目使用 CMake 作为构建系统，支持多种嵌入式架构、工具链和开发板。本文档提供完整的构建指导，包括工具链配置、构建选项、调试方法和故障排除。
+
+NOTE: 如需快速入门，请参考 README.adoc 中的"快速开始"章节。
+
+== 前置要求
+
+=== 必需工具
+
+* CMake 3.28 或更高版本
+* Ninja 构建系统
+* Git
+
+=== 嵌入式工具链
+
+根据目标平台选择工具链：
+
+==== STARM-CLANG 工具链（ARM 平台推荐）
+
+* `starm-clang` - 编译器
+* `starm-objcopy` - 二进制转换工具
+* `starm-size` - 文件大小查看工具
+
+确保工具链的 `bin` 目录已添加到系统 PATH 环境变量。
+
+==== GCC ARM Embedded Toolchain
+
+* `arm-none-eabi-gcc` - 编译器
+* `arm-none-eabi-objcopy` - 二进制转换工具
+* `arm-none-eabi-size` - 文件大小查看工具
+* `arm-none-eabi-gdb` - 调试器
+
+确保工具链的 `bin` 目录已添加到系统 PATH 环境变量。
+
+=== 验证工具链安装
+
+使用项目提供的验证脚本检查工具链配置：
+
+[source,bash]
+----
+./tools/validate_gcc_toolchain.sh
+----
+
+该脚本验证 GCC 工具链的基本功能。对于 STARM-CLANG 工具链，可直接尝试运行构建命令验证。
+
+=== OpenOCD（可选）
+
+如需使用板载调试功能，请安装 OpenOCD。
+
+== 项目结构
+
+了解项目结构有助于理解构建系统：
+
+[source]
+----
+CubeMot/
+├── CMakeLists.txt                    # 根CMake配置
+├── cmake/
+│   ├── starm_clang_toolchain.cmake   # STARM-CLANG工具链配置
+│   ├── gcc_arm_none_eabi_toolchain.cmake  # GCC工具链配置
+│   └── board_config.cmake            # 板级配置逻辑
+├── boards/                           # 板级支持代码
+│   └── nucleo_g431rb/                # 默认开发板
+├── application/                      # 应用程序代码
+├── drivers/                          # 设备驱动
+├── core_system/                      # 核心系统组件
+├── middlewares/                      # 中间件组件
+├── target/                           # 构建输出目录（自动生成）
+├── docs/                             # 文档
+└── tools/                            # 构建和辅助工具
+----
+
+== 快速构建示例
+
+本节提供最常用的构建命令示例。更多构建选项和高级用法请参考后续章节。
+
+=== Debug 构建
+
+==== 使用 STARM-CLANG 工具链
+
+[source,bash]
+----
+cmake -G Ninja \
+  -DCMAKE_TOOLCHAIN_FILE=cmake/starm_clang_toolchain.cmake \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -B build/Debug
+
+cmake --build build/Debug
+----
+
+==== 使用 GCC 工具链
+
+[source,bash]
+----
+cmake -G Ninja \
+  -DCMAKE_TOOLCHAIN_FILE=cmake/gcc_arm_none_eabi_toolchain.cmake \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -B build/Debug
+
+cmake --build build/Debug
+----
+
+=== Release 构建
+
+==== 使用 STARM-CLANG 工具链
+
+[source,bash]
+----
+cmake -G Ninja \
+  -DCMAKE_TOOLCHAIN_FILE=cmake/starm_clang_toolchain.cmake \
+  -DCMAKE_BUILD_TYPE=Release \
+  -B build/Release
+
+cmake --build build/Release
+----
+
+==== 使用 GCC 工具链
+
+[source,bash]
+----
+cmake -G Ninja \
+  -DCMAKE_TOOLCHAIN_FILE=cmake/gcc_arm_none_eabi_toolchain.cmake \
+  -DCMAKE_BUILD_TYPE=Release \
+  -B build/Release
+
+cmake --build build/Release
+----
+
+== 构建输出
+
+构建输出按开发板和构建类型组织在 `target/` 目录（类似 Maven 结构）：
+
+[source]
+----
+target/
+└── <BOARD>/
+    └── <BUILD_TYPE>/
+        ├── CubeMot.elf          # 可执行文件（用于调试）
+        ├── CubeMot.map          # 内存映射文件
+        └── openocd.cfg          # OpenOCD 调试配置（自动生成）
+----
+
+例如，对于 `nucleo_g431rb` 开发板的 Debug 构建：
+
+* `target/nucleo_g431rb/Debug/CubeMot.elf` - 可执行文件
+* `target/nucleo_g431rb/Debug/CubeMot.map` - 内存映射
+* `target/nucleo_g431rb/Debug/openocd.cfg` - OpenOCD 配置
+
+NOTE: `build/` 目录保留为 CMake 工作目录，`target/` 目录存放最终产物。
+
+== 构建配置选项
+
+本节详细介绍构建系统的配置选项。
+
+=== 选择开发板
+
+使用 `-DBOARD=<board_name>` 参数指定目标开发板。默认开发板为 `nucleo_g431rb`。
+
+[source,bash]
+----
+cmake -G Ninja \
+  -DCMAKE_TOOLCHAIN_FILE=cmake/starm_clang_toolchain.cmake \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DBOARD=nucleo_g431rb \
+  -B build/Debug
+----
+
+可用的开发板列表：
+
+[source,bash]
+----
+ls boards/
+----
+
+如果选择不存在的开发板，构建系统会报错并显示可用选项。
+
+=== 构建类型
+
+CMake 支持四种构建类型：
+
+[cols="2,3,2"]
+|===
+| 构建类型 | 说明 | 优化级别
+
+| Debug
+| 调试构建，包含完整调试信息
+| O0/GCC, Og/STARM-CLANG
+
+| Release
+| 发布构建，启用优化
+| Os/GCC, Oz/STARM-CLANG
+
+| MinSizeRel
+| 最小体积发布构建
+| Os/GCC, Oz/STARM-CLANG
+
+| RelWithDebInfo
+| 带调试信息的发布构建
+| O2 + Debug Info
+|===
+
+使用 `-DCMAKE_BUILD_TYPE=<type>` 指定构建类型。
+
+=== 构建生成器
+
+项目推荐使用 Ninja 构建系统：
+
+[source,bash]
+----
+cmake -G Ninja ...
+----
+
+也可使用 Make：
+
+[source,bash]
+----
+cmake -G "Unix Makefiles" ...
+----
+
+=== 并行构建
+
+使用 `--parallel` 参数加速构建：
+
+[source,bash]
+----
+cmake --build build/Debug --parallel $(nproc)
+----
+
+=== 详细输出
+
+使用 `--verbose` 查看详细构建输出：
+
+[source,bash]
+----
+cmake --build build/Debug --verbose
+----
+
+== 工具链详解
+
+=== STARM-CLANG 工具链
+
+STARM-CLANG 是基于 LLVM/Clang 的工具链，支持 ARM Cortex-M 系列，提供优秀的代码优化和诊断信息。
+
+==== 配置选项
+
+在 `cmake/starm_clang_toolchain.cmake` 中可配置：
+
+* `STARM_TOOLCHAIN_CONFIG` - 工具链配置模式：
+** `STARM_HYBRID` - 混合模式（STARM-CLANG 编译器 + GNU 链接器）
+** `STARM_NEWLIB` - NEWLIB C 库模式
+** `STARM_PICOLIBC` - Picolibc C 库模式（默认）
+
+==== ARM 平台编译器标志
+
+默认编译器标志：
+
+* `-mcpu=cortex-m4` - CPU 架构
+* `-mfpu=fpv4-sp-d16` - FPU 配置
+* `-mfloat-abi=hard` - 硬件浮点
+* `-Wall` - 启用警告
+* `-fdata-sections -ffunction-sections` - 函数和数据分段
+
+Debug 构建额外标志：
+
+* `-Og` - 优化调试体验
+* `-g3` - 完整调试信息
+
+Release 构建额外标志：
+
+* `-Oz` - 代码体积优化
+* `-g0` - 无调试信息
+
+=== GCC 工具链
+
+GCC 工具链支持 ARM 和 RISC-V 等多种架构。
+
+==== ARM 平台配置
+
+在 `cmake/gcc_arm_none_eabi_toolchain.cmake` 中配置：
+
+* 使用 `nano.specs` - 简化 C 库，减小代码体积
+* 链接数学库 `libm`
+
+==== ARM 平台编译器标志
+
+默认编译器标志：
+
+* `-mcpu=cortex-m4` - CPU 架构
+* `-mfpu=fpv4-sp-d16` - FPU 配置
+* `-mfloat-abi=hard` - 硬件浮点
+* `-Wall` - 启用警告
+* `-fdata-sections -ffunction-sections` - 函数和数据分段
+
+Debug 构建额外标志：
+
+* `-O0` - 无优化
+* `-g3` - 完整调试信息
+
+Release 构建额外标志：
+
+* `-Os` - 代码体积优化
+* `-g0` - 无调试信息
+
+==== RISC-V 平台配置
+
+RISC-V 工具链使用相应的架构标志：
+
+* `-march=rv32imac` - RISC-V 架构
+* `-mabi=ilp32` - ABI 选择
+
+=== 工具链对比
+
+[cols="2,3,3"]
+|===
+| 特性 | STARM-CLANG | GCC
+
+| 编译器
+| starm-clang
+| arm-none-eabi-gcc
+
+| 优化级别 (Debug)
+| `-Og`（优化调试体验）
+| `-O0`（无优化）
+
+| 优化级别 (Release)
+| `-Oz`（激进体积优化）
+| `-Os`（体积优化）
+
+| 默认 C 库
+| Picolibc（轻量级）
+| nano.specs（简化版 newlib）
+
+| 配置文件
+| `cmake/starm_clang_toolchain.cmake`
+| `cmake/gcc_arm_none_eabi_toolchain.cmake`
+
+| 链接数学库
+| 可选
+| 必需（自动链接）
+|===
+
+== 板级配置
+
+CubeMot 使用 KConfig 系统进行板级配置，提供灵活的硬件资源定义。
+
+=== 板级配置原理
+
+KConfig 生成 `boards/board_config.h`，提供编译时配置：
+
+[source,c]
+----
+#define BOARD_HAS_LED1  1
+#define BOARD_LED1_PORT GPIOA
+#define BOARD_LED1_PIN  0x20
+#define BOARD_LED_COUNT 1
+----
+
+应用程序可在编译时检查硬件资源：
+
+[source,c]
+----
+#include "boards/board_config.h"
+
+#if BOARD_HAS_LED1
+    // LED1 相关代码（仅在板卡支持时编译）
+#endif
+----
+
+=== 配置方法
+
+构建系统支持自动生成 `.config` 配置文件，也支持手动配置。
+
+==== 方法 1：自动生成配置（推荐，首次构建）
+
+构建系统会自动处理配置生成：
+
+[source,bash]
+----
+# 直接运行 cmake，.config 会自动生成
+cmake -G Ninja -DCMAKE_TOOLCHAIN_FILE=cmake/starm_clang_toolchain.cmake \
+  -DCMAKE_BUILD_TYPE=Debug -DBOARD=nucleo_g431rb -B build/Debug
+----
+
+自动生成流程：
+1. 如果 `.config` 不存在，检查板卡是否有 `defconfig` 文件
+2. 如果板卡有 `defconfig`，从该文件生成 `.config`
+3. 如果没有 `defconfig`，从 KConfig 默认配置生成 `.config`
+4. CMake 使用生成的 `.config` 继续构建
+
+NOTE: 自动生成仅在没有 `.config` 文件时触发。如果 `.config` 已存在，则直接使用现有配置。
+
+==== 方法 2：使用 KConfig 图形界面工具（自定义配置）
+
+如需自定义配置，可使用 Kconfiglib 提供的图形界面工具：
+
+[source,bash]
+----
+# 安装 Kconfiglib
+pip install kconfiglib
+
+# 使用 menuconfig 进行终端图形化配置
+menuconfig Kconfig
+
+# 或使用 guiconfig 进行图形界面配置
+guiconfig Kconfig
+----
+
+图形界面允许您：
+* 浏览所有可用的配置选项
+* 启用/禁用功能模块
+* 设置硬件资源参数
+* 保存配置到 `.config` 文件
+
+TIP: Kconfiglib 提供完整的 KConfig 工具集，包括 menuconfig、guiconfig、oldconfig、savedefconfig 等。
+
+==== 方法 3：手动编辑 .config（高级用户）
+
+直接编辑 `.config` 文件：
+
+[source,bash]
+----
+vim .config
+----
+
+.config 文件格式：
+[source]
+----
+# 这是注释
+CONFIG_BOARD_NAME="NUCLEO-G431RB"
+CONFIG_BOARD_HAS_LED1=y     # y 表示启用
+CONFIG_BOARD_LED1_PIN=0x20  # 数值配置
+----
+
+IMPORTANT: 手动编辑后，建议清理构建目录并重新运行 CMake 以确保配置生效。
+
+=== 生成板级配置头文件
+
+[source,bash]
+----
+python3 tools/gen_board_config.py .config boards/board_config.h
+----
+
+NOTE: 此步骤已集成到 CMake 构建系统中，通常无需手动执行。
+
+=== 与 CMake 集成
+
+CMake 构建系统已集成 KConfig，支持自动生成 `.config` 文件。
+
+工作流程如下：
+
+1. **自动生成配置（如需要）**：
+   如果 `.config` 不存在，CMake 会自动生成：
+   - 检查板卡是否有 `defconfig` 文件
+   - 如有 `defconfig`，使用该文件生成 `.config`
+   - 如无 `defconfig`，从 KConfig 默认配置生成 `.config`
+
+2. **配置验证**：
+   验证 `.config` 文件存在于项目根目录
+
+3. **生成配置头文件**：
+   调用 `tools/gen_config.py` 从 `.config` 生成多个配置头文件：
+   - `boards/board_config.h` - 板级配置
+   - `core_system/system_config.h` - 系统配置
+   - `drivers/drivers_config.h` - 驱动配置
+   - `middlewares/middlewares_config.h` - 中间件配置
+   - `application/app_config.h` - 应用配置
+
+4. **依赖跟踪**：
+   构建系统跟踪 `.config` 文件。当 `.config` 变更时，自动重新生成所有配置头文件。
+
+CMake 集成代码位于 `cmake/kconfig.cmake`，主要功能：
+
+[source,cmake]
+----
+# 自动生成 .config（如果不存在）
+if(NOT EXISTS ${CMAKE_SOURCE_DIR}/.config)
+    message(STATUS "KConfig configuration file (.config) not found.")
+    message(STATUS "Attempting to generate .config automatically...")
+    
+    # 查找板卡的 defconfig 文件
+    set(DEFCONFIG_PATH ${CMAKE_SOURCE_DIR}/boards/${BOARD}/defconfig)
+    
+    if(EXISTS ${DEFCONFIG_PATH})
+        message(STATUS "Found board-specific defconfig: ${DEFCONFIG_PATH}")
+        # 从 defconfig 生成 .config
+        execute_process(
+            COMMAND ${Python3_EXECUTABLE} 
+                    ${CMAKE_SOURCE_DIR}/tools/gen_config.py
+                    --kconfig ${CMAKE_SOURCE_DIR}/Kconfig
+                    --defconfig ${DEFCONFIG_PATH}
+                    --output ${CMAKE_SOURCE_DIR}/.config
+            RESULT_VARIABLE GEN_CONFIG_RESULT
+            OUTPUT_VARIABLE GEN_CONFIG_OUTPUT
+            ERROR_VARIABLE GEN_CONFIG_ERROR
+        )
+    else()
+        message(STATUS "No defconfig found, using KConfig defaults...")
+        # 从 KConfig 默认配置生成 .config
+        execute_process(
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_SOURCE_DIR}/tools/gen_config.py
+                    --kconfig ${CMAKE_SOURCE_DIR}/Kconfig
+                    --output ${CMAKE_SOURCE_DIR}/.config
+            RESULT_VARIABLE GEN_CONFIG_RESULT
+            OUTPUT_VARIABLE GEN_CONFIG_OUTPUT
+            ERROR_VARIABLE GEN_CONFIG_ERROR
+        )
+    endif()
+endif()
+
+# 验证 .config 存在
+if(NOT EXISTS ${CMAKE_SOURCE_DIR}/.config)
+    message(FATAL_ERROR "Failed to generate or find .config file!")
+endif()
+
+# 定义生成的头文件路径
+set(BOARD_CONFIG_H ${CMAKE_SOURCE_DIR}/boards/board_config.h)
+set(SYSTEM_CONFIG_H ${CMAKE_SOURCE_DIR}/core_system/system_config.h)
+set(DRIVERS_CONFIG_H ${CMAKE_SOURCE_DIR}/drivers/drivers_config.h)
+set(MIDDLEWARES_CONFIG_H ${CMAKE_SOURCE_DIR}/middlewares/middlewares_config.h)
+set(APP_CONFIG_H ${CMAKE_SOURCE_DIR}/application/app_config.h)
+
+# 自定义命令：生成所有配置头文件
+add_custom_command(
+    OUTPUT ${BOARD_CONFIG_H} ${SYSTEM_CONFIG_H} ${DRIVERS_CONFIG_H}
+           ${MIDDLEWARES_CONFIG_H} ${APP_CONFIG_H}
+    COMMAND ${CMAKE_COMMAND} -E echo "Generating configuration headers..."
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/gen_config.py
+            ${CMAKE_SOURCE_DIR}/.config
+    DEPENDS ${CMAKE_SOURCE_DIR}/.config
+            ${CMAKE_SOURCE_DIR}/tools/gen_config.py
+    COMMENT "Generating configuration headers from .config"
+    VERBATIM
+)
+
+# 自定义目标驱动生成
+add_custom_target(kconfig_gen ALL
+    DEPENDS ${BOARD_CONFIG_H} ${SYSTEM_CONFIG_H} ${DRIVERS_CONFIG_H}
+            ${MIDDLEWARES_CONFIG_H} ${APP_CONFIG_H}
+)
+----
+
+**职责分离说明：**
+- **CMake**：检测 `.config` 是否存在，如不存在则自动生成
+- **tools/gen_config.py**：生成 `.config`（从 defconfig 或 KConfig），并转换为多个 C 头文件
+- **构建系统**：跟踪 `.config` 变更，自动更新配置头文件
+
+该集成确保在构建任何目标之前，配置头文件已经生成且最新。
+
+IMPORTANT: 自动生成仅在没有 `.config` 文件时触发。如果 `.config` 已存在，则直接使用。修改 Kconfig 文件后，需要手动删除 `.config` 或重新运行 `menuconfig Kconfig`（或 `guiconfig Kconfig`）来更新配置。
+
+=== defconfig 支持
+
+板卡可以提供默认配置文件 `defconfig`，用于自动配置：
+
+**defconfig 的作用**：
+- 包含板卡的推荐默认配置
+- 在 `.config` 不存在时自动生成配置
+- 简化新用户的首次构建流程
+
+**创建 defconfig 文件**：
+
+在板卡目录创建 `defconfig`：
+
+[source,bash]
+----
+cat > boards/my-custom-board/defconfig << 'EOF'
+CONFIG_BOARD_MY_CUSTOM=y
+CONFIG_BOARD_NAME="My Custom Board"
+CONFIG_BOARD_HAS_LED1=y
+CONFIG_BOARD_LED1_PORT_GPIOA=y
+CONFIG_BOARD_LED1_PIN=0x20
+EOF
+----
+
+**自动生成流程**：
+
+1. 用户首次运行 `cmake`
+2. CMake 检测 `.config` 不存在
+3. 检查板卡是否有 `defconfig`
+4. 如有 `defconfig`，使用 `tools/gen_config.py` 从该文件生成 `.config`
+5. 如无 `defconfig`，从 KConfig 默认配置生成 `.config`
+
+**优先级顺序**：
+
+板卡特定 defconfig > KConfig 默认配置
+
+TIP: 为板卡提供 `defconfig` 可以确保所有用户获得一致的默认配置体验。
+
+=== 添加新板卡
+
+添加新板卡的步骤：
+
+1. **创建板卡目录**：
+
+[source,bash]
+----
+mkdir boards/my-custom-board
+touch boards/my-custom-board/board_led.c
+----
+
+2. **创建板卡 KConfig 文件**：
+
+创建 `boards/my-custom-board/Kconfig`：
+
+[source,kconfig]
+----
+menu "My Custom Board Configuration"
+
+config BOARD_NAME
+    string "Board Name"
+    default "MY-CUSTOM-BOARD"
+
+# 添加板卡特定配置选项...
+
+endmenu
+----
+
+3. **更新板卡选择菜单**：
+
+修改 `boards/Kconfig`，添加新板卡选项：
+
+[source,kconfig]
+----
+config BOARD_MY_CUSTOM
+    bool "My Custom Board"
+    select MCU_STM32G4  # 根据实际MCU选择
+    help
+        My custom development board
+
+# 在文件末尾添加：
+if BOARD_MY_CUSTOM
+source "boards/my-custom-board/Kconfig"
+endif
+----
+
+4. **生成板卡配置**：
+
+使用 KConfig 工具配置新板卡：
+
+[source,bash]
+----
+# 使用 menuconfig 进行配置
+menuconfig Kconfig
+# 在菜单中选择 "My Custom Board"
+# 配置板卡特定选项
+# 保存到 .config
+
+# 或使用 guiconfig
+guiconfig Kconfig
+----
+
+TIP: 安装 Kconfiglib (pip install kconfiglib) 后会自动提供 menuconfig、guiconfig 等工具。
+
+5. **创建板卡 CMake 配置**:
+
+创建 `boards/my-custom-board/board_config.cmake`：
+
+[source,cmake]
+----
+# 设置链接脚本
+set(LINKER_SCRIPT_PATH ${BOARD_DIR}/path/to/linker_script.ld)
+set_linker_script(${LINKER_SCRIPT_PATH})
+
+# 板卡特定编译定义
+set(BOARD_COMPILE_DEFINITIONS
+    USE_HAL_DRIVER
+    STM32XXXXxx
+    BOARD_NAME=\"MY_CUSTOM_BOARD\"
+)
+
+# 板卡特定包含目录
+set(BOARD_INCLUDE_DIRS
+    ${BOARD_DIR}
+)
+----
+
+== 二进制文件生成
+
+构建完成后，可将 ELF 文件转换为其他格式：
+
+=== STARM-CLANG 工具链
+
+[source,bash]
+----
+cd target/nucleo_g431rb/Debug
+starm-objcopy -O binary CubeMot.elf CubeMot.bin
+starm-objcopy -O ihex CubeMot.elf CubeMot.hex
+----
+
+=== GCC 工具链
+
+[source,bash]
+----
+cd target/nucleo_g431rb/Debug
+arm-none-eabi-objcopy -O binary CubeMot.elf CubeMot.bin
+arm-none-eabi-objcopy -O ihex CubeMot.elf CubeMot.hex
+----
+
+== 调试
+
+CubeMot 支持使用 OpenOCD 和 GDB 进行调试。
+
+NOTE: 如需详细了解 NUCLEO-G431RB 开发板的调试方法，请参考 link:debugging-nucleo-g431rb.adoc[NUCLEO-G431RB OpenOCD + GDB 调试指南]，该文档提供了完整的调试流程、典型场景和高级技巧。
+
+=== OpenOCD 配置
+
+构建系统根据所选的 `BOARD` 和 `CMAKE_BUILD_TYPE` 自动生成 OpenOCD 配置文件：
+
+[source]
+----
+target/<BOARD>/<BUILD_TYPE>/openocd.cfg
+----
+
+该文件从 `boards/<BOARD>/openocd.cfg` 复制而来。
+
+=== 启动 OpenOCD
+
+[source,bash]
+----
+# 从对应板卡和构建类型的 target 目录启动
+# 例如，对于 nucleo_g431rb 的 Debug 构建
+cd target/nucleo_g431rb/Debug
+openocd -f openocd.cfg
+----
+
+OpenOCD 会启动 GDB 服务器，通常监听 `localhost:3333`。
+
+=== 使用 GDB 调试
+
+在另一个终端启动 GDB：
+
+[source,bash]
+----
+# 从对应板卡和构建类型的 target 目录启动
+# 例如，对于 nucleo_g431rb 的 Debug 构建
+cd target/nucleo_g431rb/Debug
+
+# STARM-CLANG 工具链使用 arm-none-eabi-gdb
+# GCC 工具链同样使用 arm-none-eabi-gdb
+arm-none-eabi-gdb CubeMot.elf
+----
+
+GDB 调试会话示例：
+
+[source,gdb]
+----
+# 连接 OpenOCD GDB 服务器
+(gdb) target remote localhost:3333
+
+# 加载程序到目标
+(gdb) load
+
+# 重置并停止目标
+(gdb) monitor reset halt
+
+# 设置断点
+(gdb) break main
+
+# 继续执行
+(gdb) continue
+
+# 单步执行
+(gdb) step
+
+# 查看变量
+(gdb) print my_variable
+
+# 查看调用栈
+(gdb) backtrace
+----
+
+=== GDB 图形界面
+
+可使用 GDB 前端工具：
+
+* **VS Code Cortex-Debug 扩展**：直接在 VS Code 中调试
+* **Eclipse Embedded CDT**：完整的嵌入式 IDE 体验
+* **CLion**：JetBrains 的 C/C++ IDE
+
+=== 调试技巧
+
+==== 查看内存使用
+
+[source,gdb]
+----
+# 查看内存映射
+(gdb) info mem
+
+# 查看寄存器
+(gdb) info registers
+
+# 查看外设寄存器（需加载外设定义）
+(gdb) print/x *(uint32_t *)0x40021000
+----
+
+==== 实时变量跟踪
+
+[source,gdb]
+----
+# 显示变量值（持续更新）
+(gdb) display my_variable
+
+# 查看所有 display 表达式
+(gdb) info display
+
+# 删除 display 表达式
+(gdb) undisplay 1
+----
+
+==== 断点管理
+
+[source,gdb]
+----
+# 设置硬件断点
+(gdb) hbreak main
+
+# 设置条件断点
+(gdb) break foo.c:123 if my_var == 0
+
+# 临时断点（触发后自动删除）
+(gdb) tbreak bar
+
+# 查看所有断点
+(gdb) info breakpoints
+----
+
+== 故障排除
+
+### 问题：CMake 无法找到工具链
+
+**症状**：
+
+[source]
+----
+CMake Error: CMAKE_C_COMPILER not set
+----
+
+**解决方案**：
+
+1. 确认工具链已安装
+2. 检查工具链 `bin` 目录是否在 PATH 中：
+
+[source,bash]
+----
+# 对于 STARM-CLANG
+which starm-clang
+
+# 对于 GCC
+which arm-none-eabi-gcc
+----
+
+3. 如不在 PATH 中，添加：
+
+[source,bash]
+----
+export PATH=/path/to/toolchain/bin:$PATH
+----
+
+### 问题：板卡不存在
+
+**症状**：
+
+[source]
+----
+Board 'unknown-board' not found at boards/unknown-board
+----
+
+**解决方案**：
+
+检查可用板卡列表：
+
+[source,bash]
+----
+ls boards/
+----
+
+使用正确的板卡名称：
+
+[source,bash]
+----
+cmake -DBOARD=nucleo_g431rb ...
+----
+
+### 问题：链接器脚本未找到
+
+**症状**：
+
+[source]
+----
+Linker script not found: boards/nucleo_g431rb/path/to/linker_script.ld
+----
+
+**解决方案**：
+
+1. 确认板卡目录存在且完整
+2. 检查 `boards/<BOARD>/board_config.cmake` 中的链接器脚本路径
+3. 如使用 STM32CubeMX 生成的代码，确保已生成链接器脚本
+
+### 问题：构建失败，缺少头文件
+
+**症状**：
+
+[source]
+----
+fatal error: boards/board_config.h: No such file or directory
+----
+
+或
+
+[source]
+----
+KConfig configuration file not found!
+----
+
+**解决方案**：
+
+1. 确认 `.config` 文件存在：
+
+[source,bash]
+----
+ls -la .config
+----
+
+2. 如果 `.config` 不存在，构建系统会自动生成：
+
+[source,bash]
+----
+# 直接运行 cmake，.config 会自动生成
+cmake -G Ninja -DCMAKE_TOOLCHAIN_FILE=cmake/starm_clang_toolchain.cmake \
+  -DCMAKE_BUILD_TYPE=Debug -DBOARD=nucleo_g431rb -B build/Debug
+----
+
+3. 如果自动生成失败，手动创建 `.config`：
+
+[source,bash]
+----
+# 使用 Kconfiglib 工具生成配置（推荐安装 Kconfiglib）
+menuconfig Kconfig
+
+# 或使用 guiconfig
+guiconfig Kconfig
+
+# 或使用 alldefconfig 生成默认配置
+alldefconfig Kconfig
+
+# 或从板卡 defconfig 复制（如果有）
+cp boards/nucleo_g431rb/defconfig .config
+----
+
+TIP: 安装 Kconfiglib (pip install kconfiglib) 后会自动提供 menuconfig、guiconfig 等工具。
+
+4. 清理并重新构建：
+
+[source,bash]
+----
+# 清理旧的构建目录
+rm -rf build/
+
+# 重新配置和构建
+cmake -G Ninja -DCMAKE_TOOLCHAIN_FILE=cmake/starm_clang_toolchain.cmake \
+  -DCMAKE_BUILD_TYPE=Debug -DBOARD=nucleo_g431rb -B build/Debug
+cmake --build build/Debug
+----
+
+NOTE: 构建系统支持自动生成 `.config` 文件。如果自动生成失败，请检查板卡目录下是否有 `defconfig` 文件，或确认 KConfig 工具是否正确安装。
+
+### 问题：OpenOCD 无法连接
+
+**症状**：
+
+[source]
+----
+Error: openocd.cfg: no such file or directory
+----
+
+或
+
+[source]
+----
+Error: libusb_open() failed with LIBUSB_ERROR_ACCESS
+----
+
+**解决方案**：
+
+1. 确认已构建成功（OpenOCD 配置在构建时生成）
+2. 检查 USB 权限（Linux）：
+
+[source,bash]
+----
+# 临时解决方案（不推荐）
+sudo openocd ...
+
+# 推荐：添加 udev 规则
+sudo cp /path/to/openocd/contrib/99-openocd.rules /etc/udev/rules.d/
+sudo udevadm control --reload-rules && sudo udevadm trigger
+----
+
+3. 确认使用正确的 OpenOCD 配置文件：
+
+[source,bash]
+----
+cd target/nucleo_g431rb/Debug
+openocd -f openocd.cfg
+----
+
+### 问题：GDB 无法连接到 OpenOCD
+
+**症状**：
+
+[source]
+----
+(gdb) target remote localhost:3333
+localhost:3333: Connection refused.
+----
+
+**解决方案**：
+
+1. 确认 OpenOCD 正在运行
+2. 检查端口号（默认 3333）
+3. 查看 OpenOCD 输出日志，确认是否成功初始化
+4. 尝试重启 OpenOCD 和 GDB
+
+== 高级用法
+
+=== 自定义编译定义
+
+在 CMake 命令行添加自定义宏：
+
+[source,bash]
+----
+cmake -DCMAKE_C_FLAGS="-DMY_CUSTOM_DEFINE=1" ...
+----
+
+或在板卡配置中添加：
+
+[source,cmake]
+----
+set(BOARD_COMPILE_DEFINITIONS
+    ${BOARD_COMPILE_DEFINITIONS}
+    MY_CUSTOM_DEFINE=1
+)
+----
+
+=== 自定义包含路径
+
+在 CMake 命令行添加：
+
+[source,bash]
+----
+cmake -DCMAKE_C_FLAGS="-I/path/to/headers" ...
+----
+
+或在板卡配置中添加：
+
+[source,cmake]
+----
+set(BOARD_INCLUDE_DIRS
+    ${BOARD_INCLUDE_DIRS}
+    /path/to/headers
+)
+----
+
+=== 自定义链接选项
+
+在板卡配置中添加：
+
+[source,cmake]
+----
+set(CMAKE_EXE_LINKER_FLAGS
+    "${CMAKE_EXE_LINKER_FLAGS} -Wl,--my-linker-option"
+)
+----
+
+=== 使用自定义链接器脚本
+
+在板卡 `board_config.cmake` 中设置：
+
+[source,cmake]
+----
+set(LINKER_SCRIPT_PATH ${BOARD_DIR}/path/to/custom_linker_script.ld)
+set_linker_script(${LINKER_SCRIPT_PATH})
+----
+
+注意：链接器脚本路径必须相对于板卡目录或提供绝对路径。
+
+=== 静态分析
+
+==== 使用 Clang Static Analyzer
+
+[source,bash]
+----
+# 安装 scan-build
+sudo apt-get install clang-tools
+
+# 运行静态分析
+scan-build cmake -G Ninja -DCMAKE_TOOLCHAIN_FILE=cmake/starm_clang_toolchain.cmake -B build/analyze
+scan-build cmake --build build/analyze
+----
+
+#### 使用 cppcheck
+
+[source,bash]
+----
+# 安装 cppcheck
+sudo apt-get install cppcheck
+
+# 运行分析
+cppcheck --enable=all --std=c17 \
+  -I boards/nucleo_g431rb \
+  -I application \
+  -I drivers \
+  --suppress=missingIncludeSystem \
+  .
+----
+
+=== 代码覆盖分析
+
+需要特殊构建配置和工具支持。由于嵌入式系统资源限制，通常使用模拟器或单元测试框架进行覆盖分析。
+
+=== 性能分析
+
+#### 使用 ARM Cortex-M 性能计数器
+
+在代码中启用 Cortex-M 性能计数器：
+
+[source,c]
+----
+#include "core_cm4.h"  // 或对应 MCU 的头文件
+
+// 启用性能计数器
+DWT->CTRL |= 1;  // 启用 CYCCNT
+
+// 读取周期计数
+uint32_t start = DWT->CYCCNT;
+// ... 执行代码
+uint32_t end = DWT->CYCCNT;
+uint32_t cycles = end - start;
+----
+
+#### 使用 SEGGER SystemView
+
+对于实时性能分析，可使用 SEGGER SystemView：
+
+1. 在项目中集成 SystemView 代码
+2. 在构建配置中添加 SystemView 包含路径和源文件
+3. 使用 SystemView 应用程序实时查看系统行为
+
+== 构建脚本集成
+
+可将构建命令集成到脚本中：
+
+=== Bash 脚本示例
+
+[source,bash]
+----
+#!/bin/bash
+set -e
+
+BOARD=${BOARD:-nucleo_g431rb}
+BUILD_TYPE=${BUILD_TYPE:-Debug}
+TOOLCHAIN=${TOOLCHAIN:-starm_clang}
+
+case $TOOLCHAIN in
+    starm_clang)
+        TOOLCHAIN_FILE=cmake/starm_clang_toolchain.cmake
+        ;;
+    gcc)
+        TOOLCHAIN_FILE=cmake/gcc_arm_none_eabi_toolchain.cmake
+        ;;
+    *)
+        echo "Unknown toolchain: $TOOLCHAIN"
+        exit 1
+        ;;
+esac
+
+BUILD_DIR=build/${BUILD_TYPE}
+
+echo "Building for $BOARD with $TOOLCHAIN ($BUILD_TYPE)..."
+
+cmake -G Ninja \
+    -DCMAKE_TOOLCHAIN_FILE=$TOOLCHAIN_FILE \
+    -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+    -DBOARD=$BOARD \
+    -B $BUILD_DIR
+
+cmake --build $BUILD_DIR
+
+echo "Build complete. Output: target/$BOARD/$BUILD_TYPE/"
+----
+
+=== Make 集成
+
+创建 `Makefile` 封装：
+
+[source,makefile]
+----
+BOARD ?= nucleo_g431rb
+BUILD_TYPE ?= Debug
+
+.PHONY: all clean debug release
+
+all: debug
+
+debug:
+	cmake -G Ninja -DCMAKE_TOOLCHAIN_FILE=cmake/starm_clang_toolchain.cmake \
+		-DCMAKE_BUILD_TYPE=Debug -DBOARD=$(BOARD) -B build/Debug
+	cmake --build build/Debug
+
+release:
+	cmake -G Ninja -DCMAKE_TOOLCHAIN_FILE=cmake/starm_clang_toolchain.cmake \
+		-DCMAKE_BUILD_TYPE=Release -DBOARD=$(BOARD) -B build/Release
+	cmake --build build/Release
+
+clean:
+	rm -rf build/
+	rm -rf target/
+----
+
+== 板级支持
+
+当前支持的开发板：
+
+=== NUCLEO-G431RB
+
+* **MCU**: STM32G431RB
+* **CPU**: Cortex-M4 @ 170 MHz
+* **Flash**: 128 KB
+* **RAM**: 32 KB
+* **特性**: USB、CAN、I2C、SPI、USART、ADC、DAC、Timer
+* **板载**: ST-LINK/V2-1 调试器
+
+在 `boards/nucleo_g431rb/` 目录中包含：
+
+* STM32CubeMX 生成的 HAL 驱动代码
+* 板级特定初始化代码
+* OpenOCD 配置文件
+* 链接器脚本
+
+=== 添加新板卡支持
+
+参考《板级配置》章节的详细步骤。
+
+== 相关文档
+
+* 板级配置详细说明：link:docs/kconfig-setup.adoc[KConfig 板级配置设置]
+* GCC 工具链详细配置：link:docs/gcc-toolchain-setup.adoc[GCC 工具链设置]
+* GCC 工具链快速参考：link:docs/gcc-toolchain-quickref.adoc[GCC 工具链快速参考]
+* 架构概述：link:docs/architecture.adoc[架构文档]
+

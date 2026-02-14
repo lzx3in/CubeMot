@@ -1,0 +1,87 @@
+name: GCC Build Verification
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+    branches:
+      - main
+  schedule:
+    # Run weekly on Monday at 3 AM UTC
+    - cron: "0 3 * * 1"
+
+jobs:
+  build:
+    name: Build ${{ matrix.build_type }}
+    runs-on: ubuntu-latest
+    container: debian:trixie
+
+    strategy:
+      fail-fast: true
+      matrix:
+        build_type:
+          - Debug
+          - Release
+          - MinSizeRel
+          - RelWithDebInfo
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -y ninja-build gcc-arm-none-eabi binutils-arm-none-eabi python3 python3-pip python3-venv cmake
+          echo "PATH=/usr/bin:$PATH" >> $GITHUB_ENV
+
+      - name: Install Python dependencies
+        run: |
+          python3 -m venv .venv
+          . .venv/bin/activate
+          pip install -r tools/requirements.txt
+          echo "VIRTUAL_ENV=$VIRTUAL_ENV" >> $GITHUB_ENV
+
+      - name: Verify tools
+        run: |
+          arm-none-eabi-gcc --version
+          ninja --version
+          cmake --version
+
+      - name: Configure CMake
+        run: |
+          cmake -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE=$GITHUB_WORKSPACE/cmake/gcc_arm_none_eabi_toolchain.cmake \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DBOARD=nucleo_g431rb \
+            -B build/${{ matrix.build_type }}
+
+      - name: Build project
+        run: |
+          cmake --build build/${{ matrix.build_type }} --verbose
+
+      - name: Verify build output
+        run: |
+          if [ -f "target/nucleo_g431rb/${{ matrix.build_type }}/CubeMot.elf" ]; then
+            echo "✅ Build successful for ${{ matrix.build_type }}"
+            ls -lh target/nucleo_g431rb/${{ matrix.build_type }}/CubeMot.elf
+          else
+            echo "❌ Build failed: CubeMot.elf not found for ${{ matrix.build_type }}"
+            exit 1
+          fi
+
+      - name: Show build summary
+        run: |
+          echo "## Build Summary for ${{ matrix.build_type }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build Type**: ${{ matrix.build_type }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Board**: nucleo_g431rb" >> $GITHUB_STEP_SUMMARY
+          echo "- **Toolchain**: GCC ARM Embedded" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ✅ Success" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Build Output" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          ls -lh target/nucleo_g431rb/${{ matrix.build_type }}/ >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

@@ -1,10 +1,19 @@
 = CubeMot
+:toc: left
+:toclevels: 2
+:icons: font
+:source-highlighter: rouge
+:sectlinks:
 
 image:https://github.com/lzx3in/CubeMot/actions/workflows/code-format-check.yml/badge.svg["Code Format Check", link="https://github.com/lzx3in/CubeMot/actions/workflows/code-format-check.yml"]
 image:https://github.com/lzx3in/CubeMot/actions/workflows/gcc-build-verification.yml/badge.svg["GCC Build Verification", link="https://github.com/lzx3in/CubeMot/actions/workflows/gcc-build-verification.yml"]
 image:https://github.com/lzx3in/CubeMot/actions/workflows/static-analysis.yml/badge.svg["Static Analysis", link="https://github.com/lzx3in/CubeMot/actions/workflows/static-analysis.yml"]
+image:https://github.com/lzx3in/CubeMot/actions/workflows/docs-validation.yml/badge.svg["Documentation Validation", link="https://github.com/lzx3in/CubeMot/actions/workflows/docs-validation.yml"]
+image:https://github.com/lzx3in/CubeMot/actions/workflows/docs-link-check.yml/badge.svg["Documentation Link Check", link="https://github.com/lzx3in/CubeMot/actions/workflows/docs-link-check.yml"]
 
 == 快速开始
+
+本节提供最简化的构建流程，帮助开发者快速完成首次构建。详细构建选项请参考 link:BUILDING.adoc[BUILDING.adoc]。
 
 === 环境准备
 
@@ -49,3 +58,41 @@ cmake --build build/Debug
 openocd -f target/nucleo_g431rb/Debug/openocd.cfg \
   -c "program target/nucleo_g431rb/Debug/CubeMot.elf verify reset exit"
 ----
+
+== 构建输出
+
+构建系统使用两级目录结构：
+
+1. `build/`：CMake构建工作目录，包含CMake构建过程生成的标准产物
+2. `target/`：最终构建产物目录
+
+[source]
+----
+target/<BOARD>/<BUILD_TYPE>/
+├── CubeMot.elf      # ELF文件
+├── CubeMot.map      # 内存映射
+├── CubeMot.bin      # 二进制格式
+├── CubeMot.hex      # Intel Hex格式
+├── CubeMot.lst      # 反汇编列表
+├── memory_usage.txt # 内存使用报告
+├── size_report.txt  # 尺寸报告
+└── openocd.cfg      # OpenOCD配置
+----
+
+== 故障快速排查
+
+**构建失败？**
+
+1. 确认工具链在 PATH 中
+2. 确认板卡支持目录 `boards/${BOARD}/` 存在
+3. 查看详细输出：`cmake --build build/Debug --verbose`
+4. 参考 link:BUILDING.adoc#故障排除[BUILDING.adoc - 故障排除]
+
+**OpenOCD 连接失败？**
+
+* 确认开发板已连接
+* 检查 USB 权限（Linux）
+* 查看 OpenOCD 输出日志
+* 参考 link:BUILDING.adoc#故障排除[BUILDING.adoc - OpenOCD 故障排除]
+
+详细故障排除指南请参考 link:BUILDING.adoc#故障排除[BUILDING.adoc - 故障排除章节]。

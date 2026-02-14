@@ -1,0 +1,182 @@
+name: Documentation Link Check
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "docs/**"
+      - "**/*.adoc"
+      - "**/*.md"
+      - ".github/workflows/docs-link-check.yml"
+  schedule:
+    # Run weekly on Monday at 3 AM UTC
+    - cron: "0 3 * * 1"
+
+jobs:
+  link-check:
+    name: Documentation Link Validation
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install linkchecker
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y linkchecker
+          linkchecker --version
+
+      - name: Create linkchecker configuration
+        run: |
+          echo '# Linkchecker configuration' > linkchecker.conf
+          echo '[checking]' >> linkchecker.conf
+          echo '# Recursion level' >> linkchecker.conf
+          echo 'recursionlevel=2' >> linkchecker.conf
+          echo '' >> linkchecker.conf
+          echo "# Don't fail on SSL certificate errors" >> linkchecker.conf
+          echo 'sslverify=0' >> linkchecker.conf
+          echo '' >> linkchecker.conf
+          echo '# Timeout for each connection' >> linkchecker.conf
+          echo 'timeout=30' >> linkchecker.conf
+          echo '' >> linkchecker.conf
+          echo '# Maximum number of threads' >> linkchecker.conf
+          echo 'threads=5' >> linkchecker.conf
+          echo '' >> linkchecker.conf
+          echo '[filtering]' >> linkchecker.conf
+          echo '# Ignore localhost and private IPs' >> linkchecker.conf
+          echo 'ignore=localhost' >> linkchecker.conf
+          echo 'ignore=127.0.0.1' >> linkchecker.conf
+          echo 'ignore=.*\\.local' >> linkchecker.conf
+          echo 'ignore=.*\\.localdomain' >> linkchecker.conf
+          echo '' >> linkchecker.conf
+          echo '# Ignore certain URL patterns' >> linkchecker.conf
+          echo 'ignore=https?://stackoverflow\\.com/.*' >> linkchecker.conf
+          echo 'ignore=https?://github\\.com/.*/actions/.*' >> linkchecker.conf
+          echo 'ignore=https?://.*\\.blob\\.core\\.windows\\.net/.*' >> linkchecker.conf
+          echo '' >> linkchecker.conf
+          echo '[output]' >> linkchecker.conf
+          echo '# Output format' >> linkchecker.conf
+          echo 'status=1' >> linkchecker.conf
+          echo 'warnings=1' >> linkchecker.conf
+          echo 'quiet=0' >> linkchecker.conf
+          echo 'verbose=0' >> linkchecker.conf
+          echo '' >> linkchecker.conf
+          echo '# Log file configuration' >> linkchecker.conf
+          echo 'fileoutput=1' >> linkchecker.conf
+          echo 'logfilename=linkchecker-results.txt' >> linkchecker.conf
+
+          cat linkchecker.conf
+
+      - name: Find documentation files
+        id: find_docs
+        run: |
+          # Find all documentation files
+          DOC_FILES=$(find . -type f \( -name "*.adoc" -o -name "*.md" \) | grep -v node_modules || true)
+
+          if [ -z "$DOC_FILES" ]; then
+            echo "❌ No documentation files found"
+            exit 1
+          fi
+
+          echo "Found documentation files:"
+          echo "$DOC_FILES"
+
+          # Create a list of directories to check
+          echo "$DOC_FILES" | while read file; do dirname "$file"; done | sort -u > directories.txt
+
+          FILE_COUNT=$(echo "$DOC_FILES" | wc -l)
+          DIR_COUNT=$(wc -l < directories.txt)
+
+          echo "file_count=$FILE_COUNT" >> $GITHUB_OUTPUT
+          echo "dir_count=$DIR_COUNT" >> $GITHUB_OUTPUT
+
+      - name: Run linkchecker
+        id: link_check
+        run: |
+          echo "Running link checker..."
+          set +e  # Don't exit on error, we want to collect results
+
+          # Run linkchecker on each directory
+          > linkchecker-errors.txt
+          TOTAL_ERRORS=0
+
+          while IFS= read -r dir; do
+            if [ -n "$dir" ]; then
+              echo "Checking links in: $dir"
+
+              # Run linkchecker
+              linkchecker \
+                --config=linkchecker.conf \
+                --file-output=text/linkchecker-results.txt \
+                "$dir" 2>&1
+
+              # Check if there were errors
+              if [ -f linkchecker-results.txt ]; then
+                if grep -q "^Error" linkchecker-results.txt; then
+                  echo "❌ Errors found in: $dir" | tee -a linkchecker-errors.txt
+                  ERROR_COUNT=$(grep -c "^Error" linkchecker-results.txt || echo "0")
+                  TOTAL_ERRORS=$((TOTAL_ERRORS + ERROR_COUNT))
+
+                  # Show the errors
+                  echo "Errors in $dir:" >> linkchecker-errors.txt
+                  grep "^Error" linkchecker-results.txt >> linkchecker-errors.txt
+                  echo "" >> linkchecker-errors.txt
+                else
+                  echo "✅ No errors in: $dir"
+                fi
+
+                # Clean up
+                rm -f linkchecker-results.txt
+              fi
+            fi
+          done < directories.txt
+
+          set -e
+
+          echo "total_errors=$TOTAL_ERRORS" >> $GITHUB_OUTPUT
+
+          if [ $TOTAL_ERRORS -gt 0 ]; then
+            echo ""
+            echo "=========================================="
+            echo "Link check failed with $TOTAL_ERRORS errors"
+            echo "=========================================="
+            cat linkchecker-errors.txt
+            exit 1
+          else
+            echo "✅ All links are valid"
+          fi
+
+      - name: Upload link check results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: link-check-errors
+          path: linkchecker-errors.txt
+          retention-days: 7
+
+      - name: Generate summary
+        if: always()
+        run: |
+          echo "## Link Check Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Directories checked**: ${{ steps.find_docs.outputs.dir_count }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Documentation files**: ${{ steps.find_docs.outputs.file_count }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: $([ ${{ steps.link_check.outputs.total_errors }} -eq 0 ] && echo "✅ Passed" || echo "❌ Failed")" >> $GITHUB_STEP_SUMMARY
+
+          if [ ${{ steps.link_check.outputs.total_errors }} -gt 0 ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Link Errors Found" >> $GITHUB_STEP_SUMMARY
+            echo "${{ steps.link_check.outputs.total_errors }} broken links detected:" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            head -50 linkchecker-errors.txt >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            if [ $(wc -l < linkchecker-errors.txt) -gt 50 ]; then
+              echo "... and more errors. See artifact for full details." >> $GITHUB_STEP_SUMMARY
+            fi
+          fi

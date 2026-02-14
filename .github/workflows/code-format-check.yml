@@ -1,0 +1,23 @@
+name: Code Format Check
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  clang-format:
+    name: Clang-Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DoozyX/clang-format-lint-action@v0.20
+        with:
+          source: '.'
+          extensions: 'c,h,cpp,hpp,cc,hh,cxx,hxx'
+          clangFormatVersion: 19
+          style: file

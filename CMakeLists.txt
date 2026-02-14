@@ -29,6 +29,11 @@ add_subdirectory(boards)
 add_subdirectory(application)
 add_subdirectory(drivers)
 
+# Optional components
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/core_system)
+    add_subdirectory(core_system)
+endif()
+
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/middlewares)
     add_subdirectory(middlewares)
 endif()

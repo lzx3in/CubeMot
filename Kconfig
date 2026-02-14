@@ -15,3 +15,4 @@ source "src/boards/Kconfig"
 # Load feature module configurations
 source "src/drivers/Kconfig"
 source "src/application/Kconfig"
+source "middlewares/Kconfig"

@@ -37,6 +37,11 @@ OUTPUT_FILE_MAPPING = {
         'guard': 'DRIVER_CONFIG_H',
         'comment': 'Driver Configuration'
     },
+    'middleware_config': {
+        'file': 'middlewares/middleware_config.h',
+        'guard': 'MW_CONFIG_H',
+        'comment': 'Middleware Configuration'
+    },
     'app_config': {
         'file': 'src/application/app_config.h',
         'guard': 'APP_CONFIG_H',

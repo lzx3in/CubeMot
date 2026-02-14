@@ -59,6 +59,7 @@ set(CONFIG_HEADERS
     ${CMAKE_SOURCE_DIR}/src/boards/system_config.h
     ${CMAKE_SOURCE_DIR}/src/drivers/driver_config.h
     ${CMAKE_SOURCE_DIR}/src/application/app_config.h
+    ${CMAKE_SOURCE_DIR}/middlewares/middleware_config.h
 )
 
 # Generate configuration headers from .config at configure time

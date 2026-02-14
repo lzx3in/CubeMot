@@ -1,0 +1,62 @@
+menu "Middleware Configuration"
+
+menu "RTOS"
+
+config MW_RTOS_ENABLE
+    bool "RTOS Support"
+    default n
+    help
+        Enable Real-Time Operating System
+
+choice
+    prompt "RTOS Selection"
+    depends on MW_RTOS_ENABLE
+    default MW_RTOS_FREERTOS
+
+config MW_RTOS_FREERTOS
+    bool "FreeRTOS"
+    help
+        Use FreeRTOS as the RTOS
+
+config MW_RTOS_THREADX
+    bool "ThreadX"
+    help
+        Use ThreadX as the RTOS
+
+endchoice
+
+endmenu
+
+menu "Communication Protocols"
+
+config MW_PROTOCOL_MODBUS
+    bool "Modbus Protocol"
+    default n
+    help
+        Enable Modbus communication protocol support
+
+config MW_PROTOCOL_CANOPEN
+    bool "CANopen Protocol"
+    default n
+    help
+        Enable CANopen protocol support
+
+endmenu
+
+menu "Data Management"
+
+config MW_DATA_LOGGER
+    bool "Data Logger"
+    default n
+    help
+        Enable data logging functionality
+
+config MW_PARAMETER_STORE
+    bool "Parameter Store"
+    default n
+    help
+        Enable persistent parameter storage
+
+endmenu
+
+endmenu

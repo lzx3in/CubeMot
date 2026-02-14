@@ -45,6 +45,11 @@ OUTPUT_FILE_MAPPING = {
         'guard': 'DRIVER_CONFIG_H',
         'comment': 'Driver Configuration'
     },
+    'middleware_config': {
+        'file': 'middlewares/middleware_config.h',
+        'guard': 'MW_CONFIG_H',
+        'comment': 'Middleware Configuration'
+    },
     'app_config': {
         'file': 'application/app_config.h',
         'guard': 'APP_CONFIG_H',
@@ -145,6 +150,8 @@ def get_symbol_location_type(sym):
         return 'board_config'
     elif filename.startswith('drivers/'):
         return 'driver_config'
+    elif filename.startswith('middlewares/'):
+        return 'middleware_config'
     elif filename.startswith('application/'):
         return 'app_config'
 

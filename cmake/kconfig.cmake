@@ -74,6 +74,7 @@ set(CONFIG_HEADERS
     ${CMAKE_SOURCE_DIR}/boards/board_config.h
     ${CMAKE_SOURCE_DIR}/boards/system_config.h
     ${CMAKE_SOURCE_DIR}/drivers/driver_config.h
+    ${CMAKE_SOURCE_DIR}/middlewares/middleware_config.h
     ${CMAKE_SOURCE_DIR}/application/app_config.h
 )
 

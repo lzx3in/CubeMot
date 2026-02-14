@@ -29,6 +29,10 @@ add_subdirectory(boards)
 add_subdirectory(application)
 add_subdirectory(drivers)
 
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/middlewares)
+    add_subdirectory(middlewares)
+endif()
+
 target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # User defined library search paths
 )

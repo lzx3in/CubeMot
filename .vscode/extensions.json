@@ -1,0 +1,13 @@
+{
+    // Code formatting extensions
+    "recommendations": [
+        "llvm-vs-code-extensions.vscode-clangd",
+        "redhat.vscode-yaml",
+        "asciidoctor.asciidoctor-vscode",
+        "mhutchie.git-graph"
+    ],
+    "unwantedRecommendations": [
+        // Avoid using C/C++ extension formatting, use clang-format instead
+        "ms-vscode.cpptools-formatting"
+    ]
+}

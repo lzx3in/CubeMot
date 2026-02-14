@@ -14,10 +14,10 @@ src/boards/include/boards/system_config.h
 src/boards/include/boards/board_config.h
 src/application/app_config.h
 src/drivers/driver_config.h
+middlewares/middleware_config.h
 
 # Python cache files
 */__pycache__/
 *.pyc
 *.pyo
 *.pyd
-

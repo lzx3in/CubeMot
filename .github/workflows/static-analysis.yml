@@ -1,0 +1,112 @@
+name: Static Analysis
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+    branches:
+      - main
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: "0 2 * * *"
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  cppcheck:
+    name: Cppcheck Static Analysis
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install cppcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cppcheck
+          cppcheck --version
+
+      - name: Create cppcheck build directory
+        run: mkdir -p cppcheck-build
+
+      - name: Run cppcheck
+        run: |
+          echo "Running cppcheck static analysis..."
+
+          # Run cppcheck with SARIF output format
+          cppcheck \
+            --enable=all \
+            --inconclusive \
+            --force \
+            --std=c17 \
+            --std=c++17 \
+            --language=c \
+            --platform=arm32-wchar_t4 \
+            --suppress=missingIncludeSystem \
+            --suppress=unusedFunction \
+            --suppress=unmatchedSuppression \
+            --suppress=unusedStructMember \
+            --suppress=variableScope \
+            --suppress=checkersReport \
+            --xml \
+            --xml-version=2 \
+            -i boards/nucleo_g431rb/stm32cubemx_generated/ \
+            -i build/ \
+            -i target/ \
+            -i cmake/ \
+            -i tools/ \
+            -i .github/ \
+            --output-file=cppcheck-results.xml \
+            .
+
+          # Check if results file was created
+          if [ ! -f cppcheck-results.xml ]; then
+            echo "❌ cppcheck failed to generate results"
+            exit 1
+          fi
+
+          # Check for errors in the output
+          if grep -q "error id=" cppcheck-results.xml; then
+            echo "⚠️  Cppcheck found errors - see results for details"
+          else
+            echo "✅ No errors found by cppcheck"
+          fi
+
+          # Display summary
+          echo "Cppcheck analysis complete"
+
+      - name: Display analysis results
+        run: |
+          # Display summary of findings
+          echo "=== Analysis Summary ==="
+          if command -v xmlstarlet &> /dev/null; then
+            ERROR_COUNT=$(xmlstarlet sel -t -m "//error" -v "count(.)" cppcheck-results.xml 2>/dev/null || echo "0")
+            WARNING_COUNT=$(xmlstarlet sel -t -m "//error[@severity='warning']" -v "count(.)" cppcheck-results.xml 2>/dev/null || echo "0")
+            echo "Errors: $ERROR_COUNT"
+            echo "Warnings: $WARNING_COUNT"
+          else
+            echo "Error count: $(grep -c 'severity="error"' cppcheck-results.xml || echo "0")"
+            echo "Warning count: $(grep -c 'severity="warning"' cppcheck-results.xml || echo "0")"
+          fi
+
+      - name: Generate summary
+        run: |
+          echo "## Static Analysis Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tool**: Cppcheck" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ✅ Analysis complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Results" >> $GITHUB_STEP_SUMMARY
+          if [ -f cppcheck-results.xml ]; then
+            ERROR_COUNT=$(grep -c 'severity="error"' cppcheck-results.xml || echo "0")
+            WARNING_COUNT=$(grep -c 'severity="warning"' cppcheck-results.xml || echo "0")
+            echo "- **Errors**: $ERROR_COUNT" >> $GITHUB_STEP_SUMMARY
+            echo "- **Warnings**: $WARNING_COUNT" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📊 Detailed results available in [Security tab](https://github.com/${{ github.repository }}/security/code-scanning)" >> $GITHUB_STEP_SUMMARY

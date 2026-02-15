@@ -1,0 +1,138 @@
+= 单元测试文档
+:toc: left
+:toc-title: 目录
+:sectnums:
+
+== 概述
+
+本项目使用 Google Test (gtest) 和 Google Mock (gmock) 框架进行单元测试。测试代码位于 `tests/` 目录下，与被测试的源代码分离。
+
+== 环境要求
+
+* CMake 3.16+
+* C++17 兼容的编译器
+* 网络连接（自动下载 Google Test）
+
+== 目录结构
+
+[source]
+----
+tests/
+├── CMakeLists.txt          # 测试主配置
+├── drivers/                # 驱动测试
+│   └── test_led.cpp        # LED 驱动测试示例
+└── mocks/                  # Mock 对象
+    ├── board_led_mock.h    # 板级 LED Mock
+    └── board_led_mock.cpp
+----
+
+== 运行测试
+
+=== 方法1：直接配置测试目录（推荐）
+
+[source,bash]
+----
+cmake -B build_test tests/
+cmake --build build_test
+./build_test/cubemot-test
+----
+
+=== 方法2：从项目根目录启用测试
+
+[source,bash]
+----
+cmake -DENABLE_TESTS=ON -B build_test
+cmake --build build_test
+----
+
+=== 测试执行选项
+
+[source,bash]
+----
+# 运行所有测试
+./build_test/cubemot-test
+
+# 显示失败时的详细输出
+./build_test/cubemot-test --gtest_brief=1
+
+# 运行特定测试
+./build_test/cubemot-test --gtest_filter=LEDTest.*
+----
+
+== 编写测试
+
+=== 测试文件命名
+
+* 测试文件：`test_<模块名>.cpp`
+* Mock 文件：`<模块名>_mock.h` / `<模块名>_mock.cpp`
+
+=== 基本测试结构
+
+[source,cpp]
+----
+#include <gtest/gtest.h>
+#include "drivers/led/led.h"
+
+// 测试夹具类
+class LEDTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        // 每个测试前的初始化
+    }
+    void TearDown() override {
+        // 每个测试后的清理
+    }
+};
+
+// 定义测试
+TEST_F(LEDTest, Initialization) {
+    LED_Handle_t led;
+    EXPECT_EQ(LED_Init(&led), LED_OK);
+}
+----
+
+=== 使用 Mock
+
+[source,cpp]
+----
+#include "mocks/board_led_mock.h"
+
+TEST_F(LEDTest, SetState) {
+    // 设置期望：期望调用 BoardLED_SetState 一次，参数为 true
+    EXPECT_CALL(*GetBoardLedMock(), SetState(true))
+        .Times(1);
+
+    LED_SetState(&led, LED_ON);
+}
+----
+
+== 添加新测试
+
+. 创建测试文件 `tests/<分类>/test_<模块>.cpp`
+. 如需 Mock，创建 `tests/mocks/<模块>_mock.h` 和 `.cpp`
+. 更新 `tests/CMakeLists.txt`，添加测试文件到 `add_executable`
+. 运行测试验证
+
+== CI/CD 集成
+
+GitHub Actions 会自动运行单元测试：
+
+* 触发条件：Push 到 main/dev 分支、Pull Request
+* 配置文件：`.github/workflows/unit-tests.yml`
+
+== 常见问题
+
+=== 测试编译失败
+
+确保使用独立的测试构建目录，避免与嵌入式构建冲突：
+
+[source,bash]
+----
+rm -rf build_test
+cmake -B build_test tests/
+cmake --build build_test
+----
+
+=== Mock 未生效
+
+检查是否正确链接了 Mock 库，并在测试中使用了 `GetXXXMock()` 获取 Mock 实例。

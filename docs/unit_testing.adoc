@@ -1,0 +1,168 @@
+= 单元测试文档
+:toc: left
+:toc-title: 目录
+:sectnums:
+
+== 概述
+
+本项目使用 Google Test (gtest) 和 Google Mock (gmock) 框架进行单元测试。测试代码位于 `tests/` 目录下，通过 `BUILD_TESTING` 选项启用。
+
+== 环境要求
+
+* CMake 3.28+
+* pass:[C++17 兼容的编译器 (g++ 或 clang++)]
+* 网络连接（首次构建时自动下载 Google Test）
+
+== 目录结构
+
+[source]
+----
+tests/
+├── CMakeLists.txt          # 测试主配置
+├── deps/                   # 第三方依赖
+│   └── googletest/         # Google Test 子模块
+├── drivers/                # 驱动测试
+│   └── test_led.cpp        # LED 驱动测试示例
+└── mocks/                  # Mock 对象
+    ├── board_led_mock.h
+    └── board_led_mock.cpp
+----
+
+== 运行测试
+
+=== 启用测试构建
+
+使用BUILD_TESTING选项将构建工程设置为测试模式。测试构建使用主机原生编译器，而非嵌入式交叉编译器。
+
+[source,bash]
+----
+# 配置
+cmake -DBUILD_TESTING=ON -B build_test
+
+# 构建
+cmake --build build_test
+
+# 运行测试
+./build_test/tests/cubemot-test
+----
+
+=== 使用 CTest
+
+CTest 是 CMake 的测试驱动程序，可用于统一管理和运行测试。
+
+[source,bash]
+----
+# 在构建目录内运行所有测试
+ctest
+
+# 或从任意位置指定构建目录运行测试
+ctest --test-dir build_test
+
+# 详细输出
+ctest -V
+
+# 只运行失败的测试
+ctest --rerun-failed
+
+# 并行运行测试（如有多个测试可执行文件）
+ctest -j4
+----
+
+=== 直接运行测试可执行文件
+
+如需更精细的控制，可直接运行测试二进制文件：
+
+[source,bash]
+----
+# 运行所有测试
+./build_test/tests/cubemot-test
+
+# 显示详细输出
+./build_test/tests/cubemot-test --gtest_brief=0
+
+# 运行特定测试
+./build_test/tests/cubemot-test --gtest_filter=LEDTest.*
+
+# 列出所有测试
+./build_test/tests/cubemot-test --gtest_list_tests
+----
+
+== 编写测试
+
+=== 测试文件命名
+
+* 测试文件：`test_<模块名>.cpp`
+* Mock 文件：`<模块名>_mock.h` / `<模块名>_mock.cpp`
+
+=== 基本测试结构
+
+[source,cpp]
+----
+#include <gtest/gtest.h>
+#include "drivers/led/led.h"
+
+// 测试夹具类
+class LEDTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        // 每个测试前的初始化
+    }
+    void TearDown() override {
+        // 每个测试后的清理
+    }
+};
+
+// 定义测试
+TEST_F(LEDTest, Initialization) {
+    LED_Handle_t led;
+    EXPECT_EQ(LED_Init(&led), LED_OK);
+}
+----
+
+=== 使用 Mock
+
+[source,cpp]
+----
+#include "mocks/board_led_mock.h"
+
+TEST_F(LEDTest, SetState) {
+    // 设置期望：期望调用 BoardLED_SetState 一次，参数为 true
+    EXPECT_CALL(*GetBoardLedMock(), SetState(true))
+        .Times(1);
+
+    LED_SetState(&led, LED_ON);
+}
+----
+
+== 添加新测试
+
+. 创建测试文件 `tests/<分类>/test_<模块>.cpp`
+. 如需 Mock，创建 `tests/mocks/<模块>_mock.h` 和 `.cpp`
+. 更新 `tests/CMakeLists.txt`，添加测试文件到 `add_executable`
+. 运行测试验证
+
+== CI/CD 集成
+
+GitHub Actions 会自动运行单元测试：
+
+* 触发条件：Push 到 main/dev 分支、Pull Request
+* 配置文件：`.github/workflows/unit-tests.yml`
+
+== 常见问题
+
+=== 首次构建失败（googletest 未找到）
+
+确保子模块已初始化：
+
+[source,bash]
+----
+git submodule update --init tests/deps/googletest
+----
+
+=== 测试编译失败（嵌入式头文件冲突）
+
+确保使用 `BUILD_TESTING=ON` 而不是直接配置 tests/ 目录。
+
+=== Mock 未生效
+
+检查是否正确链接了 Mock 库，并在测试中使用了 `GetXXXMock()` 获取 Mock 实例。

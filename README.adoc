@@ -1,1 +1,5 @@
 = CubeMot
+
+image:https://github.com/lzx3in/CubeMot/actions/workflows/code-format-check.yml/badge.svg["Code Format Check", link="https://github.com/lzx3in/CubeMot/actions/workflows/code-format-check.yml"]
+image:https://github.com/lzx3in/CubeMot/actions/workflows/gcc-build-verification.yml/badge.svg["GCC Build Verification", link="https://github.com/lzx3in/CubeMot/actions/workflows/gcc-build-verification.yml"]
+image:https://github.com/lzx3in/CubeMot/actions/workflows/static-analysis.yml/badge.svg["Static Analysis", link="https://github.com/lzx3in/CubeMot/actions/workflows/static-analysis.yml"]

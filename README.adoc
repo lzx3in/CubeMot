@@ -3,3 +3,49 @@
 image:https://github.com/lzx3in/CubeMot/actions/workflows/code-format-check.yml/badge.svg["Code Format Check", link="https://github.com/lzx3in/CubeMot/actions/workflows/code-format-check.yml"]
 image:https://github.com/lzx3in/CubeMot/actions/workflows/gcc-build-verification.yml/badge.svg["GCC Build Verification", link="https://github.com/lzx3in/CubeMot/actions/workflows/gcc-build-verification.yml"]
 image:https://github.com/lzx3in/CubeMot/actions/workflows/static-analysis.yml/badge.svg["Static Analysis", link="https://github.com/lzx3in/CubeMot/actions/workflows/static-analysis.yml"]
+
+== 快速开始
+
+=== 环境准备
+
+==== 获取源码
+
+[source,bash]
+----
+git clone git@github.com:lzx3in/CubeMot.git
+cd CubeMot
+----
+
+==== 安装项目依赖：
+
+[source,bash]
+----
+python3 -m venv .venv
+source venv/bin/activate
+pip install -r tools/requirements.txt
+----
+
+=== 配置与构建
+
+可通过Kconfig工具配置系统参数，或者由构建系统自动生成默认配置。
+
+[source,bash]
+----
+menuconfig Kconfig          # 配置系统参数，可选
+
+cmake -G Ninja \
+  -DCMAKE_TOOLCHAIN_FILE=cmake/gcc_arm_none_eabi_toolchain.cmake \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DBOARD=nucleo_g431rb \
+  -B build/Debug
+
+cmake --build build/Debug
+----
+
+=== 烧录固件
+
+[source,bash]
+----
+openocd -f target/nucleo_g431rb/Debug/openocd.cfg \
+  -c "program target/nucleo_g431rb/Debug/CubeMot.elf verify reset exit"
+----

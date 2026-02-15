@@ -1,0 +1,44 @@
+name: Unit Tests
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  gtest:
+    name: Google Test
+    runs-on: ubuntu-latest
+    container: debian:trixie
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -y cmake build-essential g++
+
+      - name: Configure tests
+        run: |
+          cmake -B build_test tests/
+
+      - name: Build tests
+        run: |
+          cmake --build build_test
+
+      - name: Run tests
+        run: |
+          ./build_test/cubemot-test --output-on-failure
+
+      - name: Show test summary
+        if: always()
+        run: |
+          echo "## Unit Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          ./build_test/cubemot-test --gtest_brief=1 >> $GITHUB_STEP_SUMMARY 2>&1 || true

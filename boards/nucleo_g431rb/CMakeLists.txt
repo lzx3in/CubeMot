@@ -49,12 +49,6 @@ set(BOARD_SRCS
     ${CMAKE_CURRENT_LIST_DIR}/led.c
 )
 
-add_library(nucleo_g431rb OBJECT)
-target_sources(nucleo_g431rb PRIVATE ${BOARD_SRCS})
-
-# STM32 application sources
-target_sources(${CMAKE_PROJECT_NAME} PRIVATE ${STM32_APPLICATION_SRCS})
-
 # STM32 HAL interface library
 add_library(stm32_hal INTERFACE)
 target_include_directories(stm32_hal INTERFACE ${STM32_INCLUDE_DIRS})
@@ -65,28 +59,22 @@ add_library(stm32_hal_drivers OBJECT)
 target_sources(stm32_hal_drivers PRIVATE ${STM32_HAL_SRCS})
 target_link_libraries(stm32_hal_drivers PUBLIC stm32_hal)
 
-target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE)
-
-# Link HAL libraries
-target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE
-    stm32_hal_drivers
-    ${TOOLCHAIN_LINK_LIBRARIES}
+# Configure the boards library target
+target_sources(boards PRIVATE
+    ${BOARD_SRCS}
+    ${STM32_APPLICATION_SRCS}
 )
 
-# Link board library
-target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE nucleo_g431rb)
-
-# Board configuration includes and definitions
-target_include_directories(nucleo_g431rb PRIVATE ${CMAKE_SOURCE_DIR})
-if(DEFINED BOARD_INCLUDE_DIRS)
-    target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${BOARD_INCLUDE_DIRS})
-    target_include_directories(nucleo_g431rb PRIVATE ${BOARD_INCLUDE_DIRS})
-endif()
+target_include_directories(boards PUBLIC
+    ${CMAKE_SOURCE_DIR}
+)
 
 if(DEFINED BOARD_COMPILE_DEFINITIONS)
-    target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE ${BOARD_COMPILE_DEFINITIONS})
-    target_compile_definitions(nucleo_g431rb PRIVATE ${BOARD_COMPILE_DEFINITIONS})
+    target_compile_definitions(boards PUBLIC ${BOARD_COMPILE_DEFINITIONS})
 endif()
 
-# Link with HAL
-target_link_libraries(nucleo_g431rb PUBLIC stm32_hal)
+# Link HAL libraries to boards
+target_link_libraries(boards PUBLIC
+    stm32_hal_drivers
+    stm32_hal
+)

@@ -1,4 +1,4 @@
-#include "led.h"
+#include "drivers/led/led.h"
 #include "boards/led.h"
 
 led_error_t led_init(led_t *led, const struct board_led_config_t *hw_config)

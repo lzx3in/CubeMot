@@ -5,10 +5,9 @@ target_sources(drivers PRIVATE
 )
 
 target_include_directories(drivers PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/led
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_include_directories(drivers PRIVATE 
-    ${CMAKE_SOURCE_DIR}
+target_link_libraries(drivers PRIVATE
+    boards
 )

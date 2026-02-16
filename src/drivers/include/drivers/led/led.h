@@ -3,6 +3,10 @@
 
 #include <stdbool.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct board_led_config_t;
 
 typedef enum {
@@ -24,5 +28,9 @@ led_error_t led_init(led_t *led, const struct board_led_config_t *hw_config);
 led_error_t led_set_state(led_t *led, led_state_t state);
 led_error_t led_toggle(led_t *led);
 led_error_t led_get_state(led_t *led, led_state_t *state);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

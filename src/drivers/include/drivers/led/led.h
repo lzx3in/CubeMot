@@ -1,5 +1,5 @@
-#ifndef LED_H
-#define LED_H
+#ifndef DRIVERS_LED_H
+#define DRIVERS_LED_H
 
 #include <stdbool.h>
 

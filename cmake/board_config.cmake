@@ -12,10 +12,10 @@ endif()
 string(REPLACE "-" "_" BOARD_TARGET_NAME ${BOARD})
 
 # Validate board directory exists
-set(BOARD_DIR ${CMAKE_CURRENT_SOURCE_DIR}/boards/${BOARD})
+set(BOARD_DIR ${CMAKE_SOURCE_DIR}/src/boards/${BOARD})
 if(NOT EXISTS ${BOARD_DIR})
     message(FATAL_ERROR "Board '${BOARD}' not found at ${BOARD_DIR}\n"
-                        "Available boards: $(ls ${CMAKE_CURRENT_SOURCE_DIR}/boards/)")
+                        "Available boards: $(ls ${CMAKE_SOURCE_DIR}/src/boards/)")
 endif()
 
 # Include board-specific configuration

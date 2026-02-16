@@ -31,22 +31,22 @@ except ImportError:
 # Output file mapping for header generation
 OUTPUT_FILE_MAPPING = {
     'system_config': {
-        'file': 'boards/system_config.h',
+        'file': 'src/boards/include/boards/system_config.h',
         'guard': 'SYSTEM_CONFIG_H',
         'comment': 'System Configuration'
     },
     'board_config': {
-        'file': 'boards/board_config.h',
+        'file': 'src/boards/include/boards/board_config.h',
         'guard': 'BOARD_CONFIG_H',
         'comment': 'Board Configuration'
     },
     'driver_config': {
-        'file': 'drivers/driver_config.h',
+        'file': 'src/drivers/driver_config.h',
         'guard': 'DRIVER_CONFIG_H',
         'comment': 'Driver Configuration'
     },
     'app_config': {
-        'file': 'application/app_config.h',
+        'file': 'src/application/app_config.h',
         'guard': 'APP_CONFIG_H',
         'comment': 'Application Configuration'
     }
@@ -141,11 +141,11 @@ def get_symbol_location_type(sym):
         return 'system_config'
 
     # Subdirectory Kconfig files
-    if filename.startswith('boards/'):
+    if filename.startswith('src/boards/'):
         return 'board_config'
-    elif filename.startswith('drivers/'):
+    elif filename.startswith('src/drivers/'):
         return 'driver_config'
-    elif filename.startswith('application/'):
+    elif filename.startswith('src/application/'):
         return 'app_config'
 
     # Unknown location - skip

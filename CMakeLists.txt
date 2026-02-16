@@ -22,34 +22,12 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/board_config.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/kconfig.cmake)
 
 enable_language(C ASM)
-add_executable(${CMAKE_PROJECT_NAME})
+
+# Include post-build functions before subdirectories that need them
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/post_build.cmake)
 
 # Add project modules
-add_subdirectory(boards)
-add_subdirectory(application)
-add_subdirectory(drivers)
-
-target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
-    # User defined library search paths
-)
-
-target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    # User defined include paths
-)
-
-target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
-    # User defined symbols
-)
+add_subdirectory(src)
 
 # Remove incorrect libob.a dependency
 list(REMOVE_ITEM CMAKE_C_IMPLICIT_LINK_LIBRARIES ob)
-
-target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE
-    drivers
-    ${TOOLCHAIN_LINK_LIBRARIES}
-)
-
-# Generate binary, hex, and map files in target/ directory
-include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/post_build.cmake)
-

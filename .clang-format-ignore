@@ -1,5 +1,5 @@
 # Exclude STM32CubeMX generated code
-./boards/nucleo_g431rb/stm32cubemx_generated/**
+./src/boards/nucleo_g431rb/stm32cubemx_generated/**
 
 # Exclude build output directories
 ./build/**

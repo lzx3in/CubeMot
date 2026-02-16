@@ -16,7 +16,7 @@ endchoice
 
 # Load board-specific configuration based on selection
 if BOARD_NUCLEO_G431RB
-source "boards/nucleo_g431rb/Kconfig"
+source "src/boards/nucleo_g431rb/Kconfig"
 endif
 
 endmenu

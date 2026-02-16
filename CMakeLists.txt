@@ -7,8 +7,9 @@ message(STATUS "Project: ${CMAKE_PROJECT_NAME}")
 option(CMAKE_EXPORT_COMPILE_COMMANDS "generate compile_commands.json for IDE integration" ON)
 
 if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE "Debug")
+    set(CMAKE_BUILD_TYPE "Debug" CACHE STRING "Build type" FORCE)
 endif()
+set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "RelWithDebInfo" "MinSizeRel")
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
 # Generate configuration headers from KConfig at configure time

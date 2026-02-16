@@ -28,7 +28,6 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/post_build.cmake)
 
 # Add project modules
 add_subdirectory(boards)
-add_subdirectory(application)
 add_subdirectory(src)
 
 # Remove incorrect libob.a dependency

@@ -46,7 +46,7 @@ OUTPUT_FILE_MAPPING = {
         'comment': 'Driver Configuration'
     },
     'app_config': {
-        'file': 'application/app_config.h',
+        'file': 'src/application/app_config.h',
         'guard': 'APP_CONFIG_H',
         'comment': 'Application Configuration'
     }
@@ -145,7 +145,7 @@ def get_symbol_location_type(sym):
         return 'board_config'
     elif filename.startswith('src/drivers/'):
         return 'driver_config'
-    elif filename.startswith('application/'):
+    elif filename.startswith('src/application/'):
         return 'app_config'
 
     # Unknown location - skip

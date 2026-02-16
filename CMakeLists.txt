@@ -1,5 +1,12 @@
 cmake_minimum_required(VERSION 3.28)
 
+# Set default toolchain before project() as CMake loads toolchain file during project() command
+if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
+    set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/cmake/gcc_arm_none_eabi_toolchain.cmake" 
+        CACHE STRING "Toolchain file" FORCE)
+    message(STATUS "Using default toolchain: ${CMAKE_TOOLCHAIN_FILE}")
+endif()
+
 # Project configuration
 project(CubeMot)
 message(STATUS "Project: ${CMAKE_PROJECT_NAME}")

@@ -11,11 +11,11 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
-# Board configuration must come before output directory settings
-include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/board_config.cmake)
-
 # Generate configuration headers from KConfig at configure time
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/kconfig.cmake)
+
+# Board configuration must come before output directory settings
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/board_config.cmake)
 
 # Add project modules
 add_subdirectory(src)

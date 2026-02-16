@@ -10,7 +10,7 @@ config PROJECT_VERSION
     default "1.0.0"
 
 # Load board selection menu
-source "boards/Kconfig"
+source "src/boards/Kconfig"
 
 # Load feature module configurations
 source "src/drivers/Kconfig"

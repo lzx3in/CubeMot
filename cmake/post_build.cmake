@@ -14,7 +14,7 @@ function(consolidate_outputs_to_target_dir TARGET_NAME)
     set(MAP_FILE "${CMAKE_BINARY_DIR}/${TARGET_NAME}.map")
 
     configure_file(
-        ${CMAKE_SOURCE_DIR}/boards/${BOARD}/openocd.cfg
+        ${CMAKE_SOURCE_DIR}/src/boards/${BOARD}/openocd.cfg
         ${TARGET_OUTPUT_DIR}/openocd.cfg
         COPYONLY
     )

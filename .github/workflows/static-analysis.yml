@@ -55,7 +55,7 @@ jobs:
             --suppress=checkersReport \
             --xml \
             --xml-version=2 \
-            -i boards/nucleo_g431rb/stm32cubemx_generated/ \
+            -i src/boards/nucleo_g431rb/stm32cubemx_generated/ \
             -i build/ \
             -i target/ \
             -i cmake/ \

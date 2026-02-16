@@ -10,16 +10,16 @@ if(NOT EXISTS ${KCONFIG_CONFIG})
     # Search for defconfig in priority order: board-specific first, then global
     set(DEFCONFIG_PATH "")
     if(DEFINED BOARD)
-        set(BOARD_DEFCONFIG "${CMAKE_SOURCE_DIR}/boards/${BOARD}/defconfig")
+        set(BOARD_DEFCONFIG "${CMAKE_SOURCE_DIR}/src/boards/${BOARD}/defconfig")
         if(EXISTS ${BOARD_DEFCONFIG})
             set(DEFCONFIG_PATH ${BOARD_DEFCONFIG})
             message(STATUS "KConfig: Found board defconfig: ${BOARD_DEFCONFIG}")
         endif()
     endif()
 
-    if(NOT DEFCONFIG_PATH AND EXISTS ${CMAKE_SOURCE_DIR}/boards/defconfig)
-        set(DEFCONFIG_PATH ${CMAKE_SOURCE_DIR}/boards/defconfig)
-        message(STATUS "KConfig: Found global defconfig: ${CMAKE_SOURCE_DIR}/boards/defconfig")
+    if(NOT DEFCONFIG_PATH AND EXISTS ${CMAKE_SOURCE_DIR}/src/boards/defconfig)
+        set(DEFCONFIG_PATH ${CMAKE_SOURCE_DIR}/src/boards/defconfig)
+        message(STATUS "KConfig: Found global defconfig: ${CMAKE_SOURCE_DIR}/src/boards/defconfig")
     endif()
 
     # Find Python interpreter (prefer virtual environment if available)
@@ -71,8 +71,8 @@ endif()
 
 # Output configuration header files
 set(CONFIG_HEADERS
-    ${CMAKE_SOURCE_DIR}/boards/board_config.h
-    ${CMAKE_SOURCE_DIR}/boards/system_config.h
+    ${CMAKE_SOURCE_DIR}/src/boards/board_config.h
+    ${CMAKE_SOURCE_DIR}/src/boards/system_config.h
     ${CMAKE_SOURCE_DIR}/src/drivers/driver_config.h
     ${CMAKE_SOURCE_DIR}/src/application/app_config.h
 )

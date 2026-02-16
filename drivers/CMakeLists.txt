@@ -12,5 +12,3 @@ target_include_directories(drivers PUBLIC
 target_include_directories(drivers PRIVATE 
     ${CMAKE_SOURCE_DIR}
 )
-
-target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE drivers)

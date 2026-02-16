@@ -1,5 +1,6 @@
 # Build directories (CMake working directory)
 build/
+build_*
 
 # Target directory (final build artifacts)
 target/

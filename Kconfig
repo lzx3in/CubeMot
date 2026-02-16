@@ -13,5 +13,5 @@ config PROJECT_VERSION
 source "boards/Kconfig"
 
 # Load feature module configurations
-source "drivers/Kconfig"
+source "src/drivers/Kconfig"
 source "application/Kconfig"

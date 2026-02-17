@@ -4,58 +4,42 @@
 set(KCONFIG_ROOT ${CMAKE_SOURCE_DIR}/Kconfig)
 set(KCONFIG_CONFIG ${CMAKE_SOURCE_DIR}/.config)
 
+# Find Python interpreter (prefer virtual environment if available)
+if(EXISTS ${CMAKE_SOURCE_DIR}/.venv/bin/python)
+    set(PYTHON_EXECUTABLE ${CMAKE_SOURCE_DIR}/.venv/bin/python)
+    message(STATUS "KConfig: Using virtual environment Python")
+else()
+    find_package(Python3 REQUIRED)
+    set(PYTHON_EXECUTABLE ${Python3_EXECUTABLE})
+endif()
+
+# Check if gen_config.py exists
+if(NOT EXISTS ${CMAKE_SOURCE_DIR}/tools/gen_config.py)
+    message(FATAL_ERROR "gen_config.py not found in tools/ directory")
+endif()
+
 # Generate .config from defconfig if not exists
 if(NOT EXISTS ${KCONFIG_CONFIG})
+    message(STATUS "KConfig: Generating .config...")
 
-    # Search for defconfig in priority order: board-specific first, then global
-    set(DEFCONFIG_PATH "")
+    # Build command arguments
+    set(GEN_CONFIG_ARGS
+        generate-config
+        ${KCONFIG_ROOT}
+        ${KCONFIG_CONFIG}
+        --search-path ${CMAKE_SOURCE_DIR}/src/boards
+    )
     if(DEFINED BOARD)
-        set(BOARD_DEFCONFIG "${CMAKE_SOURCE_DIR}/src/boards/${BOARD}/defconfig")
-        if(EXISTS ${BOARD_DEFCONFIG})
-            set(DEFCONFIG_PATH ${BOARD_DEFCONFIG})
-            message(STATUS "KConfig: Found board defconfig: ${BOARD_DEFCONFIG}")
-        endif()
+        list(APPEND GEN_CONFIG_ARGS --board ${BOARD})
     endif()
 
-    if(NOT DEFCONFIG_PATH AND EXISTS ${CMAKE_SOURCE_DIR}/src/boards/defconfig)
-        set(DEFCONFIG_PATH ${CMAKE_SOURCE_DIR}/src/boards/defconfig)
-        message(STATUS "KConfig: Found global defconfig: ${CMAKE_SOURCE_DIR}/src/boards/defconfig")
-    endif()
-
-    # Find Python interpreter (prefer virtual environment if available)
-    if(EXISTS ${CMAKE_SOURCE_DIR}/.venv/bin/python)
-        set(PYTHON_EXECUTABLE ${CMAKE_SOURCE_DIR}/.venv/bin/python)
-        message(STATUS "KConfig: Using virtual environment Python")
-    else()
-        find_package(Python3 REQUIRED)
-        set(PYTHON_EXECUTABLE ${Python3_EXECUTABLE})
-    endif()
-
-    # Check if gen_config.py exists
-    if(NOT EXISTS ${CMAKE_SOURCE_DIR}/tools/gen_config.py)
-        message(FATAL_ERROR "gen_config.py not found in tools/ directory")
-    endif()
-
-    # Generate .config from defconfig or defaults
-    if(DEFCONFIG_PATH)
-        message(STATUS "KConfig: Generating .config from ${DEFCONFIG_PATH}...")
-        execute_process(
-            COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/gen_config.py
-                    generate-config ${KCONFIG_ROOT} ${KCONFIG_CONFIG} ${DEFCONFIG_PATH}
-            RESULT_VARIABLE GENERATE_RESULT
-            OUTPUT_VARIABLE GENERATE_OUTPUT
-            ERROR_VARIABLE GENERATE_ERROR
-        )
-    else()
-        message(STATUS "KConfig: No defconfig found, generating .config from Kconfig defaults...")
-        execute_process(
-            COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/gen_config.py
-                    generate-config ${KCONFIG_ROOT} ${KCONFIG_CONFIG}
-            RESULT_VARIABLE GENERATE_RESULT
-            OUTPUT_VARIABLE GENERATE_OUTPUT
-            ERROR_VARIABLE GENERATE_ERROR
-        )
-    endif()
+    execute_process(
+        COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/gen_config.py
+                ${GEN_CONFIG_ARGS}
+        RESULT_VARIABLE GENERATE_RESULT
+        OUTPUT_VARIABLE GENERATE_OUTPUT
+        ERROR_VARIABLE GENERATE_ERROR
+    )
 
     if(GENERATE_RESULT EQUAL 0)
         message(STATUS "KConfig: Successfully generated ${KCONFIG_CONFIG}")
@@ -76,20 +60,6 @@ set(CONFIG_HEADERS
     ${CMAKE_SOURCE_DIR}/src/drivers/driver_config.h
     ${CMAKE_SOURCE_DIR}/src/application/app_config.h
 )
-
-# Find Python interpreter (prefer virtual environment if available)
-if(EXISTS ${CMAKE_SOURCE_DIR}/.venv/bin/python)
-    set(PYTHON_EXECUTABLE ${CMAKE_SOURCE_DIR}/.venv/bin/python)
-    message(STATUS "KConfig: Using virtual environment Python")
-else()
-    find_package(Python3 REQUIRED)
-    set(PYTHON_EXECUTABLE ${Python3_EXECUTABLE})
-endif()
-
-# Check if gen_config.py exists
-if(NOT EXISTS ${CMAKE_SOURCE_DIR}/tools/gen_config.py)
-    message(FATAL_ERROR "gen_config.py not found in tools/ directory")
-endif()
 
 # Generate configuration headers from .config at configure time
 # Ensures headers exist before compilation starts

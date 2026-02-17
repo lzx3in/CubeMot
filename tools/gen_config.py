@@ -63,6 +63,30 @@ def load_kconfig(kconfig_root):
         sys.exit(1)
 
 
+def find_defconfig(board, search_path):
+    """Find defconfig file based on board and search path
+
+    Priority: board-specific defconfig > global defconfig > None
+    """
+    if not search_path:
+        return None
+
+    # Board-specific defconfig
+    if board:
+        board_defconfig = os.path.join(search_path, board, 'defconfig')
+        if os.path.exists(board_defconfig):
+            print(f"Found board defconfig: {board_defconfig}")
+            return board_defconfig
+
+    # Global defconfig
+    global_defconfig = os.path.join(search_path, 'defconfig')
+    if os.path.exists(global_defconfig):
+        print(f"Found global defconfig: {global_defconfig}")
+        return global_defconfig
+
+    return None
+
+
 def cmd_generate_config(args):
     """Generate complete .config from defconfig or Kconfig defaults"""
     try:
@@ -75,10 +99,24 @@ def cmd_generate_config(args):
         print(f"Loading Kconfig from {args.kconfig_root}...")
         kconf = load_kconfig(os.path.basename(args.kconfig_root))
 
-        # Load defconfig if provided (using load_allconfig like LiteOS)
-        if args.defconfig_file and os.path.exists(args.defconfig_file):
-            print(f"Loading defconfig from {args.defconfig_file}...")
-            kconf.load_config(os.path.join(original_cwd, args.defconfig_file))
+        # Determine defconfig to load
+        defconfig_path = None
+        if args.defconfig_file:
+            # Explicitly specified defconfig file
+            if os.path.exists(args.defconfig_file):
+                defconfig_path = args.defconfig_file
+            else:
+                print(f"Warning: Specified defconfig not found: {args.defconfig_file}", file=sys.stderr)
+        elif args.search_path:
+            # Auto-find defconfig based on board and search path
+            defconfig_path = find_defconfig(args.board, args.search_path)
+
+        # Load defconfig if found
+        if defconfig_path:
+            print(f"Loading defconfig from {defconfig_path}...")
+            kconf.load_config(os.path.join(original_cwd, defconfig_path))
+        else:
+            print("Using Kconfig defaults...")
 
         os.chdir(original_cwd)
 
@@ -255,6 +293,10 @@ def main():
     gen_config_parser.add_argument('output_config', help='Output .config file')
     gen_config_parser.add_argument('defconfig_file', nargs='?', default=None,
                                    help='Input defconfig file (optional)')
+    gen_config_parser.add_argument('--board', default=None,
+                                   help='Board name for auto-finding defconfig')
+    gen_config_parser.add_argument('--search-path', default=None,
+                                   help='Search path for defconfig files')
 
     # generate-headers subcommand
     gen_headers_parser = subparsers.add_parser('generate-headers', help='Generate C header files')

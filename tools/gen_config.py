@@ -16,17 +16,8 @@ import sys
 import argparse
 from collections import defaultdict
 
-# Try to import Kconfiglib from virtual environment first
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '.venv', 'lib',
-                               f'python{sys.version_info.major}.{sys.version_info.minor}', 'site-packages'))
-
-try:
-    import kconfiglib
-    from kconfiglib import Kconfig
-except ImportError:
-    print("Error: kconfiglib not found. Please install it:", file=sys.stderr)
-    print("  pip install kconfiglib", file=sys.stderr)
-    sys.exit(1)
+import kconfiglib
+from kconfiglib import Kconfig
 
 
 # Output file mapping for header generation

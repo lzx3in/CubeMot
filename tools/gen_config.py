@@ -11,8 +11,8 @@ Usage:
   gen_config.py generate-headers <kconfig_root> <config_file> <output_dir>
 """
 
-import sys
 import os
+import sys
 import argparse
 from collections import defaultdict
 
@@ -22,6 +22,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '.venv', 'lib',
 
 try:
     import kconfiglib
+    from kconfiglib import Kconfig
 except ImportError:
     print("Error: kconfiglib not found. Please install it:", file=sys.stderr)
     print("  pip install kconfiglib", file=sys.stderr)
@@ -56,49 +57,31 @@ OUTPUT_FILE_MAPPING = {
 def load_kconfig(kconfig_root):
     """Load Kconfig tree from root Kconfig file"""
     try:
-        kconf = kconfiglib.Kconfig(kconfig_root, warn=False)
-        return kconf
+        return Kconfig(kconfig_root, warn=False)
     except Exception as e:
         print(f"Error loading Kconfig from {kconfig_root}: {e}", file=sys.stderr)
         sys.exit(1)
 
 
-def load_config(kconf, config_file):
-    """Load .config file into Kconfig object"""
-    try:
-        kconf.load_config(config_file)
-    except Exception as e:
-        print(f"Error loading config file {config_file}: {e}", file=sys.stderr)
-        sys.exit(1)
-
-
 def cmd_generate_config(args):
-    """
-    Generate complete .config from defconfig or Kconfig defaults
-    """
+    """Generate complete .config from defconfig or Kconfig defaults"""
     try:
-        # Load Kconfig tree
-        print(f"Loading Kconfig from {args.kconfig_root}...")
-        kconf = load_kconfig(args.kconfig_root)
+        kconfig_dir = os.path.dirname(os.path.abspath(args.kconfig_root)) or os.getcwd()
+        original_cwd = os.getcwd()
 
         # Change to Kconfig directory to handle relative source paths
-        kconfig_dir = os.path.dirname(os.path.abspath(args.kconfig_root))
-        original_cwd = os.getcwd()
-        if kconfig_dir:
-            os.chdir(kconfig_dir)
+        os.chdir(kconfig_dir)
 
-        # Load defconfig if provided, otherwise use defaults
+        print(f"Loading Kconfig from {args.kconfig_root}...")
+        kconf = load_kconfig(os.path.basename(args.kconfig_root))
+
+        # Load defconfig if provided (using load_allconfig like LiteOS)
         if args.defconfig_file and os.path.exists(args.defconfig_file):
             print(f"Loading defconfig from {args.defconfig_file}...")
-            # Kconfiglib automatically applies defaults for symbols not in defconfig
             kconf.load_config(os.path.join(original_cwd, args.defconfig_file))
-        else:
-            print("No defconfig provided, using Kconfig defaults...")
 
-        # Change back to original directory for output
         os.chdir(original_cwd)
 
-        # Write complete .config
         print(f"Writing complete config to {args.output_config}...")
         kconf.write_config(args.output_config)
 
@@ -112,199 +95,140 @@ def cmd_generate_config(args):
 
 def get_value_for_header(sym):
     """Convert Kconfig symbol value to appropriate C macro value"""
-    if sym.type == kconfiglib.BOOL:
+    if sym.type in (kconfiglib.BOOL, kconfiglib.TRISTATE):
         return "1" if sym.tri_value == 2 else "0"
-    elif sym.type == kconfiglib.TRISTATE:
-        return "1" if sym.tri_value == 2 else "0" if sym.tri_value == 1 else "0"
-    elif sym.type in (kconfiglib.STRING, kconfiglib.INT, kconfiglib.HEX):
-        return sym.str_value
-    else:
-        return sym.str_value
+    return sym.str_value
 
+
+# Mapping of Kconfig file prefixes to config types
+LOCATION_MAP = [
+    ('src/boards/', 'board_config'),
+    ('src/drivers/', 'driver_config'),
+    ('src/application/', 'app_config'),
+]
 
 def get_symbol_location_type(sym):
-    """
-    Determine which output file a symbol should go to based on its location
-
-    Returns:
-        str: Type of config ('system_config', 'board_config', 'driver_config', etc.)
-               or None if the symbol should not be included
-    """
+    """Determine which output file a symbol should go to based on its location"""
     if not sym.nodes:
         return None
 
-    # Get the filename where this symbol is defined
     filename = sym.nodes[0].filename
 
     # Root Kconfig file
     if filename == 'Kconfig':
         return 'system_config'
 
-    # Subdirectory Kconfig files
-    if filename.startswith('src/boards/'):
-        return 'board_config'
-    elif filename.startswith('src/drivers/'):
-        return 'driver_config'
-    elif filename.startswith('src/application/'):
-        return 'app_config'
+    # Check subdirectory prefixes
+    for prefix, config_type in LOCATION_MAP:
+        if filename.startswith(prefix):
+            return config_type
 
-    # Unknown location - skip
     return None
 
 
 def group_symbols_by_location(kconf):
-    """
-    Group all symbols by their output file location
-
-    Returns:
-        dict: Mapping of config_type to list of symbols
-    """
-    grouped_symbols = defaultdict(list)
-
+    """Group all symbols by their output file location"""
+    grouped = defaultdict(list)
     for sym in kconf.unique_defined_syms:
-        location_type = get_symbol_location_type(sym)
-        if location_type:
-            grouped_symbols[location_type].append(sym)
+        loc_type = get_symbol_location_type(sym)
+        if loc_type:
+            grouped[loc_type].append(sym)
+    return grouped
 
-    return grouped_symbols
 
+def get_menu_path(sym):
+    """Get menu path for a symbol"""
+    path = []
+    node = sym.nodes[0]
+    while node.parent:
+        if node.parent.is_menuconfig:
+            prompt = node.parent.prompt[0] if node.parent.prompt else "Other"
+            path.insert(0, prompt)
+        node = node.parent
+    return "/".join(path) if path else "Other"
+
+def write_macro(f, sym):
+    """Write a single macro definition"""
+    value = get_value_for_header(sym)
+    macro_name = sym.name
+
+    # Add help text as comments
+    if sym.nodes and sym.nodes[0].help:
+        for line in sym.nodes[0].help.strip().split('\n'):
+            if line.strip():
+                f.write(f"/* {line.strip()} */\n")
+
+    # Write the macro
+    val = f'"{value}"' if sym.type == kconfiglib.STRING else value
+    f.write(f"#define {macro_name}  {val}\n\n")
 
 def generate_header_file(kconf, symbols, config_type, output_dir):
-    """
-    Generate a configuration header file for a group of symbols
-
-    Args:
-        kconf: Kconfig object
-        symbols: List of symbols to include in this header
-        config_type: Type of config (e.g., 'board_config', 'driver_config')
-        output_dir: Output directory for the header file
-
-    Returns:
-        str: Path to generated file, or None if no symbols
-    """
+    """Generate a configuration header file for a group of symbols"""
     if not symbols:
         return None
 
-    config_info = OUTPUT_FILE_MAPPING[config_type]
-    output_file = os.path.join(output_dir, config_info['file'])
-    guard = config_info['guard']
-    comment = config_info['comment']
-
-    # Ensure output directory exists
+    info = OUTPUT_FILE_MAPPING[config_type]
+    output_file = os.path.join(output_dir, info['file'])
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
 
-    # Generate header file
+    # Group by menu path
+    by_menu = defaultdict(list)
+    for sym in symbols:
+        by_menu[get_menu_path(sym)].append(sym)
+
     with open(output_file, 'w') as f:
-        # Write header
-        f.write(f"/* Auto-generated by gen_config.py for {comment} - DO NOT EDIT */\n\n")
-        f.write(f"#ifndef {guard}\n")
-        f.write(f"#define {guard}\n\n")
-
-        f.write(f"/* {comment} */\n\n")
-
-        # Group symbols by menu for better readability
-        symbols_by_menu = {}
-        for sym in symbols:
-            # Try to find menu path
-            menu_path = []
-            node = sym.nodes[0]
-            while node.parent:
-                if node.parent.is_menuconfig:
-                    menu_prompt = node.parent.prompt[0] if node.parent.prompt else "Other"
-                    menu_path.insert(0, menu_prompt)
-                node = node.parent
-
-            menu_key = "/".join(menu_path) if menu_path else "Other"
-            if menu_key not in symbols_by_menu:
-                symbols_by_menu[menu_key] = []
-            symbols_by_menu[menu_key].append(sym)
+        f.write(f"/* Auto-generated by gen_config.py for {info['comment']} - DO NOT EDIT */\n\n")
+        f.write(f"#ifndef {info['guard']}\n")
+        f.write(f"#define {info['guard']}\n\n")
+        f.write(f"/* {info['comment']} */\n\n")
 
         # Write symbols grouped by menu
-        for menu_name, menu_symbols in symbols_by_menu.items():
+        for menu_name, menu_syms in sorted(by_menu.items()):
             if menu_name != "Other":
                 f.write(f"/* {menu_name} */\n")
-
-            for sym in menu_symbols:
-                value = get_value_for_header(sym)
-                macro_name = sym.name
-
-                # Add comment with help text if available
-                if sym.nodes and sym.nodes[0].help:
-                    help_lines = sym.nodes[0].help.split('\n')
-                    for line in help_lines:
-                        if line.strip():
-                            f.write(f"/* {line.strip()} */\n")
-
-                # Write the macro definition
-                if sym.type == kconfiglib.STRING:
-                    f.write(f"#define {macro_name} \"{value}\"\n")
-                else:
-                    f.write(f"#define {macro_name}  {value}\n")
-
-                f.write("\n")
-
+            for sym in menu_syms:
+                write_macro(f, sym)
             f.write("\n")
 
-        # Add BOARD_LED_COUNT for board_config.h specifically
+        # Add BOARD_LED_COUNT for board_config
         if config_type == 'board_config':
-            # Calculate LED count
-            led_count = 0
-            if kconf.syms.get('BOARD_HAS_LED1') and kconf.syms.get('BOARD_HAS_LED1').tri_value == 2:
-                led_count += 1
-            if kconf.syms.get('BOARD_HAS_LED2') and kconf.syms.get('BOARD_HAS_LED2').tri_value == 2:
-                led_count += 1
-            if kconf.syms.get('BOARD_HAS_LED3') and kconf.syms.get('BOARD_HAS_LED3').tri_value == 2:
-                led_count += 1
-
+            led_count = sum(1 for i in [1,2,3]
+                          if kconf.syms.get(f'BOARD_HAS_LED{i}', kconfiglib.Symbol()).tri_value == 2)
             f.write(f"\n#define BOARD_LED_COUNT {led_count}\n")
 
-        # Write footer
-        f.write(f"#endif /* {guard} */\n")
+        f.write(f"\n#endif /* {info['guard']} */\n")
 
     print(f"Generated: {output_file}")
     return output_file
 
 
 def cmd_generate_headers(args):
-    """
-    Generate C header files from .config
-    """
+    """Generate C header files from .config"""
     try:
-        # Change to the directory containing Kconfig root to handle relative source paths
-        kconfig_dir = os.path.dirname(os.path.abspath(args.kconfig_root))
-        if not kconfig_dir:
-            kconfig_dir = os.getcwd()
-
+        kconfig_dir = os.path.dirname(os.path.abspath(args.kconfig_root)) or os.getcwd()
         original_cwd = os.getcwd()
         os.chdir(kconfig_dir)
 
-        # Load Kconfig tree
         print(f"Loading Kconfig from {args.kconfig_root}...")
         kconf = load_kconfig(os.path.basename(args.kconfig_root))
 
-        # Load .config file
         print(f"Loading config from {args.config_file}...")
-        load_config(kconf, os.path.join(original_cwd, args.config_file))
+        kconf.load_config(os.path.join(original_cwd, args.config_file))
 
-        # Group symbols by their location
-        print("Grouping symbols by location...")
-        grouped_symbols = group_symbols_by_location(kconf)
-
-        # Generate header files for each group
         print("Generating configuration headers...")
-        generated_files = []
+        grouped = group_symbols_by_location(kconf)
+        generated = []
 
-        for config_type, symbols in sorted(grouped_symbols.items()):
-            if symbols:
-                result = generate_header_file(kconf, symbols, config_type, os.path.join(original_cwd, args.output_dir))
-                if result:
-                    generated_files.append(result)
+        for config_type, symbols in sorted(grouped.items()):
+            result = generate_header_file(kconf, symbols, config_type,
+                                          os.path.join(original_cwd, args.output_dir))
+            if result:
+                generated.append(result)
 
-        # Change back to original directory
         os.chdir(original_cwd)
 
-        print(f"\nGenerated {len(generated_files)} header file(s)")
-        for f in generated_files:
+        print(f"\nGenerated {len(generated)} header file(s)")
+        for f in generated:
             print(f"  - {f}")
 
         return True

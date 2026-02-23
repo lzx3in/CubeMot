@@ -1,5 +1,5 @@
 #include "boards/led.h"
-#include "boards/board_config.h"
+#include "cubemot_config.h"
 #include "main.h"
 #include "stm32g4xx.h"
 

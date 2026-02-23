@@ -1,7 +1,7 @@
 #include "main.h"
 #include "drivers/led/led.h"
 #include "boards/led.h"
-#include "boards/board_config.h"
+#include "cubemot_config.h"
 
 void SystemClock_Config(void);
 

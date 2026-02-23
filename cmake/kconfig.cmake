@@ -1,5 +1,5 @@
 # KConfig Integration
-# Generates cubemot_config.h from Kconfig files using gen_config.py
+# Generates configuration header from Kconfig files using gen_config.py
 
 set(KCONFIG_ROOT ${CMAKE_SOURCE_DIR}/Kconfig)
 set(KCONFIG_USRCONFIG ${CMAKE_SOURCE_DIR}/.config)
@@ -25,7 +25,6 @@ set(ENV{SRCTREE} ${CMAKE_SOURCE_DIR})
 execute_process(
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/gen_config.py
             ${KCONFIG_ROOT}
-            --output ${KCONFIG_HEADER}
             --usrconfig ${KCONFIG_USRCONFIG}
             --defconfig ${KCONFIG_DEFCONFIG}
     RESULT_VARIABLE GENERATE_RESULT

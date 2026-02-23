@@ -1,5 +1,10 @@
 mainmenu "CubeMot Configuration"
 
+# Internal (hidden) settings for build system
+config HEADER_PATH
+    string
+    default "cubemot_config.h"
+
 # Project General Options
 config PROJECT_NAME
     string "Project Name"

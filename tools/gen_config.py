@@ -2,9 +2,11 @@
 """Generate configuration header from Kconfig definitions.
 
 Usage:
-    gen_config.py Kconfig --output config.h
+    gen_config.py Kconfig
     gen_config.py Kconfig --symbol CONFIG_BOARD_NAME
     gen_config.py Kconfig --tree
+
+The output header path is configured via HEADER_PATH in Kconfig.
 """
 import argparse
 import os
@@ -132,7 +134,7 @@ class ConfigTree:
                 sym = node.item
                 prompt_text = node.prompt[0] if node.prompt else None
                 help_text = node.help if node.help else None
-                
+
                 config_node = ConfigNode(
                     name=sym.name,
                     node_type=NodeType.CONFIG,
@@ -143,10 +145,10 @@ class ConfigTree:
                         'type': kconfiglib.TYPE_TO_STR[sym.type] if sym.type in kconfiglib.TYPE_TO_STR else str(sym.type),
                     }
                 )
-                
+
                 # Register in symbol map for quick lookup
                 self._symbol_map[sym.name] = config_node
-                
+
                 # Add to current parent
                 menu_stack[-1].add_child(config_node)
                     
@@ -251,11 +253,9 @@ class ConfigTree:
 class SConf:
     """Kconfig configuration session with tree-based organization."""
     
-    DEFAULT_HEADER: str = 'config.h'
     DEFAULT_USRCONFIG: str = '.config'
     
     kconfig_root: str = ''
-    output: str = DEFAULT_HEADER
     usrconfig: str = DEFAULT_USRCONFIG
     defconfig: Optional[str] = None
     symbol: Optional[str] = None
@@ -305,12 +305,28 @@ class SConf:
             raise KeyError(f"Symbol '{symbol_name}' has no value")
         return value
     
-    def generate_header(self, output_path: Optional[str] = None) -> str:
-        output = output_path or self.output
+    def _get_header_path(self) -> str:
+        """Get header path from Kconfig or use default.
+        Path is relative to project root (where Kconfig is located)."""
+        node = self.tree.get_symbol_node('HEADER_PATH')
+        if node:
+            value = node.get_value()
+            if value:
+                return value
+        return 'config.h'
+
+    def generate_header(self) -> str:
+        output = self._get_header_path()
         if not os.path.isabs(output):
             output = os.path.join(self.project_root, output)
-        
+
+        # Ensure output directory exists
+        output_dir = os.path.dirname(output)
+        if output_dir and not os.path.exists(output_dir):
+            os.makedirs(output_dir, exist_ok=True)
+
         self.kconf.write_autoconf(output)
+
         return output
     
     def print_tree(self) -> None:
@@ -328,10 +344,8 @@ def parse_args() -> SConf:
         epilog=__doc__
     )
     parser.add_argument('kconfig', help='Root Kconfig file path')
-    parser.add_argument('-o', '--output', default=SConf.DEFAULT_HEADER,
-                        help=f'Output header path (default: {SConf.DEFAULT_HEADER})')
     parser.add_argument('--usrconfig', default=SConf.DEFAULT_USRCONFIG,
-                        help=f'User config file (default: {SConf.DEFAULT_USRCONFIG})')
+                        help=f'User config file (default: {SConf.DEFAULT_USRCONFIG}')
     parser.add_argument('--defconfig', help='Default config file')
     parser.add_argument('--symbol', help='Query specific symbol value')
     parser.add_argument('--tree', action='store_true',
@@ -341,7 +355,6 @@ def parse_args() -> SConf:
     
     return SConf(
         kconfig_root=args.kconfig,
-        output=args.output,
         usrconfig=args.usrconfig,
         defconfig=args.defconfig,
         symbol=args.symbol,

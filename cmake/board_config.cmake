@@ -1,11 +1,43 @@
 # Board configuration
-# Use -DBOARD=<board_name> to select board (default: nucleo_g431rb)
+# BOARD is read from Kconfig BOARD_NAME symbol
+# Run 'make menuconfig' to select board
 
-if(NOT DEFINED BOARD)
-    set(BOARD "nucleo_g431rb" CACHE STRING "Target board name" FORCE)
-    message(STATUS "BOARD not specified, using default: ${BOARD}")
+# Python interpreter: prefer venv, fallback to system Python3
+if(EXISTS ${CMAKE_SOURCE_DIR}/.venv/bin/python)
+    set(PYTHON_EXECUTABLE ${CMAKE_SOURCE_DIR}/.venv/bin/python)
 else()
-    message(STATUS "Selected board: ${BOARD}")
+    find_package(Python3 REQUIRED)
+    set(PYTHON_EXECUTABLE ${Python3_EXECUTABLE})
+endif()
+
+# Kconfig paths (duplicated from kconfig.cmake for independence)
+set(KCONFIG_ROOT ${CMAKE_SOURCE_DIR}/Kconfig)
+set(KCONFIG_USRCONFIG ${CMAKE_SOURCE_DIR}/.config)
+set(KCONFIG_DEFCONFIG ${CMAKE_SOURCE_DIR}/defconfig)
+
+# Query BOARD_NAME from Kconfig using gen_config.py
+set(ENV{SRCTREE} ${CMAKE_SOURCE_DIR})
+execute_process(
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/gen_config.py
+            ${KCONFIG_ROOT}
+            --usrconfig ${KCONFIG_USRCONFIG}
+            --defconfig ${KCONFIG_DEFCONFIG}
+            --symbol BOARD_NAME
+    OUTPUT_VARIABLE BOARD
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    RESULT_VARIABLE BOARD_QUERY_RESULT
+    ERROR_VARIABLE BOARD_QUERY_ERROR
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
+if(NOT BOARD_QUERY_RESULT EQUAL 0 OR NOT BOARD)
+    set(BOARD "nucleo_g431rb")
+    message(STATUS "BOARD_NAME not found in Kconfig, using default: ${BOARD}")
+    if(BOARD_QUERY_ERROR)
+        message(STATUS "  (Query error: ${BOARD_QUERY_ERROR})")
+    endif()
+else()
+    message(STATUS "Board from Kconfig: ${BOARD}")
 endif()
 
 # Normalize board name (replace hyphens with underscores for CMake target names)

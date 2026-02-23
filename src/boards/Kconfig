@@ -1,5 +1,13 @@
 menu "Board Selection"
 
+# Board name string - used by CMake to select board directory
+config BOARD_NAME
+    string
+    default "nucleo_g431rb" if BOARD_NUCLEO_G431RB
+    help
+        Target board name (directory name in src/boards/)
+        This value is read by CMake to select the correct board subdirectory.
+
 choice
     prompt "Target Board"
     default BOARD_NUCLEO_G431RB

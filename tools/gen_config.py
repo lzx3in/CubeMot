@@ -40,6 +40,8 @@ class SConf:
         return self._kconf
     
     def _load_kconfig(self) -> None:
+        # Set SRCTREE for kconfiglib to resolve relative paths in 'source' statements
+        os.environ.setdefault('SRCTREE', self.project_root)
         self._kconf = kconfiglib.Kconfig(self.kconfig_root, suppress_traceback=True)
         
         if self.defconfig and os.path.exists(self.defconfig):

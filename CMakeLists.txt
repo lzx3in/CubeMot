@@ -19,11 +19,11 @@ endif()
 set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "RelWithDebInfo" "MinSizeRel")
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
-# Generate configuration headers from KConfig at configure time
-include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/kconfig.cmake)
-
-# Board configuration must come before output directory settings
+# Board configuration (reads BOARD_NAME from Kconfig)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/board_config.cmake)
+
+# Generate configuration header from Kconfig (after board config)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/kconfig.cmake)
 
 # Add project modules
 add_subdirectory(src)

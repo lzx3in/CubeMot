@@ -21,6 +21,7 @@ endif()
 
 message(STATUS "KConfig: Generating configuration header...")
 
+set(ENV{SRCTREE} ${CMAKE_SOURCE_DIR})
 execute_process(
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/gen_config.py
             ${KCONFIG_ROOT}
@@ -30,6 +31,7 @@ execute_process(
     RESULT_VARIABLE GENERATE_RESULT
     OUTPUT_VARIABLE GENERATE_OUTPUT
     ERROR_VARIABLE GENERATE_ERROR
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 
 if(GENERATE_RESULT EQUAL 0)

@@ -1,0 +1,116 @@
+name: Documentation Validation
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "docs/**"
+      - "**/*.adoc"
+      - "**/*.md"
+      - ".github/workflows/docs-validation.yml"
+
+jobs:
+  asciidoc-build:
+    name: Asciidoc Build Validation
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install asciidoctor
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y asciidoctor ruby-rouge
+          asciidoctor --version
+
+      - name: Create build directory
+        run: mkdir -p docs-build
+
+      - name: Find and validate Asciidoc files
+        id: doc_check
+        run: |
+          echo "Finding Asciidoc files..."
+
+          # Find all .adoc files
+          ADOC_FILES=$(find . -type f -name "*.adoc" | grep -v node_modules || true)
+
+          if [ -z "$ADOC_FILES" ]; then
+            echo "❌ No Asciidoc files found"
+            exit 1
+          fi
+
+          echo "Found Asciidoc files:"
+          echo "$ADOC_FILES"
+          echo ""
+
+          FILE_COUNT=$(echo "$ADOC_FILES" | wc -l)
+          echo "file_count=$FILE_COUNT" >> $GITHUB_OUTPUT
+
+          FAILED_FILES=0
+          > build-failures.txt
+
+          # Build each file
+          while IFS= read -r file; do
+            if [ -n "$file" ]; then
+              echo "Building: $file"
+              OUTPUT_FILE="docs-build/$(basename "$file" .adoc).html"
+
+              if asciidoctor \
+                -a toc=left \
+                -a toclevels=3 \
+                -a icons=font \
+                -a source-highlighter=rouge \
+                -a sectlinks \
+                -D docs-build \
+                "$file" 2>&1; then
+                echo "✅ Successfully built: $file"
+              else
+                echo "❌ Failed to build: $file" | tee -a build-failures.txt
+                FAILED_FILES=$((FAILED_FILES + 1))
+              fi
+              echo ""
+            fi
+          done <<< "$ADOC_FILES"
+
+          echo "failed_files=$FAILED_FILES" >> $GITHUB_OUTPUT
+
+          if [ $FAILED_FILES -gt 0 ]; then
+            echo ""
+            echo "=========================================="
+            echo "Build failed for $FAILED_FILES files"
+            echo "=========================================="
+            cat build-failures.txt
+            exit 1
+          else
+            echo "✅ All Asciidoc files built successfully"
+          fi
+
+      - name: Upload built documentation
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: documentation-html
+          path: docs-build/
+          retention-days: 7
+
+      - name: Generate summary
+        if: always()
+        run: |
+          echo "## Documentation Validation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Total files**: ${{ steps.doc_check.outputs.file_count }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: $([ ${{ steps.doc_check.outputs.failed_files }} -eq 0 ] && echo "✅ Passed" || echo "❌ Failed")" >> $GITHUB_STEP_SUMMARY
+          if [ ${{ steps.doc_check.outputs.failed_files }} -gt 0 ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Failed Files" >> $GITHUB_STEP_SUMMARY
+            echo "${{ steps.doc_check.outputs.failed_files }} files failed to build:" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            cat build-failures.txt >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          fi

@@ -4,6 +4,8 @@ image:https://github.com/lzx3in/CubeMot/actions/workflows/code-format-check.yml/
 image:https://github.com/lzx3in/CubeMot/actions/workflows/gcc-build-verification.yml/badge.svg["GCC Build Verification", link="https://github.com/lzx3in/CubeMot/actions/workflows/gcc-build-verification.yml"]
 image:https://github.com/lzx3in/CubeMot/actions/workflows/static-analysis.yml/badge.svg["Static Analysis", link="https://github.com/lzx3in/CubeMot/actions/workflows/static-analysis.yml"]
 image:https://github.com/lzx3in/CubeMot/actions/workflows/unit-tests.yml/badge.svg["Unit Tests", link="https://github.com/lzx3in/CubeMot/actions/workflows/unit-tests.yml"]
+image:https://github.com/lzx3in/CubeMot/actions/workflows/docs-validation.yml/badge.svg["Documentation Validation", link="https://github.com/lzx3in/CubeMot/actions/workflows/docs-validation.yml"]
+image:https://github.com/lzx3in/CubeMot/actions/workflows/docs-link-check.yml/badge.svg["Documentation Link Check", link="https://github.com/lzx3in/CubeMot/actions/workflows/docs-link-check.yml"]
 
 == 快速开始
 

@@ -4,7 +4,8 @@
         "llvm-vs-code-extensions.vscode-clangd",
         "redhat.vscode-yaml",
         "asciidoctor.asciidoctor-vscode",
-        "mhutchie.git-graph"
+        "mhutchie.git-graph",
+        "ms-vscode.cmake-tools"
     ],
     "unwantedRecommendations": [
         // Avoid using C/C++ extension formatting, use clang-format instead

@@ -1,4 +1,5 @@
 add_subdirectory(deps)
+add_subdirectory(test_common)
 add_subdirectory(mocks)
 add_subdirectory(drivers)
 
@@ -14,6 +15,7 @@ target_include_directories(cubemot-test PRIVATE
 target_link_libraries(cubemot-test PRIVATE
     board_mocks
     drivers_for_test
+    test_common
     GTest::gtest_main
     GTest::gmock
 )

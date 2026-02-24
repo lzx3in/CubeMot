@@ -19,7 +19,10 @@ class LedTest : public ::testing::Test
         led_valid_.handle = valid_handle_;
     }
 
-    void TearDown() override { mock_ = nullptr; }
+    void TearDown() override
+    {
+        mock_ = nullptr;
+    }
 
     BoardLedMock *mock_;
     // Use a simple non-null pointer as valid handle

@@ -1,13 +1,18 @@
 #include "drivers/led/led.h"
 #include "boards/led.h"
+#include <stddef.h>
 
-led_error_t led_init(led_t *led, const struct board_led_config_t *hw_config)
+led_error_t led_init(led_t *led, int led_id)
 {
-    if (led == NULL || hw_config == NULL) {
+    if (led == NULL) {
         return LED_ERROR_INVALID_PARAM;
     }
 
-    led->hw_config = hw_config;
+    led->handle = board_led_get_handle(led_id);
+    if (!board_led_is_valid(led->handle)) {
+        return LED_ERROR_NOT_INITIALIZED;
+    }
+
     return LED_SUCCESS;
 }
 
@@ -17,12 +22,11 @@ led_error_t led_set_state(led_t *led, led_state_t state)
         return LED_ERROR_INVALID_PARAM;
     }
 
-    if (led->hw_config == NULL) {
+    if (!board_led_is_valid(led->handle)) {
         return LED_ERROR_NOT_INITIALIZED;
     }
 
-    board_led_set_state(led->hw_config, (state == LED_ON) ? true : false);
-
+    board_led_set_state(led->handle, (state == LED_ON));
     return LED_SUCCESS;
 }
 
@@ -32,12 +36,11 @@ led_error_t led_toggle(led_t *led)
         return LED_ERROR_INVALID_PARAM;
     }
 
-    if (led->hw_config == NULL) {
+    if (!board_led_is_valid(led->handle)) {
         return LED_ERROR_NOT_INITIALIZED;
     }
 
-    board_led_toggle(led->hw_config);
-
+    board_led_toggle(led->handle);
     return LED_SUCCESS;
 }
 
@@ -47,11 +50,11 @@ led_error_t led_get_state(led_t *led, led_state_t *state)
         return LED_ERROR_INVALID_PARAM;
     }
 
-    if (led->hw_config == NULL) {
+    if (!board_led_is_valid(led->handle)) {
         return LED_ERROR_NOT_INITIALIZED;
     }
 
-    bool hw_state = board_led_get_state(led->hw_config);
+    bool hw_state = board_led_get_state(led->handle);
     *state = hw_state ? LED_ON : LED_OFF;
 
     return LED_SUCCESS;

@@ -11,6 +11,13 @@ endif()
 project(CubeMot)
 message(STATUS "Project: ${CMAKE_PROJECT_NAME}")
 
+# Global Language Standards
+set(CMAKE_C_STANDARD 17)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+
+enable_language(C ASM)
+set(CMAKE_C_EXTENSIONS OFF)  # Embedded strict mode
+
 option(CMAKE_EXPORT_COMPILE_COMMANDS "generate compile_commands.json for IDE integration" ON)
 
 if(NOT CMAKE_BUILD_TYPE)

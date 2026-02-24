@@ -1,0 +1,46 @@
+name: Unit Tests
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  gtest:
+    name: Google Test
+    runs-on: ubuntu-latest
+    container: debian:trixie
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -y cmake build-essential g++
+
+      - name: Configure tests
+        run: |
+          cmake -DBUILD_TESTING=ON -B build_test
+
+      - name: Build tests
+        run: |
+          cmake --build build_test
+
+      - name: Run tests
+        run: |
+          ctest --test-dir build_test -V
+
+      - name: Show test summary
+        if: always()
+        run: |
+          echo "## Unit Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          ctest --test-dir build_test || true

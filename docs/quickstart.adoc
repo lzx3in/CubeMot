@@ -40,6 +40,8 @@ menuconfig Kconfig
 
 若不手动配置，构建系统将使用默认配置。
 
+详细配置系统说明，请参阅 xref:kconfig.adoc[KConfig 配置系统]。
+
 === 快速构建（推荐）
 
 使用 Workflow Presets 一键完成配置+构建：
@@ -88,6 +90,8 @@ cmake --preset test-debug
 cmake --build --preset test-debug
 ctest --preset test-debug
 ----
+
+完整的单元测试文档，包括编写测试和 Mock 使用方法，请参阅 xref:unit_testing.adoc[单元测试文档]。
 
 == 烧录固件
 

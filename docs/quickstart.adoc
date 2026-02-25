@@ -1,0 +1,98 @@
+= 快速开始
+:toc: left
+:toclevels: 2
+:icons: font
+:sectlinks:
+
+本指南介绍从获取源码到烧录固件的完整流程。
+
+== 环境准备
+
+=== 获取源码
+
+[source,bash]
+----
+git clone git@github.com:lzx3in/CubeMot.git
+cd CubeMot
+----
+
+=== 安装依赖
+
+[source,bash]
+----
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r tools/requirements.txt
+----
+
+== 配置与构建
+
+项目使用 **CMake Presets** 管理构建配置。
+
+=== 配置系统参数（可选）
+
+板型和其他参数通过 Kconfig 选择：
+
+[source,bash]
+----
+menuconfig Kconfig
+----
+
+若不手动配置，构建系统将使用默认配置。
+
+=== 快速构建（推荐）
+
+使用 Workflow Presets 一键完成配置+构建：
+
+[source,bash]
+----
+# 嵌入式 Debug 构建
+cmake --workflow --preset embedded-debug
+
+# 嵌入式 Release 构建（发布前清理）
+cmake --workflow --preset embedded-release-clean
+
+# 运行单元测试（配置+构建+测试）
+cmake --workflow --preset test-debug
+----
+
+=== 分步构建
+
+[source,bash]
+----
+# 配置
+cmake --preset embedded-debug
+
+# 构建
+cmake --build --preset embedded-debug
+
+# 清理后重新构建
+cmake --build --preset embedded-debug-clean
+----
+
+=== 可用预设
+
+列出所有预设：`cmake --list-presets`
+
+列出工作流：`cmake --workflow --list-presets`
+
+== 运行单元测试
+
+[source,bash]
+----
+# 一键完成（推荐）
+cmake --workflow --preset test-debug
+
+# 或分步执行
+cmake --preset test-debug
+cmake --build --preset test-debug
+ctest --preset test-debug
+----
+
+== 烧录固件
+
+[source,bash]
+----
+openocd -f target/nucleo_g431rb/Debug/openocd.cfg \
+  -c "program target/nucleo_g431rb/Debug/CubeMot.elf verify reset exit"
+----

@@ -3,6 +3,8 @@
 
 add_library(driver_tests OBJECT
     test_led.cpp
+    test_led_level.cpp
+    test_led_animate.cpp
 )
 
 target_include_directories(driver_tests PRIVATE

@@ -2,6 +2,8 @@ add_library(drivers OBJECT)
 
 target_sources(drivers PRIVATE
     led/led.c
+    led/led_level.c
+    led/led_animate.c
 )
 
 target_include_directories(drivers PUBLIC

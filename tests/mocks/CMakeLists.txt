@@ -17,6 +17,8 @@ target_link_libraries(board_mocks PUBLIC
 # Unified drivers library for testing (host build, not embedded)
 add_library(drivers_for_test STATIC
     ../../src/drivers/led/led.c
+    ../../src/drivers/led/led_level.c
+    ../../src/drivers/led/led_animate.c
 )
 
 target_include_directories(drivers_for_test PUBLIC

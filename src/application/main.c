@@ -1,22 +1,19 @@
-#include "main.h"
 #include "drivers/led/led.h"
 #include "boards/led.h"
+#include "boards/delay.h"
+#include "boards/init.h"
 #include "cubemot_config.h"
-
-void SystemClock_Config(void);
 
 int main(void)
 {
-    HAL_Init();
-    SystemClock_Config();
-    MX_GPIO_Init();
+    board_init();
 
 #if CONFIG_BOARD_HAS_LED1
     led_t led1;
     if (led_init(&led1, BOARD_LED_1) == LED_SUCCESS) {
         while (1) {
             led_toggle(&led1);
-            HAL_Delay(500);
+            board_delay_ms(500);
         }
     }
 #else

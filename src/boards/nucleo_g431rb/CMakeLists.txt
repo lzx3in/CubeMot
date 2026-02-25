@@ -47,6 +47,8 @@ set(STM32_HAL_SRCS
 
 set(BOARD_SRCS
     ${CMAKE_CURRENT_LIST_DIR}/led.c
+    ${CMAKE_CURRENT_LIST_DIR}/init.c
+    ${CMAKE_CURRENT_LIST_DIR}/delay.c
 )
 
 # STM32 HAL interface library

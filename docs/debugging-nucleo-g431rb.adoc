@@ -1,0 +1,804 @@
+= NUCLEO-G431RB 调试指南
+:toc: left
+:toclevels: 2
+:icons: font
+:sectlinks:
+
+== 概述
+
+本文档介绍 NUCLEO-G431RB 开发板的 OpenOCD + GDB 调试方法，涵盖从环境配置到高级调试技巧的完整流程。
+
+NUCLEO-G431RB 板载 ST-LINK/V2-1 调试器，支持 SWD 接口调试。开发板配置：
+
+* MCU: STM32G431RB (Cortex-M4 @ 170 MHz)
+* Flash: 128 KB
+* RAM: 32 KB
+* 调试接口: SWD (Serial Wire Debug)
+
+== 快速开始
+
+=== 1. 构建固件
+
+使用 CMake Preset 一键构建（确保已安装工具链）：
+
+[source,bash]
+----
+# Debug 构建（推荐用于调试）
+cmake --workflow --preset embedded-debug
+
+# 或 Release 构建
+cmake --workflow --preset embedded-release
+----
+
+构建完成后，产物位于 `target/nucleo_g431rb/Debug/` 目录。
+
+=== 2. 启动调试会话
+
+开启两个终端：
+
+*终端 1 - 启动 OpenOCD 服务器：*
+
+[source,bash]
+----
+cd target/nucleo_g431rb/Debug
+openocd -f openocd.cfg
+----
+
+*终端 2 - 启动 GDB 客户端：*
+
+[source,bash]
+----
+cd target/nucleo_g431rb/Debug
+arm-none-eabi-gdb CubeMot.elf
+----
+
+在 GDB 中执行：
+
+[source,gdb]
+----
+(gdb) target remote localhost:3333
+(gdb) load
+(gdb) monitor reset halt
+(gdb) break main
+(gdb) continue
+----
+
+=== 3. 快速烧录（不调试）
+
+[source,bash]
+----
+openocd -f target/nucleo_g431rb/Debug/openocd.cfg \
+  -c "program target/nucleo_g431rb/Debug/CubeMot.elf verify reset exit"
+----
+
+== 环境准备
+
+=== 硬件准备
+
+1. NUCLEO-G431RB 开发板
+2. Micro USB 数据线（连接板载 ST-LINK USB 接口）
+3. 跳线配置（出厂默认已正确配置）：
+   * **CN4**: ST-LINK 跳线帽全部连接（使用板载调试器）
+   * **CN2**: 电源跳线选择 **U5V**（USB 供电）
+
+=== 软件环境
+
+==== 必需工具
+
+[source,bash]
+----
+# Ubuntu/Debian
+sudo apt-get install openocd gdb-multiarch
+
+# 或使用 ARM 官方工具链中的 GDB
+which arm-none-eabi-gdb
+----
+
+==== USB 权限配置（Linux）
+
+[source,bash]
+----
+# 添加 udev 规则
+sudo cp /usr/share/openocd/contrib/60-openocd.rules /etc/udev/rules.d/
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+
+# 将用户加入 dialout 组（需重新登录生效）
+sudo usermod -a -G dialout $USER
+----
+
+=== 构建产物说明
+
+构建完成后，`target/nucleo_g431rb/Debug/` 目录包含：
+
+[cols="2,3"]
+|===
+| 文件 | 说明
+
+| `CubeMot.elf`
+| 可执行文件（调试用）
+
+| `CubeMot.bin`
+| 二进制文件（烧录用）
+
+| `CubeMot.hex`
+| Intel Hex 文件（烧录用）
+
+| `CubeMot.map`
+| 内存映射文件
+
+| `CubeMot.lst`
+| 反汇编列表
+
+| `openocd.cfg`
+| OpenOCD 调试配置
+
+| `memory_usage.txt`
+| 详细内存使用报告
+
+| `size_report.txt`
+| 简洁内存使用摘要
+|===
+
+== OpenOCD 使用指南
+
+=== 启动 OpenOCD
+
+[source,bash]
+----
+cd target/nucleo_g431rb/Debug
+openocd -f openocd.cfg
+----
+
+正常启动输出示例：
+
+[source]
+----
+Open On-Chip Debugger 0.12.0
+Licensed under GNU GPL v2
+...
+Info : STLINK V2J29M18 (API v2) VID:PID 0483:374B
+Info : Target voltage: 3.244063
+Info : stm32g4x.cpu: Cortex-M4 r0p1 processor detected
+Info : stm32g4x.cpu: target has 6 breakpoints, 4 watchpoints
+Info : starting gdb server for stm32g4x.cpu on 3333
+Info : Listening on port 3333 for gdb connections
+Info : Listening on port 4444 for telnet connections
+----
+
+关键信息：
+
+* **STLINK V2J29M18**: ST-LINK 调试器版本
+* **Target voltage**: 目标板电压（正常范围 3.0-3.3V）
+* **Cortex-M4 r0p1**: MCU 识别成功
+* **6 breakpoints, 4 watchpoints**: 硬件断点/观察点数量
+* **Port 3333**: GDB 服务器端口
+* **Port 4444**: Telnet 命令端口
+
+=== 常用 OpenOCD 命令
+
+通过 Telnet 连接（端口 4444）：
+
+[source,bash]
+----
+telnet localhost 4444
+----
+
+常用命令：
+
+[cols="2,3"]
+|===
+| 命令 | 说明
+
+| `halt`
+| 暂停目标
+
+| `resume`
+| 恢复执行
+
+| `reset halt`
+| 复位并暂停
+
+| `mdw <addr> <count>`
+| 查看内存（字为单位）
+
+| `mww <addr> <value>`
+| 修改内存
+
+| `reg`
+| 查看寄存器
+
+| `flash list`
+| 查看 Flash 信息
+
+| `adapter speed <khz>`
+| 设置调试速度
+|===
+
+=== OpenOCD 配置文件
+
+项目使用的配置文件：`src/boards/nucleo_g431rb/openocd.cfg`
+
+主要配置项：
+
+[source,openocd]
+----
+# 使用 ST-LINK 接口
+source [find interface/stlink.cfg]
+transport select hla_swd
+
+# STM32G4 目标配置
+source [find target/stm32g4x.cfg]
+
+# 复位配置
+reset_config srst_only
+adapter speed 4000    # 4MHz 调试速度
+
+# 工作区大小
+set WORKAREASIZE 0x2000
+----
+
+自定义选项：
+
+1. **降低调试速度**（连接不稳定时）：
++
+[source,openocd]
+----
+adapter speed 1000    # 降至 1MHz
+----
+
+2. **启用 RTOS 支持**（如使用 FreeRTOS）：
++
+[source,openocd]
+----
+$_TARGETNAME configure -rtos auto
+----
+
+== GDB 使用指南
+
+=== 启动 GDB
+
+[source,bash]
+----
+cd target/nucleo_g431rb/Debug
+arm-none-eabi-gdb CubeMot.elf
+----
+
+=== 连接与加载
+
+[source,gdb]
+----
+# 连接 OpenOCD 服务器
+(gdb) target remote localhost:3333
+
+# 加载程序到 Flash
+(gdb) load
+
+# 复位并暂停
+(gdb) monitor reset halt
+
+# 在 main 函数设置断点
+(gdb) break main
+
+# 继续执行
+(gdb) continue
+----
+
+=== 基本调试命令
+
+==== 运行控制
+
+[cols="2,1,3"]
+|===
+| 命令 | 缩写 | 说明
+
+| `continue` | `c` | 继续执行
+
+| `step` | `s` | 单步执行（进入函数）
+
+| `next` | `n` | 单步执行（跳过函数）
+
+| `finish` | `fin` | 执行到当前函数返回
+
+| `Ctrl+C` | - | 停止执行
+|===
+
+==== 断点管理
+
+[source,gdb]
+----
+# 设置断点
+(gdb) break main                    # 函数断点
+(gdb) break main.c:50               # 行号断点
+(gdb) break *0x08000188             # 地址断点
+(gdb) tbreak function_name          # 临时断点
+
+# 管理断点
+(gdb) info breakpoints              # 查看所有断点
+(gdb) delete 1                      # 删除断点 1
+(gdb) disable 1                     # 禁用断点
+(gdb) enable 1                      # 启用断点
+
+# 条件断点
+(gdb) break foo.c:123 if counter == 10
+----
+
+==== 观察点（数据断点）
+
+观察点监控变量或内存地址的变化。STM32G431RB 支持 4 个硬件观察点。
+
+[source,gdb]
+----
+# 监控变量写入
+(gdb) watch my_variable
+
+# 监控变量读取
+(gdb) rwatch my_variable
+
+# 监控变量读写
+(gdb) awatch my_variable
+
+# 监控内存地址
+(gdb) watch *(int*)0x20000000
+----
+
+==== 查看和修改变量
+
+[source,gdb]
+----
+# 打印变量
+(gdb) print my_variable             # 十进制
+(gdb) print/x my_variable           # 十六进制
+(gdb) print/t my_variable           # 二进制
+
+# 修改变量
+(gdb) set my_variable = 100
+
+# 显示数组
+(gdb) print array[0]@10             # 前10个元素
+
+# 持续显示变量（每次停止时自动显示）
+(gdb) display counter
+(gdb) info display                  # 查看所有 display
+(gdb) undisplay 1                   # 删除 display
+----
+
+==== 查看内存
+
+[source,gdb]
+----
+# 格式: x/nfu addr
+# n=数量, f=格式(x/d/u/o/t/c/s/i), u=单位(b/h/w/g)
+
+(gdb) x/16xw 0x08000000             # Flash 起始（16字十六进制）
+(gdb) x/64xb 0x20000000             # RAM 起始（64字节）
+(gdb) x/s 0x20000100                # 查看字符串
+(gdb) x/10i main                    # 反汇编 main 函数
+----
+
+==== 查看寄存器
+
+[source,gdb]
+----
+# 查看所有寄存器
+(gdb) info registers
+
+# 查看特定寄存器
+(gdb) info registers r0 pc sp lr
+
+# Cortex-M 特殊寄存器
+(gdb) print/x $xpsr                 # 程序状态寄存器
+(gdb) print/x $control              # 控制寄存器
+(gdb) print/x $msp                  # 主栈指针
+(gdb) print/x $psp                  # 进程栈指针
+
+# 修改寄存器
+(gdb) set $r0 = 0x1234
+(gdb) set $pc = main
+----
+
+==== 调用栈
+
+[source,gdb]
+----
+# 查看调用栈
+(gdb) backtrace
+(gdb) backtrace full                # 包含局部变量
+
+# 切换栈帧
+(gdb) frame 2
+(gdb) up
+(gdb) down
+
+# 查看当前栈帧
+(gdb) info frame
+----
+
+=== GDB 初始化脚本
+
+创建 `.gdbinit` 文件自动执行常用命令：
+
+[source,gdb]
+----
+# 连接 OpenOCD
+target remote localhost:3333
+
+# 加载程序
+load
+
+# 复位并暂停
+monitor reset halt
+
+# 常用断点
+break main
+break HardFault_Handler
+
+# 界面配置
+layout src                          # 显示源代码窗口
+set disassembly-flavor intel        # Intel 汇编风格
+set print pretty on                 # 美化结构体输出
+set print array-indexes on          # 显示数组索引
+set history save on                 # 保存命令历史
+----
+
+使用脚本：
+
+[source,bash]
+----
+arm-none-eabi-gdb -x .gdbinit CubeMot.elf
+----
+
+== 典型调试场景
+
+=== 场景 1：程序无法启动或进入 HardFault
+
+[source,gdb]
+----
+# 1. 检查向量表
+(gdb) x/2xw 0x08000000
+# 第一个字应为栈顶指针（0x2000xxxx），第二个字应为 Reset_Handler
+
+# 2. 在 Reset_Handler 和 HardFault_Handler 设置断点
+(gdb) break Reset_Handler
+(gdb) break HardFault_Handler
+(gdb) monitor reset halt
+(gdb) continue
+
+# 3. 如果进入 HardFault，检查故障状态寄存器
+(gdb) print/x *(uint32_t*)0xE000ED28    # CFSR
+(gdb) print/x *(uint32_t*)0xE000ED2C    # HFSR
+(gdb) print/x *(uint32_t*)0xE000ED34    # MMFAR
+(gdb) print/x *(uint32_t*)0xE000ED38    # BFAR
+----
+
+=== 场景 2：外设不工作
+
+[source,gdb]
+----
+# 1. 检查 RCC 时钟使能
+(gdb) print/x *(uint32_t*)0x4002104C    # RCC_AHB2ENR
+(gdb) print/x *(uint32_t*)0x40021058    # RCC_APB1ENR1
+(gdb) print/x *(uint32_t*)0x40021060    # RCC_APB2ENR
+
+# 2. 检查外设寄存器配置（以 GPIOA 为例）
+(gdb) print/x *(uint32_t*)0x48000000    # GPIOA_MODER
+(gdb) print/x *(uint32_t*)0x48000014    # GPIOA_ODR
+
+# 3. 使用观察点监控寄存器变化
+(gdb) awatch *(uint32_t*)0x48000014
+----
+
+=== 场景 3：内存/栈溢出
+
+[source,gdb]
+----
+# 1. 检查栈指针位置
+(gdb) info registers sp msp
+
+# 2. 在栈底设置观察点（假设栈大小 8KB，从 0x20005000 开始）
+(gdb) awatch *(uint32_t*)0x20003000
+
+# 3. 查看内存使用报告
+# 构建产物中的 memory_usage.txt 和 size_report.txt
+----
+
+=== 场景 4：时序测量
+
+使用 DWT 周期计数器测量代码执行时间：
+
+[source,c]
+----
+#include "core_cm4.h"
+
+// 启用 DWT 周期计数器
+CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+
+// 测量代码
+uint32_t start = DWT->CYCCNT;
+// ... 被测量的代码
+uint32_t end = DWT->CYCCNT;
+uint32_t cycles = end - start;
+// 时间 = cycles / 170MHz (STM32G431 @ 170MHz)
+----
+
+== 实用脚本
+
+=== 一键调试脚本
+
+创建 `debug.sh`：
+
+[source,bash]
+----
+#!/bin/bash
+
+TARGET_DIR="target/nucleo_g431rb/Debug"
+ELF_FILE="$TARGET_DIR/CubeMot.elf"
+OCD_CFG="$TARGET_DIR/openocd.cfg"
+
+# 检查文件是否存在
+if [ ! -f "$ELF_FILE" ]; then
+    echo "错误: 未找到 $ELF_FILE"
+    echo "请先构建: cmake --workflow --preset embedded-debug"
+    exit 1
+fi
+
+# 启动 OpenOCD（后台）
+echo "启动 OpenOCD..."
+openocd -f "$OCD_CFG" &
+OPENOCD_PID=$!
+sleep 1
+
+# 启动 GDB
+echo "启动 GDB..."
+arm-none-eabi-gdb "$ELF_FILE" \
+    -ex "target remote localhost:3333" \
+    -ex "load" \
+    -ex "monitor reset halt" \
+    -ex "break main" \
+    -ex "continue"
+
+# 清理：终止 OpenOCD
+echo "关闭 OpenOCD..."
+kill $OPENOCD_PID 2>/dev/null
+----
+
+使用：
+
+[source,bash]
+----
+chmod +x debug.sh
+./debug.sh
+----
+
+=== 快速烧录脚本
+
+创建 `flash.sh`：
+
+[source,bash]
+----
+#!/bin/bash
+
+TARGET_DIR="target/nucleo_g431rb/Debug"
+ELF_FILE="$TARGET_DIR/CubeMot.elf"
+OCD_CFG="$TARGET_DIR/openocd.cfg"
+
+if [ ! -f "$ELF_FILE" ]; then
+    echo "错误: 未找到 $ELF_FILE"
+    exit 1
+fi
+
+echo "烧录 $ELF_FILE ..."
+openocd -f "$OCD_CFG" \
+    -c "program $ELF_FILE verify reset exit"
+
+echo "烧录完成"
+----
+
+== 常见问题排查
+
+=== OpenOCD 无法识别 ST-LINK
+
+**症状**：`Error: libusb_open() failed with LIBUSB_ERROR_ACCESS`
+
+**解决方案**：
+
+[source,bash]
+----
+# 1. 检查 USB 连接
+lsusb | grep 0483:374b
+
+# 2. 配置 udev 规则
+sudo cp /usr/share/openocd/contrib/60-openocd.rules /etc/udev/rules.d/
+sudo udevadm control --reload-rules && sudo udevadm trigger
+
+# 3. 检查用户权限（重新登录生效）
+groups | grep dialout
+----
+
+=== GDB 连接失败
+
+**症状**：`localhost:3333: Connection refused`
+
+**排查步骤**：
+
+1. 确认 OpenOCD 正在运行且端口 3333 正在监听
+2. 检查防火墙设置
+3. 重启 OpenOCD：`killall openocd`，然后重新启动
+
+=== 断点无法设置
+
+**症状**：`Cannot insert breakpoint 1. Cannot access memory at address ...`
+
+**原因与解决方案**：
+
+1. **程序未加载**
++
+[source,gdb]
+----
+(gdb) load
+(gdb) monitor reset halt
+----
+
+2. **硬件断点用尽**（STM32G4 只有 6 个）
++
+[source,gdb]
+----
+(gdb) info breakpoints
+(gdb) delete <num>           # 删除不必要的断点
+----
+
+3. **调试速度过高**
++
+编辑 `openocd.cfg`，降低 `adapter speed` 至 1000
+
+=== 变量显示 "optimized out"
+
+**解决方案**：
+
+1. 使用 Debug 构建（`-O0` 无优化）
+2. 将变量声明为 `volatile`
+3. 在代码中添加虚拟引用防止优化：`my_var = my_var;`
+
+=== 连接不稳定/经常断开
+
+**解决方案**：
+
+1. **降低调试速度**：`adapter speed 1000`
+2. **检查线缆**：使用高质量 Micro USB 线，避免过长电缆
+3. **避免 USB 集线器**：直接连接主板 USB 端口
+4. **检查电源**：确保开发板供电稳定（3.3V）
+
+=== 下载速度慢
+
+**优化方法**：
+
+1. **提高调试速度**：`adapter speed 8000`（8MHz）
+2. **使用 bin 文件烧录**（比 ELF 快）：
++
+[source,bash]
+----
+openocd -f openocd.cfg \
+    -c "program CubeMot.bin 0x08000000 verify reset exit"
+----
+
+== 高级调试技巧
+
+=== 调试低功耗模式
+
+调试 Stop/Standby 模式时，CPU 时钟会停止导致调试连接断开。
+
+[source,c]
+----
+// 在进入低功耗前使能调试
+DBGMCU->CR |= DBGMCU_CR_DBG_STOP | DBGMCU_CR_DBG_STANDBY;
+----
+
+=== 调试 Bootloader + 应用程序
+
+[source,gdb]
+----
+# 加载 Bootloader
+(gdb) file bootloader.elf
+(gdb) load
+
+# 加载 Application（不覆盖 Bootloader）
+(gdb) add-symbol-file application.elf 0x08004000
+(gdb) load application.elf
+
+# 在不同区域设置断点
+(gdb) break *0x08000000      # Bootloader 入口
+(gdb) break *0x08004000      # Application 入口
+----
+
+=== 使用 Python GDB 脚本
+
+创建 `gdb_utils.py`：
+
+[source,python]
+----
+import gdb
+
+class HardFaultAnalyzer(gdb.Command):
+    """分析 HardFault 原因"""
+    def __init__(self):
+        super().__init__("analyze_hardfault", gdb.COMMAND_USER)
+
+    def invoke(self, arg, from_tty):
+        cfsr = gdb.parse_and_eval("*(uint32_t*)0xE000ED28")
+        hfsr = gdb.parse_and_eval("*(uint32_t*)0xE000ED2C")
+        print(f"CFSR = 0x{int(cfsr):08X}")
+        print(f"HFSR = 0x{int(hfsr):08X}")
+
+HardFaultAnalyzer()
+----
+
+使用：
+
+[source,gdb]
+----
+(gdb) source gdb_utils.py
+(gdb) analyze_hardfault
+----
+
+== 快速参考
+
+=== GDB 命令速查表
+
+[cols="2,1,3"]
+|===
+| 命令 | 缩写 | 说明
+
+| `file <elf>` | | 加载 ELF 文件
+| `target remote <host:port>` | | 连接 GDB 服务器
+| `load` | | 下载程序到目标
+| `monitor reset halt` | `mon reset halt` | 复位并暂停
+| `break <location>` | `b` | 设置断点
+| `continue` | `c` | 继续执行
+| `step` | `s` | 单步（进入）
+| `next` | `n` | 单步（跳过）
+| `finish` | `fin` | 执行到函数返回
+| `print <expr>` | `p` | 打印表达式
+| `display <expr>` | | 持续显示
+| `backtrace` | `bt` | 查看调用栈
+| `info breakpoints` | `i b` | 查看断点
+| `info registers` | `i r` | 查看寄存器
+| `x/<n><f><u> <addr>` | | 查看内存
+| `disassemble` | `disas` | 反汇编
+| `set <var> = <val>` | | 修改变量
+| `quit` | `q` | 退出 GDB
+|===
+
+=== 关键寄存器地址
+
+[cols="2,3"]
+|===
+| 地址 | 寄存器
+
+| `0xE000ED28` | CFSR（可配置故障状态）
+| `0xE000ED2C` | HFSR（HardFault 状态）
+| `0xE000ED34` | MMFAR（存储器管理故障地址）
+| `0xE000ED38` | BFAR（总线故障地址）
+| `0xE0001000` | DWT_CTRL（DWT 控制）
+| `0xE0001004` | DWT_CYCCNT（周期计数器）
+|===
+
+=== RCC 寄存器地址
+
+[cols="2,3"]
+|===
+| 地址 | 寄存器
+
+| `0x4002104C` | RCC_AHB2ENR
+| `0x40021058` | RCC_APB1ENR1
+| `0x40021060` | RCC_APB2ENR
+|===
+
+== 相关文档
+
+* link:BUILDING.adoc[构建指导] - 完整的构建系统说明
+* link:quickstart.adoc[快速开始] - 快速上手指南
+* link:kconfig.adoc[Kconfig 配置] - 配置系统说明
+* OpenOCD 官方文档: https://openocd.org/doc/
+* GDB 手册: https://sourceware.org/gdb/current/onlinedocs/gdb/
+* STM32G4 参考手册: https://www.st.com/resource/en/reference_manual/rm0440.pdf

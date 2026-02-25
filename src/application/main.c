@@ -10,7 +10,7 @@ int main(void)
 
 #if CONFIG_BOARD_HAS_LED1
     led_t led1;
-    if (led_init(&led1, BOARD_LED_1) == LED_SUCCESS) {
+    if (led_init(&led1, BOARD_LED_1) == LED_OK) {
         while (1) {
             led_toggle(&led1);
             board_delay_ms(500);

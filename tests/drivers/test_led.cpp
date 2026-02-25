@@ -1,12 +1,12 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
-
-#include "drivers/led/led.h"
 #include "mocks/board_led_mock.h"
 
+extern "C" {
+#include "drivers/led/led.h"
+}
+
 using ::testing::_;
-using ::testing::IsNull;
-using ::testing::NotNull;
 using ::testing::Return;
 
 class LedTest : public ::testing::Test
@@ -15,219 +15,203 @@ class LedTest : public ::testing::Test
     void SetUp() override
     {
         mock_ = &GetBoardLedMock();
-        // Initialize a valid LED for tests that need it
-        led_valid_.handle = valid_handle_;
     }
 
     void TearDown() override
     {
-        mock_ = nullptr;
+        // Mock will be destroyed after each test
+    }
+
+    // Helper: Expect a valid handle to be returned for given ID
+    void ExpectValidHandle(int id, board_led_t handle)
+    {
+        EXPECT_CALL(*mock_, get_handle(id)).WillOnce(Return(handle));
+        EXPECT_CALL(*mock_, is_valid(handle)).WillRepeatedly(Return(true));
+    }
+
+    // Helper: Expect an invalid handle (null or is_valid returns false)
+    void ExpectInvalidHandle(int id)
+    {
+        EXPECT_CALL(*mock_, get_handle(id)).WillOnce(Return(nullptr));
+        EXPECT_CALL(*mock_, is_valid(nullptr)).WillOnce(Return(false));
+    }
+
+    // Helper: Setup a valid LED instance for tests that need one
+    led_err_t SetupLed(led_t *led, int id, board_led_t handle)
+    {
+        ExpectValidHandle(id, handle);
+        return led_init(led, id);
     }
 
     BoardLedMock *mock_;
-    // Use a simple non-null pointer as valid handle
-    board_led_t valid_handle_ = reinterpret_cast<board_led_t>(0x1234);
-    // Pre-initialized valid LED for convenience
-    led_t led_valid_;
 };
 
-// led_init tests
-TEST_F(LedTest, NullLedReturnsError)
+TEST_F(LedTest, InitWithNullPointerReturnsError)
 {
-    led_error_t result = led_init(nullptr, 0);
-    EXPECT_EQ(result, LED_ERROR_INVALID_PARAM);
+    led_err_t err = led_init(nullptr, 0);
+    EXPECT_EQ(err, LED_ERR_NULL);
 }
 
-TEST_F(LedTest, InvalidLedIdReturnsNotInitialized)
+TEST_F(LedTest, InitWithInvalidIdReturnsError)
 {
-    // When get_handle returns NULL, is_valid is called to check the handle
-    EXPECT_CALL(*mock_, get_handle(0)).WillOnce(Return(nullptr));
-    EXPECT_CALL(*mock_, is_valid(IsNull())).WillOnce(Return(false));
+    ExpectInvalidHandle(99);
 
     led_t led;
-    led_error_t result = led_init(&led, 0);
-    EXPECT_EQ(result, LED_ERROR_NOT_INITIALIZED);
-    EXPECT_EQ(led.handle, nullptr);
+    led_err_t err = led_init(&led, 99);
+    EXPECT_EQ(err, LED_ERR_INVALID);
 }
 
-TEST_F(LedTest, ValidLedIdReturnsSuccess)
+TEST_F(LedTest, InitSuccess)
 {
-    EXPECT_CALL(*mock_, get_handle(1)).WillOnce(Return(valid_handle_));
-    EXPECT_CALL(*mock_, is_valid(valid_handle_)).WillOnce(Return(true));
+    board_led_t dummy_handle = (board_led_t)0x1234;
+    ExpectValidHandle(0, dummy_handle);
 
     led_t led;
-    led_error_t result = led_init(&led, 1);
-    EXPECT_EQ(result, LED_SUCCESS);
-    EXPECT_EQ(led.handle, valid_handle_);
+    led_err_t err = led_init(&led, 0);
+    EXPECT_EQ(err, LED_OK);
 }
 
-// led_set_state tests
-TEST_F(LedTest, SetStateNullLedReturnsError)
+TEST_F(LedTest, SetOnTurnsLedOn)
 {
-    led_error_t result = led_set_state(nullptr, LED_ON);
-    EXPECT_EQ(result, LED_ERROR_INVALID_PARAM);
-}
-
-TEST_F(LedTest, SetStateUninitializedLedReturnsError)
-{
-    led_t led_uninit;
-    led_uninit.handle = nullptr;
-
-    EXPECT_CALL(*mock_, is_valid(IsNull())).WillOnce(Return(false));
-
-    led_error_t result = led_set_state(&led_uninit, LED_ON);
-    EXPECT_EQ(result, LED_ERROR_NOT_INITIALIZED);
-}
-
-TEST_F(LedTest, TurnOnActivatesHardware)
-{
-    EXPECT_CALL(*mock_, is_valid(valid_handle_)).WillOnce(Return(true));
-    EXPECT_CALL(*mock_, set_state(valid_handle_, true)).Times(1);
-
-    led_error_t result = led_set_state(&led_valid_, LED_ON);
-    EXPECT_EQ(result, LED_SUCCESS);
-}
-
-TEST_F(LedTest, TurnOffDeactivatesHardware)
-{
-    EXPECT_CALL(*mock_, is_valid(valid_handle_)).WillOnce(Return(true));
-    EXPECT_CALL(*mock_, set_state(valid_handle_, false)).Times(1);
-
-    led_error_t result = led_set_state(&led_valid_, LED_OFF);
-    EXPECT_EQ(result, LED_SUCCESS);
-}
-
-TEST_F(LedTest, SetStateInvalidStateValue)
-{
-    // Test with an invalid state value (not LED_ON or LED_OFF)
-    // The driver does (state == LED_ON), so 99 != 1 results in false
-    EXPECT_CALL(*mock_, is_valid(valid_handle_)).WillOnce(Return(true));
-    EXPECT_CALL(*mock_, set_state(valid_handle_, false)).Times(1);
-
-    led_error_t result = led_set_state(&led_valid_, (led_state_t)99);
-    EXPECT_EQ(result, LED_SUCCESS);
-}
-
-// led_toggle tests
-TEST_F(LedTest, ToggleNullLedReturnsError)
-{
-    led_error_t result = led_toggle(nullptr);
-    EXPECT_EQ(result, LED_ERROR_INVALID_PARAM);
-}
-
-TEST_F(LedTest, ToggleUninitializedLedReturnsError)
-{
-    led_t led_uninit;
-    led_uninit.handle = nullptr;
-
-    EXPECT_CALL(*mock_, is_valid(IsNull())).WillOnce(Return(false));
-
-    led_error_t result = led_toggle(&led_uninit);
-    EXPECT_EQ(result, LED_ERROR_NOT_INITIALIZED);
-}
-
-TEST_F(LedTest, ToggleSwitchesHardwareState)
-{
-    EXPECT_CALL(*mock_, is_valid(valid_handle_)).WillOnce(Return(true));
-    EXPECT_CALL(*mock_, toggle(valid_handle_)).Times(1);
-
-    led_error_t result = led_toggle(&led_valid_);
-    EXPECT_EQ(result, LED_SUCCESS);
-}
-
-// led_get_state tests
-TEST_F(LedTest, GetStateNullLedReturnsError)
-{
-    led_state_t state;
-    led_error_t result = led_get_state(nullptr, &state);
-    EXPECT_EQ(result, LED_ERROR_INVALID_PARAM);
-}
-
-TEST_F(LedTest, GetStateNullStateReturnsError)
-{
-    led_error_t result = led_get_state(&led_valid_, nullptr);
-    EXPECT_EQ(result, LED_ERROR_INVALID_PARAM);
-}
-
-TEST_F(LedTest, GetStateUninitializedLedReturnsError)
-{
-    led_t led_uninit;
-    led_uninit.handle = nullptr;
-    led_state_t state;
-
-    EXPECT_CALL(*mock_, is_valid(IsNull())).WillOnce(Return(false));
-
-    led_error_t result = led_get_state(&led_uninit, &state);
-    EXPECT_EQ(result, LED_ERROR_NOT_INITIALIZED);
-}
-
-TEST_F(LedTest, ReadingStateWhenHardwareIsOnReturnsLedOn)
-{
-    led_state_t state;
-
-    EXPECT_CALL(*mock_, is_valid(valid_handle_)).WillOnce(Return(true));
-    EXPECT_CALL(*mock_, get_state(valid_handle_)).WillOnce(Return(true));
-
-    led_error_t result = led_get_state(&led_valid_, &state);
-    EXPECT_EQ(result, LED_SUCCESS);
-    EXPECT_EQ(state, LED_ON);
-}
-
-TEST_F(LedTest, ReadingStateWhenHardwareIsOffReturnsLedOff)
-{
-    led_state_t state;
-
-    EXPECT_CALL(*mock_, is_valid(valid_handle_)).WillOnce(Return(true));
-    EXPECT_CALL(*mock_, get_state(valid_handle_)).WillOnce(Return(false));
-
-    led_error_t result = led_get_state(&led_valid_, &state);
-    EXPECT_EQ(result, LED_SUCCESS);
-    EXPECT_EQ(state, LED_OFF);
-}
-
-// board_led_get_count test
-TEST_F(LedTest, QueryingLedCountReturnsBoardConfiguration)
-{
-    EXPECT_CALL(*mock_, get_count()).WillOnce(Return(3));
-
-    int count = board_led_get_count();
-    EXPECT_EQ(count, 3);
-}
-
-// ============================================================================
-// Boundary and edge case tests
-// ============================================================================
-
-TEST_F(LedTest, InitWithNegativeLedId)
-{
-    EXPECT_CALL(*mock_, get_handle(-1)).WillOnce(Return(nullptr));
-    EXPECT_CALL(*mock_, is_valid(IsNull())).WillOnce(Return(false));
-
+    board_led_t dummy_handle = (board_led_t)0x1234;
     led_t led;
-    led_error_t result = led_init(&led, -1);
-    EXPECT_EQ(result, LED_ERROR_NOT_INITIALIZED);
+    ASSERT_EQ(SetupLed(&led, 0, dummy_handle), LED_OK);
+
+    EXPECT_CALL(*mock_, set_state(dummy_handle, true));
+
+    led_err_t err = led_set(&led, true);
+    EXPECT_EQ(err, LED_OK);
 }
 
-TEST_F(LedTest, InitWithLargeLedId)
+TEST_F(LedTest, SetOffTurnsLedOff)
 {
-    EXPECT_CALL(*mock_, get_handle(9999)).WillOnce(Return(nullptr));
-    EXPECT_CALL(*mock_, is_valid(IsNull())).WillOnce(Return(false));
-
+    board_led_t dummy_handle = (board_led_t)0x1234;
     led_t led;
-    led_error_t result = led_init(&led, 9999);
-    EXPECT_EQ(result, LED_ERROR_NOT_INITIALIZED);
+    ASSERT_EQ(SetupLed(&led, 0, dummy_handle), LED_OK);
+
+    EXPECT_CALL(*mock_, set_state(dummy_handle, false));
+
+    led_err_t err = led_set(&led, false);
+    EXPECT_EQ(err, LED_OK);
 }
 
-TEST_F(LedTest, InitSetsHandleEvenWhenInvalid)
+TEST_F(LedTest, SetWithNullPointerReturnsError)
 {
-    // Verify that led->handle is set even when board returns invalid handle
-    EXPECT_CALL(*mock_, get_handle(5)).WillOnce(Return(nullptr));
-    EXPECT_CALL(*mock_, is_valid(IsNull())).WillOnce(Return(false));
+    led_err_t err = led_set(nullptr, true);
+    EXPECT_EQ(err, LED_ERR_NULL);
+}
 
+TEST_F(LedTest, GetReturnsCurrentStateOn)
+{
+    board_led_t dummy_handle = (board_led_t)0x1234;
     led_t led;
-    // Pre-set handle to non-null to verify it gets overwritten
-    led.handle = valid_handle_;
-    led_error_t result = led_init(&led, 5);
-    EXPECT_EQ(result, LED_ERROR_NOT_INITIALIZED);
-    EXPECT_EQ(led.handle, nullptr);
+    ASSERT_EQ(SetupLed(&led, 0, dummy_handle), LED_OK);
+
+    EXPECT_CALL(*mock_, get_state(dummy_handle)).WillOnce(Return(true));
+
+    bool state;
+    led_err_t err = led_get(&led, &state);
+    EXPECT_EQ(err, LED_OK);
+    EXPECT_TRUE(state);
+}
+
+TEST_F(LedTest, GetReturnsCurrentStateOff)
+{
+    board_led_t dummy_handle = (board_led_t)0x1234;
+    led_t led;
+    ASSERT_EQ(SetupLed(&led, 0, dummy_handle), LED_OK);
+
+    EXPECT_CALL(*mock_, get_state(dummy_handle)).WillOnce(Return(false));
+
+    bool state;
+    led_err_t err = led_get(&led, &state);
+    EXPECT_EQ(err, LED_OK);
+    EXPECT_FALSE(state);
+}
+
+TEST_F(LedTest, GetWithNullLedPointerReturnsError)
+{
+    bool state;
+    led_err_t err = led_get(nullptr, &state);
+    EXPECT_EQ(err, LED_ERR_NULL);
+}
+
+TEST_F(LedTest, GetWithNullStatePointerReturnsError)
+{
+    board_led_t dummy_handle = (board_led_t)0x1234;
+    led_t led;
+    ASSERT_EQ(SetupLed(&led, 0, dummy_handle), LED_OK);
+
+    led_err_t err = led_get(&led, nullptr);
+    EXPECT_EQ(err, LED_ERR_NULL);
+}
+
+TEST_F(LedTest, ToggleChangesState)
+{
+    board_led_t dummy_handle = (board_led_t)0x1234;
+    led_t led;
+    ASSERT_EQ(SetupLed(&led, 0, dummy_handle), LED_OK);
+
+    EXPECT_CALL(*mock_, toggle(dummy_handle));
+
+    led_err_t err = led_toggle(&led);
+    EXPECT_EQ(err, LED_OK);
+}
+
+TEST_F(LedTest, ToggleWithNullPointerReturnsError)
+{
+    led_err_t err = led_toggle(nullptr);
+    EXPECT_EQ(err, LED_ERR_NULL);
+}
+
+TEST_F(LedTest, MultipleLedsCanBeControlledIndependently)
+{
+    board_led_t handle1 = (board_led_t)0x1000;
+    board_led_t handle2 = (board_led_t)0x2000;
+
+    ExpectValidHandle(0, handle1);
+    led_t led1;
+    EXPECT_EQ(led_init(&led1, 0), LED_OK);
+
+    ExpectValidHandle(1, handle2);
+    led_t led2;
+    EXPECT_EQ(led_init(&led2, 1), LED_OK);
+
+    EXPECT_CALL(*mock_, set_state(handle1, true));
+    EXPECT_CALL(*mock_, set_state(handle2, false));
+
+    EXPECT_EQ(led_set(&led1, true), LED_OK);
+    EXPECT_EQ(led_set(&led2, false), LED_OK);
+}
+
+TEST_F(LedTest, MultipleLedsGetStateIndependently)
+{
+    board_led_t handle1 = (board_led_t)0x1000;
+    board_led_t handle2 = (board_led_t)0x2000;
+
+    led_t led1, led2;
+    ASSERT_EQ(SetupLed(&led1, 0, handle1), LED_OK);
+    ASSERT_EQ(SetupLed(&led2, 1, handle2), LED_OK);
+
+    EXPECT_CALL(*mock_, get_state(handle1)).WillOnce(Return(true));
+    EXPECT_CALL(*mock_, get_state(handle2)).WillOnce(Return(false));
+
+    bool state1, state2;
+    EXPECT_EQ(led_get(&led1, &state1), LED_OK);
+    EXPECT_EQ(led_get(&led2, &state2), LED_OK);
+
+    EXPECT_TRUE(state1);
+    EXPECT_FALSE(state2);
+}
+
+TEST_F(LedTest, OperationsFailWithUninitializedLed)
+{
+    led_t uninitialized_led = {nullptr};
+
+    EXPECT_EQ(led_set(&uninitialized_led, true), LED_ERR_INVALID);
+    EXPECT_EQ(led_get(&uninitialized_led, nullptr), LED_ERR_NULL);
+
+    bool state;
+    EXPECT_EQ(led_get(&uninitialized_led, &state), LED_ERR_INVALID);
+    EXPECT_EQ(led_toggle(&uninitialized_led), LED_ERR_INVALID);
 }

@@ -1,0 +1,112 @@
+= KConfig 配置系统
+
+本文档描述 CubeMot 项目的 KConfig 配置系统架构和使用方法。
+
+== 概述
+
+KConfig 提供编译时配置管理：
+
+* 通过 `menuconfig` 进行图形化配置
+* 配置存储于 `.config` 文件
+* CMake 自动生成 `cubemot_config.h` 头文件
+* 源代码通过 `CONFIG_*` 宏访问配置
+
+== 架构
+
+=== 文件组织
+
+----
+CubeMot/
+├── Kconfig                    # 根配置入口
+├── .config                    # 用户配置（生成/手动编辑）
+├── defconfig                  # 默认配置
+├── cubemot_config.h           # 生成的头文件
+├── cmake/
+│   ├── kconfig.cmake          # 头文件生成
+│   └── board_config.cmake     # 板卡检测
+├── tools/
+│   └── gen_config.py          # 配置生成脚本
+└── src/
+    ├── boards/Kconfig         # 板卡选择
+    ├── boards/<BOARD>/Kconfig # 板卡配置
+    ├── drivers/Kconfig        # 驱动配置
+    └── application/Kconfig    # 应用配置
+----
+
+=== 构建流程
+
+1. **板卡检测**：`cmake/board_config.cmake`（通过调用 `gen_config.py`）获取 `BOARD_NAME`
+2. **头文件生成**：`cmake/kconfig.cmake`（通过调用 `gen_config.py`）生成 `cubemot_config.h`
+3. **源码编译**：代码通过 `#include "cubemot_config.h"` 使用配置
+
+== 使用方法
+
+=== 图形化配置（推荐）
+
+[source,bash]
+----
+# 安装工具
+pip install kconfiglib
+
+# 配置
+menuconfig Kconfig
+
+# 重新构建
+rm -rf build
+cmake --workflow --preset embedded-debug
+----
+
+=== 手动编辑配置
+
+直接修改 `.config` 后重新构建：
+
+[source,bash]
+----
+vi .config
+rm -rf build
+cmake --workflow --preset embedded-debug
+----
+
+=== 代码中使用
+
+[source,c]
+----
+#include "cubemot_config.h"
+
+#if CONFIG_BOARD_HAS_LED1
+    led_init(CONFIG_BOARD_LED1_PORT, CONFIG_BOARD_LED1_PIN);
+#endif
+----
+
+== 添加新板卡
+
+. 创建板卡目录：`mkdir src/boards/my_board`
+. 创建板卡 Kconfig 定义配置项
+. 创建 `board_config.cmake` 设置 MCU 参数
+. 在 `src/boards/Kconfig` 中添加板卡选项
+. （可选）创建 `defconfig` 提供默认配置
+
+== 配置工具
+
+[cols="1,2"]
+|===
+| 命令 | 用途
+
+| `menuconfig Kconfig` | 终端图形配置
+| `guiconfig Kconfig` | GUI 配置
+| `savedefconfig` | 导出最小配置
+| `olddefconfig` | 更新到最新默认值
+|===
+
+== 故障排除
+
+*配置未生效*:: 清理构建目录 `rm -rf build/` 后重新构建
+
+*板卡检测失败*:: 检查 `src/boards/<board>/` 目录和 `board_config.cmake` 是否存在
+
+*头文件未生成*:: 检查 `tools/gen_config.py` 是否存在且可执行
+
+== 参考
+
+* Kconfig 语法：https://www.kernel.org/doc/Documentation/kbuild/kconfig-language.txt
+* Kconfiglib：https://github.com/ulfalizer/Kconfiglib

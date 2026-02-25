@@ -15,6 +15,8 @@
 
 == 目录结构
 
+=== 测试源码
+
 [source]
 ----
 tests/
@@ -28,22 +30,80 @@ tests/
     └── board_led_mock.cpp
 ----
 
+=== 构建输出
+
+使用 CMake Preset 时，构建目录结构：
+
+[source]
+----
+build/
+├── test-debug/             # test-debug Preset 输出
+│   ├── tests/
+│   │   └── cubemot-test    # 测试可执行文件
+│   └── ...
+└── test-release/           # test-release Preset 输出
+    └── ...
+----
+
 == 运行测试
 
-=== 启用测试构建
+=== 使用 CMake Preset（推荐）
 
-使用BUILD_TESTING选项将构建工程设置为测试模式。测试构建使用主机原生编译器，而非嵌入式交叉编译器。
+项目已配置 CMake Presets，支持一键配置、构建和运行测试。
+
+==== 可用测试 Presets
+
+|===
+| Preset 名称 | 说明
+
+| `test-debug` | PC 单元测试（Debug 模式）
+| `test-release` | PC 单元测试（Release 模式）
+|===
+
+==== 完整工作流（一键执行）
+
+[source,bash]
+----
+# 配置 + 构建 + 运行测试（Debug）
+cmake --workflow --preset test-debug
+
+# 配置 + 构建 + 运行测试（Release）
+cmake --workflow --preset test-release
+----
+
+==== 分步执行
+
+如需分步控制：
+
+[source,bash]
+----
+# 1. 配置（Debug 测试模式）
+cmake --preset test-debug
+
+# 2. 构建
+cmake --build --preset test-debug
+
+# 3. 运行测试（使用 CTest）
+ctest --preset test-debug
+
+# 或直接运行测试可执行文件
+./build/test-debug/tests/cubemot-test
+----
+
+=== 手动配置（传统方式）
+
+如不使用 Preset，可手动配置：
 
 [source,bash]
 ----
 # 配置
-cmake -DBUILD_TESTING=ON -B build_test
+cmake -DBUILD_TESTING=ON -B build/test-debug
 
 # 构建
-cmake --build build_test
+cmake --build build/test-debug
 
 # 运行测试
-./build_test/tests/cubemot-test
+./build/test-debug/tests/cubemot-test
 ----
 
 === 使用 CTest
@@ -52,11 +112,11 @@ CTest 是 CMake 的测试驱动程序，可用于统一管理和运行测试。
 
 [source,bash]
 ----
-# 在构建目录内运行所有测试
-ctest
+# 使用 Preset 运行测试（推荐）
+ctest --preset test-debug
 
 # 或从任意位置指定构建目录运行测试
-ctest --test-dir build_test
+ctest --test-dir build/test-debug
 
 # 详细输出
 ctest -V
@@ -75,16 +135,16 @@ ctest -j4
 [source,bash]
 ----
 # 运行所有测试
-./build_test/tests/cubemot-test
+./build/test-debug/tests/cubemot-test
 
 # 显示详细输出
-./build_test/tests/cubemot-test --gtest_brief=0
+./build/test-debug/tests/cubemot-test --gtest_brief=0
 
 # 运行特定测试
-./build_test/tests/cubemot-test --gtest_filter=LEDTest.*
+./build/test-debug/tests/cubemot-test --gtest_filter=LEDTest.*
 
 # 列出所有测试
-./build_test/tests/cubemot-test --gtest_list_tests
+./build/test-debug/tests/cubemot-test --gtest_list_tests
 ----
 
 == 编写测试

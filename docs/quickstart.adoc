@@ -40,9 +40,9 @@ menuconfig Kconfig
 
 若不手动配置，构建系统将使用默认配置。
 
-详细配置系统说明，请参阅 xref:kconfig.adoc[KConfig 配置系统]。
+NOTE: 详细配置说明，请参阅 xref:kconfig.adoc[KConfig 配置系统]。
 
-=== 快速构建（推荐）
+=== 快速构建
 
 使用 Workflow Presets 一键完成配置+构建：
 
@@ -53,30 +53,9 @@ cmake --workflow --preset embedded-debug
 
 # 嵌入式 Release 构建（发布前清理）
 cmake --workflow --preset embedded-release-clean
-
-# 运行单元测试（配置+构建+测试）
-cmake --workflow --preset test-debug
 ----
 
-=== 分步构建
-
-[source,bash]
-----
-# 配置
-cmake --preset embedded-debug
-
-# 构建
-cmake --build --preset embedded-debug
-
-# 清理后重新构建
-cmake --build --preset embedded-debug-clean
-----
-
-=== 可用预设
-
-列出所有预设：`cmake --list-presets`
-
-列出工作流：`cmake --workflow --list-presets`
+NOTE: 详细构建说明，请参阅 link:BUILDING.adoc[构建指导文档]。
 
 == 运行单元测试
 
@@ -91,7 +70,7 @@ cmake --build --preset test-debug
 ctest --preset test-debug
 ----
 
-完整的单元测试文档，包括编写测试和 Mock 使用方法，请参阅 xref:unit_testing.adoc[单元测试文档]。
+NOTE: 完整测试说明，请参阅 xref:unit_testing.adoc[单元测试文档]。
 
 == 烧录固件
 

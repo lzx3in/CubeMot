@@ -18,6 +18,10 @@ readonly YELLOW='\033[1;33m'
 readonly BLUE='\033[0;34m'
 readonly NC='\033[0m'
 
+# 全局状态
+USBIP_AVAILABLE=false
+DEVICE_CONNECTED=false
+
 # 显示使用说明
 show_help() {
     cat << 'EOF'
@@ -98,8 +102,9 @@ check_wsl_environment() {
             echo -e "   正在验证 USB/IP 环境..."
             if "$(dirname "$0")/stlink_wsl_usbip_tools/stlink_wsl_usbip_validator.sh" --quiet; then
                 echo -e "   ${GREEN}✓${NC} USB/IP 环境验证通过，ST-Link 设备已正确连接"
+                USBIP_AVAILABLE=true
             else
-                echo -e "   ${YELLOW}⚠${NC}  USB/IP 环境验证失败"
+                echo -e "   ${RED}✗${NC}  USB/IP 环境验证失败，ST-Link 设备未连接"
                 echo -e "   ${BLUE}提示${NC}: 在WSL中使用OpenOCD前，请先确保ST-Link设备已正确连接"
                 echo -e "   ${BLUE}提示${NC}: 可以手动运行以下命令查看详细信息:"
                 echo -e "   ${BLUE}./stlink_wsl_usbip_tools/stlink_wsl_usbip_validator.sh${NC}"
@@ -160,7 +165,15 @@ check_openocd_installation() {
 # 测试 OpenOCD 配置
 test_openocd_config() {
     echo -e "${BLUE}4.${NC} 正在测试 OpenOCD 配置..."
-    
+
+    # 如果在 WSL 中且 USB/IP 未就绪，跳过硬连接测试
+    if grep -qEi "(Microsoft|WSL)" /proc/version &>/dev/null && [[ "$USBIP_AVAILABLE" == "false" ]]; then
+        echo -e "   ${YELLOW}⚠${NC} 跳过配置测试 - 未检测到 ST-Link 设备"
+        echo -e "   ${BLUE}提示${NC}: 请先连接 ST-Link 设备后再测试配置"
+        echo ""
+        return 0
+    fi
+
     local exit_code=0
     timeout "${TIMEOUT_CONFIG}s" openocd -f "${CONFIG_FILE}" -c "init; echo \"Config OK\"; exit" >"${LOG_FILE}" 2>&1 || exit_code=$?
     
@@ -226,6 +239,15 @@ check_udev_rules() {
 # 测试与目标设备的连接
 test_target_connection() {
     echo -e "${BLUE}6.${NC} 正在测试与目标设备的连接（${TIMEOUT_CONNECT} 秒）..."
+
+    # 如果在 WSL 中且 USB/IP 未就绪，跳过连接测试
+    if grep -qEi "(Microsoft|WSL)" /proc/version &>/dev/null && [[ "$USBIP_AVAILABLE" == "false" ]]; then
+        echo -e "   ${YELLOW}⚠${NC} 跳过连接测试 - 未检测到 ST-Link 设备"
+        echo -e "   ${BLUE}提示${NC}: 请先连接 ST-Link 设备后再测试连接"
+        echo ""
+        return 2  # 返回 2 表示跳过
+    fi
+
     echo "   请确保开发板已连接并通电。"
     echo ""
     
@@ -245,7 +267,12 @@ test_target_connection() {
     if grep -q "breakpoints" "${LOG_FILE}" 2>/dev/null; then
         echo -e "   ${GREEN}✓${NC} 目标设备已准备好调试"
     fi
-    
+
+    # 如果成功检测到目标设备，设置全局标志
+    if [[ $exit_code -eq 0 ]] && grep -q "Cortex-M" "${LOG_FILE}" 2>/dev/null; then
+        DEVICE_CONNECTED=true
+    fi
+
     return $exit_code
 }
 
@@ -256,7 +283,18 @@ handle_test_result() {
     echo ""
     echo "==================================="
     
-    if [[ $exit_code -eq 124 ]]; then
+    if [[ $exit_code -eq 2 ]]; then
+        echo -e "${RED}结果: 失败 - 未检测到 ST-Link 设备${NC}"
+        echo ""
+        echo "请确保:"
+        echo "1. ST-Link 调试器已通过 USB 连接到电脑"
+        echo "2. 在 WSL 中已正确配置 USB/IP（运行 stlink_wsl_usbip_tools/setup.sh）"
+        echo "3. 开发板已通电"
+        echo ""
+        echo "手动检查命令:"
+        echo "- lsusb | grep -i st          # 查看 ST-Link 设备"
+        echo "- ./stlink_wsl_usbip_tools/stlink_wsl_usbip_validator.sh  # 验证 USB/IP 环境"
+    elif [[ $exit_code -eq 124 ]]; then
         echo -e "${YELLOW}结果: 超时 - 开发板无响应${NC}"
         echo ""
         echo "故障排除步骤:"
@@ -305,9 +343,10 @@ main() {
     check_openocd_installation
     test_openocd_config
     check_udev_rules
-    
-    test_target_connection
-    handle_test_result $?
+
+    local result=0
+    test_target_connection || result=$?
+    handle_test_result $result
 }
 
 main "$@"

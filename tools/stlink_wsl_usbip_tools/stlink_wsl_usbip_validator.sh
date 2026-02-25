@@ -335,10 +335,13 @@ validate_stlink_environment() {
         if [ $stlink_status -eq $STATUS_PASS ]; then
             stlink_found=1
             record_result "USB Device Enumeration" $STATUS_PASS "ST-Link device detected" ""
-        elif [ "$stlink_detail" = "no_usb_devices" ]; then
-            record_result "USB Device Enumeration" $STATUS_WARN "No USB devices detected" "Use usbipd attach in Windows to connect devices first"
         else
-            record_result "USB Device Enumeration" $STATUS_WARN "USB devices present but no ST-Link found" "Check device connection or run lsusb to list devices"
+            result=1
+            if [ "$stlink_detail" = "no_usb_devices" ]; then
+                record_result "USB Device Enumeration" $STATUS_FAIL "No USB devices detected" "Use usbipd attach in Windows to connect devices first"
+            else
+                record_result "USB Device Enumeration" $STATUS_FAIL "USB devices present but no ST-Link found" "Check device connection or run lsusb to list devices"
+            fi
         fi
     else
         checks="${checks}\"lsusb_available\": false,"

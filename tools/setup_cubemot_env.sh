@@ -19,6 +19,7 @@ apt-get install -y \
     gcc-arm-none-eabi \
     binutils-arm-none-eabi \
     libnewlib-arm-none-eabi \
+    gdb-multiarch \
     python3 \
     python3-pip \
     python3-venv \

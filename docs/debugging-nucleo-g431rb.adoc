@@ -49,7 +49,7 @@ openocd -f openocd.cfg
 [source,bash]
 ----
 cd target/nucleo_g431rb/Debug
-arm-none-eabi-gdb CubeMot.elf
+gdb-multiarch CubeMot.elf
 ----
 
 在 GDB 中执行：
@@ -89,9 +89,6 @@ openocd -f target/nucleo_g431rb/Debug/openocd.cfg \
 ----
 # Ubuntu/Debian
 sudo apt-get install openocd gdb-multiarch
-
-# 或使用 ARM 官方工具链中的 GDB
-which arm-none-eabi-gdb
 ----
 
 ==== USB 权限配置（Linux）
@@ -261,7 +258,7 @@ $_TARGETNAME configure -rtos auto
 [source,bash]
 ----
 cd target/nucleo_g431rb/Debug
-arm-none-eabi-gdb CubeMot.elf
+gdb-multiarch CubeMot.elf
 ----
 
 === 连接与加载
@@ -445,7 +442,7 @@ set history save on                 # 保存命令历史
 
 [source,bash]
 ----
-arm-none-eabi-gdb -x .gdbinit CubeMot.elf
+gdb-multiarch -x .gdbinit CubeMot.elf
 ----
 
 == 典型调试场景
@@ -551,7 +548,7 @@ sleep 1
 
 # 启动 GDB
 echo "启动 GDB..."
-arm-none-eabi-gdb "$ELF_FILE" \
+gdb-multiarch "$ELF_FILE" \
     -ex "target remote localhost:3333" \
     -ex "load" \
     -ex "monitor reset halt" \

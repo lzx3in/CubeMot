@@ -97,7 +97,7 @@ openocd -f target/nucleo_g431rb/Debug/openocd.cfg
 
 [source,bash]
 ----
-arm-none-eabi-gdb target/nucleo_g431rb/Debug/CubeMot.elf
+gdb-multiarch target/nucleo_g431rb/Debug/CubeMot.elf
 
 # 在 GDB 中连接 OpenOCD
 (gdb) target remote localhost:3333

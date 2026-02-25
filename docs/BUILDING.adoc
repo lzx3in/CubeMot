@@ -281,7 +281,7 @@ openocd -f openocd.cfg
 [source,bash]
 ----
 # 连接 OpenOCD（另一个终端）
-arm-none-eabi-gdb CubeMot.elf
+gdb-multiarch CubeMot.elf
 
 (gdb) target remote localhost:3333
 (gdb) load

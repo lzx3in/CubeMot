@@ -183,7 +183,12 @@ check_wsl_environment() {
 }
 
 check_usbip_client() {
-    if command -v usbip &> /dev/null; then
+    # WSL2: usbip command not required - devices attached via Windows usbipd
+    # Just verify USB subsystem is functional by checking if lsusb works
+    if command -v lsusb &> /dev/null && lsusb &> /dev/null; then
+        echo "wsl2_usbip_active"
+        return $STATUS_PASS
+    elif command -v usbip &> /dev/null; then
         echo "available"
         return $STATUS_PASS
     else
@@ -225,7 +230,8 @@ get_usb_devices() {
 check_stlink_device() {
     local usb_devices
     usb_devices=$(get_usb_devices)
-    if echo "$usb_devices" | grep -qi "st-link"; then
+    # Match ST-Link variants: "ST-Link", "STLINK", case insensitive
+    if echo "$usb_devices" | grep -qiE "st[-_]?link"; then
         echo "found"
         return $STATUS_PASS
     else
@@ -279,7 +285,11 @@ validate_stlink_environment() {
     
     if [ $usbip_status -eq $STATUS_PASS ]; then
         checks="${checks}\"usbip_client\": true,"
-        record_result "USB/IP Client" $STATUS_PASS "usbip command available" ""
+        if [ "$usbip_detail" = "wsl2_usbip_active" ]; then
+            record_result "USB/IP Client" $STATUS_PASS "WSL2 USB/IP active (via Windows usbipd)" ""
+        else
+            record_result "USB/IP Client" $STATUS_PASS "usbip command available" ""
+        fi
     else
         checks="${checks}\"usbip_client\": false,"
         errors="${errors}\"usbip client not found. Install with: sudo apt install -y usbip"

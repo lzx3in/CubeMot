@@ -1,0 +1,414 @@
+= CubeMot 构建指导
+:toc: left
+:toclevels: 2
+:icons: font
+:sectlinks:
+
+== 概述
+
+CubeMot 项目使用 CMake 作为构建系统，支持多种构建配置和工具链。本文档提供完整的构建指导。
+
+NOTE: 如需快速入门，请参考 link:quickstart.adoc[快速开始文档]。单元测试构建详见 link:unit_testing.adoc[单元测试文档]。
+
+== 前置要求
+
+=== 必需工具
+
+* CMake 3.28 或更高版本
+* Ninja 构建系统（推荐）
+* Git
+* Python 3（用于配置生成）
+
+=== 工具链
+
+==== 嵌入式构建（固件）
+
+* `arm-none-eabi-gcc` - ARM GCC 编译器
+* `arm-none-eabi-objcopy` - 二进制转换工具
+* `arm-none-eabi-size` - 文件大小查看工具
+
+确保工具链的 `bin` 目录已添加到系统 PATH：
+
+[source,bash]
+----
+export PATH=/path/to/arm-gnu-toolchain/bin:$PATH
+----
+
+==== 单元测试构建（PC 端）
+
+* pass:[C++17 兼容的编译器（g++ 或 clang++）]
+
+=== OpenOCD（可选）
+
+如需调试和烧录，请安装 OpenOCD。
+
+== 构建系统文件组织
+
+----
+CubeMot/
+├── CMakeLists.txt          # 根 CMake 配置
+├── CMakePresets.json       # 预设配置
+├── Kconfig                 # 根 Kconfig 文件
+├── .config                 # 用户配置（生成）
+├── cubemot_config.h        # 生成的配置头文件
+├── cmake/                  # CMake 模块
+│   ├── gcc_arm_none_eabi_toolchain.cmake  # 工具链配置
+│   ├── board_config.cmake                 # 板级检测
+│   ├── kconfig.cmake                      # 配置头文件生成
+│   └── post_build.cmake                   # 后处理（产物复制）
+├── src/                    # 源代码（构建输入）
+├── tests/                  # 单元测试（构建输入）
+├── tools/
+│   └── gen_config.py       # 配置生成脚本（Kconfig → 头文件）
+├── build/                  # CMake 工作目录（生成，按预设分目录）
+└── target/                 # 最终构建产物（生成，ELF/MAP/OpenOCD 配置）
+----
+
+== 快速构建
+
+项目使用 **CMake Presets** 管理构建配置。
+
+=== 完整工作流（推荐）
+
+[source,bash]
+----
+# 嵌入式 Debug 构建
+cmake --workflow --preset embedded-debug
+
+# 嵌入式 Release 构建
+cmake --workflow --preset embedded-release
+
+# 单元测试
+cmake --workflow --preset test-debug
+----
+
+=== 列出可用预设
+
+[source,bash]
+----
+# 列出所有预设
+cmake --list-presets
+
+# 列出工作流预设
+cmake --workflow --list-presets
+----
+
+=== 分步构建
+
+[source,bash]
+----
+# 配置
+cmake --preset embedded-debug
+
+# 构建
+cmake --build --preset embedded-debug
+
+# 清理构建
+cmake --build --preset embedded-debug-clean
+----
+
+== 构建预设详解
+
+=== 嵌入式构建预设
+
+[cols="2,3"]
+|===
+| 预设名称 | 说明
+
+| `embedded-debug`
+| 嵌入式固件 Debug 构建
+
+| `embedded-release`
+| 嵌入式固件 Release 构建
+
+| `embedded-relwithdebinfo`
+| 带调试信息的 Release 构建
+
+| `embedded-minsizerel`
+| 最小体积 Release 构建
+|===
+
+=== 单元测试预设
+
+[cols="2,3"]
+|===
+| 预设名称 | 说明
+
+| `test-debug`
+| PC 端单元测试（Debug）
+
+| `test-release`
+| PC 端单元测试（Release）
+|===
+
+=== 构建类型对比
+
+[cols="2,3,2"]
+|===
+| 构建类型 | 说明 | 优化级别
+
+| Debug
+| 调试构建，包含完整调试信息
+| -O0
+
+| Release
+| 发布构建，启用优化
+| -Os
+
+| MinSizeRel
+| 最小体积发布构建
+| -Os
+
+| RelWithDebInfo
+| 带调试信息的发布构建
+| -O2 + 调试信息
+|===
+
+== 配置系统
+
+=== Kconfig 概述
+
+项目使用 Kconfig 管理编译时配置：
+
+* 配置存储于 `.config` 文件
+* 通过 `menuconfig` 进行图形化配置
+* CMake 自动生成 `cubemot_config.h` 头文件
+* 源码通过 `CONFIG_*` 宏访问配置
+
+详细配置系统说明请参考 link:kconfig.adoc[Kconfig 配置系统文档]。
+
+=== 图形化配置
+
+[source,bash]
+----
+# 安装 kconfiglib
+pip install kconfiglib
+
+# 启动配置界面
+menuconfig Kconfig
+
+# 或使用 GUI
+guiconfig Kconfig
+----
+
+配置完成后需重新构建：
+
+[source,bash]
+----
+rm -rf build
+cmake --workflow --preset embedded-debug
+----
+
+=== 代码中使用配置
+
+[source,c]
+----
+#include "cubemot_config.h"
+
+#if CONFIG_BOARD_HAS_LED1
+    led_init(CONFIG_BOARD_LED1_PORT, CONFIG_BOARD_LED1_PIN);
+#endif
+----
+
+== 构建输出
+
+=== 输出目录结构
+
+构建输出按预设名称组织：
+
+----
+build/
+├── embedded-debug/         # embedded-debug 预设输出
+│   ├── build.ninja
+│   ├── CMakeCache.txt
+│   └── ...
+├── embedded-release/       # embedded-release 预设输出
+└── test-debug/             # test-debug 预设输出
+    └── tests/
+        └── cubemot-test    # 测试可执行文件
+
+target/
+└── nucleo_g431rb/          # 板级输出
+    ├── Debug/
+    │   ├── CubeMot.elf
+    │   ├── CubeMot.map
+    │   └── openocd.cfg
+    └── Release/
+----
+
+=== 固件产物
+
+[cols="2,3"]
+|===
+| 文件 | 说明
+
+| `CubeMot.elf`
+| 可执行文件（用于调试）
+
+| `CubeMot.map`
+| 内存映射文件
+
+| `openocd.cfg`
+| OpenOCD 调试配置
+|===
+
+=== 生成二进制文件
+
+[source,bash]
+----
+# 生成 .bin 文件
+arm-none-eabi-objcopy -O binary target/nucleo_g431rb/Debug/CubeMot.elf target/nucleo_g431rb/Debug/CubeMot.bin
+
+# 生成 .hex 文件
+arm-none-eabi-objcopy -O ihex target/nucleo_g431rb/Debug/CubeMot.elf target/nucleo_g431rb/Debug/CubeMot.hex
+----
+
+== 调试与烧录
+
+=== 使用 OpenOCD
+
+构建系统自动生成 OpenOCD 配置文件：
+
+[source,bash]
+----
+# 启动调试服务器
+cd target/nucleo_g431rb/Debug
+openocd -f openocd.cfg
+----
+
+=== 使用 GDB
+
+[source,bash]
+----
+# 连接 OpenOCD（另一个终端）
+arm-none-eabi-gdb CubeMot.elf
+
+(gdb) target remote localhost:3333
+(gdb) load
+(gdb) monitor reset halt
+(gdb) continue
+----
+
+=== 直接烧录
+
+[source,bash]
+----
+openocd -f target/nucleo_g431rb/Debug/openocd.cfg \
+  -c "program target/nucleo_g431rb/Debug/CubeMot.elf verify reset exit"
+----
+
+== 工具链配置
+
+=== GCC ARM 工具链
+
+默认工具链配置位于 `cmake/gcc_arm_none_eabi_toolchain.cmake`。
+
+主要编译器标志：
+
+* `-mcpu=cortex-m4` - CPU 架构
+* `-mfpu=fpv4-sp-d16` - FPU 配置
+* `-mfloat-abi=hard` - 硬件浮点
+* `-Wall` - 启用警告
+* `-fdata-sections -ffunction-sections` - 函数和数据分段
+
+=== STARM-CLANG 工具链（可选）
+
+项目也支持 STARM-CLANG 工具链，配置位于 `cmake/starm_clang_toolchain.cmake`。
+
+使用方式：
+
+[source,bash]
+----
+cmake --preset embedded-debug \
+  -DCMAKE_TOOLCHAIN_FILE=cmake/starm_clang_toolchain.cmake
+----
+
+== 故障排除
+
+=== CMake 无法找到工具链
+
+**症状**：
+
+----
+CMake Error: CMAKE_C_COMPILER not set
+----
+
+**解决方案**：
+
+[source,bash]
+----
+# 检查工具链是否在 PATH 中
+which arm-none-eabi-gcc
+
+# 如不在 PATH 中，添加：
+export PATH=/path/to/arm-gnu-toolchain/bin:$PATH
+----
+
+=== 配置未生效
+
+**症状**：修改 `.config` 后构建行为未改变
+
+**解决方案**：
+
+[source,bash]
+----
+# 清理构建目录后重新构建
+rm -rf build
+cmake --workflow --preset embedded-debug
+----
+
+=== OpenOCD 无法连接
+
+**症状**：`Error: libusb_open() failed`
+
+**解决方案**（Linux）：
+
+[source,bash]
+----
+# 添加 udev 规则
+sudo cp /usr/share/openocd/contrib/60-openocd.rules /etc/udev/rules.d/
+sudo udevadm control --reload-rules && sudo udevadm trigger
+----
+
+== 高级用法
+
+=== 自定义编译定义
+
+[source,bash]
+----
+cmake --preset embedded-debug \
+  -DCMAKE_C_FLAGS="-DMY_CUSTOM_DEFINE=1"
+----
+
+=== 并行构建
+
+构建预设已自动配置并行构建。如需手动指定：
+
+[source,bash]
+----
+cmake --build --preset embedded-debug --parallel $(nproc)
+----
+
+=== 详细输出
+
+[source,bash]
+----
+cmake --build --preset embedded-debug --verbose
+----
+
+=== 清理构建
+
+[source,bash]
+----
+# 清理所有构建目录
+rm -rf build target
+
+# 或仅清理特定预设
+cmake --build --preset embedded-debug-clean
+----
+
+== 相关文档
+
+* link:quickstart.adoc[快速开始文档] - 快速上手指南
+* link:unit_testing.adoc[单元测试文档] - 测试构建与运行
+* link:kconfig.adoc[Kconfig 配置系统] - 配置系统详细说明

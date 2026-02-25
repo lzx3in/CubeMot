@@ -79,3 +79,62 @@ NOTE: 完整测试说明，请参阅 xref:unit_testing.adoc[单元测试文档]�
 openocd -f target/nucleo_g431rb/Debug/openocd.cfg \
   -c "program target/nucleo_g431rb/Debug/CubeMot.elf verify reset exit"
 ----
+
+== 调试
+
+=== 启动 OpenOCD 调试服务器
+
+保持此终端运行：
+
+[source,bash]
+----
+openocd -f target/nucleo_g431rb/Debug/openocd.cfg
+----
+
+=== 连接 GDB
+
+在另一个终端中：
+
+[source,bash]
+----
+arm-none-eabi-gdb target/nucleo_g431rb/Debug/CubeMot.elf
+
+# 在 GDB 中连接 OpenOCD
+(gdb) target remote localhost:3333
+
+# 加载程序（若尚未烧录）
+(gdb) load
+
+# 重置并暂停在入口点
+(gdb) monitor reset halt
+
+# 设置断点（示例）
+(gdb) break main
+
+# 继续执行
+(gdb) continue
+----
+
+=== 常用 GDB 命令
+
+[cols="1,2"]
+|===
+| 命令 | 说明
+
+| `continue` 或 `c` | 继续执行
+| `step` 或 `s` | 单步进入
+| `next` 或 `n` | 单步跳过
+| `finish` | 运行到当前函数返回
+| `break <location>` | 设置断点
+| `info breakpoints` | 查看断点列表
+| `delete <num>` | 删除断点
+| `print <var>` | 打印变量值
+| `backtrace` 或 `bt` | 查看调用栈
+| `info registers` | 查看寄存器
+| `x/<n><f><u> <addr>` | 检查内存
+| `monitor reset halt` | 复位并暂停目标
+| `detach` | 断开连接
+| `quit` | 退出 GDB
+|===
+
+NOTE: 详细调试说明，请参阅 xref:debugging.adoc[调试指南]。

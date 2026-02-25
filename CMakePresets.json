@@ -1,0 +1,208 @@
+{
+  "version": 10,
+  "$schema": "https://raw.githubusercontent.com/Kitware/CMake/master/Help/manual/presets/schema.json",
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 28,
+    "patch": 0
+  },
+  "vendor": {
+    "microsoft.com/VisualStudioSettings/CMake/1.0": {
+      "hostOS": ["Linux"],
+      "intelliSenseMode": "linux-gcc-arm"
+    }
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
+      "name": "base-embedded",
+      "hidden": true,
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/gcc_arm_none_eabi_toolchain.cmake"
+      }
+    },
+    {
+      "name": "base-test",
+      "hidden": true,
+      "inherits": "base",
+      "cacheVariables": {
+        "BUILD_TESTING": "ON"
+      }
+    },
+    {
+      "name": "embedded-debug",
+      "displayName": "Embedded (Debug)",
+      "description": "Embedded build with debug symbols.",
+      "inherits": "base-embedded",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "embedded-release",
+      "displayName": "Embedded (Release)",
+      "description": "Embedded build optimized.",
+      "inherits": "base-embedded",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "embedded-relwithdebinfo",
+      "displayName": "Embedded (RelWithDebInfo)",
+      "description": "Embedded build with optimizations and debug info.",
+      "inherits": "base-embedded",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+      }
+    },
+    {
+      "name": "embedded-minsizerel",
+      "displayName": "Embedded (MinSizeRel)",
+      "description": "Embedded build optimized for size.",
+      "inherits": "base-embedded",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "MinSizeRel"
+      }
+    },
+    {
+      "name": "test-debug",
+      "displayName": "Unit Tests (Debug)",
+      "description": "PC-based unit tests with debug symbols",
+      "inherits": "base-test",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "test-release",
+      "displayName": "Unit Tests (Release)",
+      "description": "PC-based unit tests optimized",
+      "inherits": "base-test",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "embedded-debug",
+      "configurePreset": "embedded-debug",
+      "jobs": 0
+    },
+    {
+      "name": "embedded-debug-clean",
+      "displayName": "Embedded (Debug) - Clean Build",
+      "description": "Clean and rebuild embedded debug",
+      "configurePreset": "embedded-debug",
+      "cleanFirst": true,
+      "jobs": 0
+    },
+    {
+      "name": "embedded-release",
+      "configurePreset": "embedded-release",
+      "jobs": 0
+    },
+    {
+      "name": "embedded-release-clean",
+      "displayName": "Embedded (Release) - Clean Build",
+      "description": "Clean and rebuild embedded release",
+      "configurePreset": "embedded-release",
+      "cleanFirst": true,
+      "jobs": 0
+    },
+    {
+      "name": "test-debug",
+      "configurePreset": "test-debug",
+      "jobs": 0
+    },
+    {
+      "name": "test-release",
+      "configurePreset": "test-release",
+      "jobs": 0
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "test-debug",
+      "configurePreset": "test-debug",
+      "output": {
+        "verbosity": "verbose"
+      }
+    },
+    {
+      "name": "test-release",
+      "configurePreset": "test-release",
+      "output": {
+        "verbosity": "verbose"
+      }
+    }
+  ],
+  "workflowPresets": [
+    {
+      "name": "embedded-debug",
+      "displayName": "Embedded Debug Workflow",
+      "description": "Configure and build embedded debug",
+      "steps": [
+        { "type": "configure", "name": "embedded-debug" },
+        { "type": "build", "name": "embedded-debug" }
+      ]
+    },
+    {
+      "name": "embedded-release",
+      "displayName": "Embedded Release Workflow",
+      "description": "Configure and build embedded release",
+      "steps": [
+        { "type": "configure", "name": "embedded-release" },
+        { "type": "build", "name": "embedded-release" }
+      ]
+    },
+    {
+      "name": "embedded-debug-clean",
+      "displayName": "Embedded Debug Clean Workflow",
+      "description": "Clean, configure and build embedded debug",
+      "steps": [
+        { "type": "configure", "name": "embedded-debug" },
+        { "type": "build", "name": "embedded-debug-clean" }
+      ]
+    },
+    {
+      "name": "embedded-release-clean",
+      "displayName": "Embedded Release Clean Workflow",
+      "description": "Clean, configure and build embedded release",
+      "steps": [
+        { "type": "configure", "name": "embedded-release" },
+        { "type": "build", "name": "embedded-release-clean" }
+      ]
+    },
+    {
+      "name": "test-debug",
+      "displayName": "Test Debug Workflow",
+      "description": "Configure, build and run unit tests (debug)",
+      "steps": [
+        { "type": "configure", "name": "test-debug" },
+        { "type": "build", "name": "test-debug" },
+        { "type": "test", "name": "test-debug" }
+      ]
+    },
+    {
+      "name": "test-release",
+      "displayName": "Test Release Workflow",
+      "description": "Configure, build and run unit tests (release)",
+      "steps": [
+        { "type": "configure", "name": "test-release" },
+        { "type": "build", "name": "test-release" },
+        { "type": "test", "name": "test-release" }
+      ]
+    }
+  ]
+}

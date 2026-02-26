@@ -3,29 +3,48 @@
 
 set -e
 
-if ! command -v git-clang-format &> /dev/null; then
-  echo "⚠️  [pre-commit hook] Warning: git-clang-format not found. Please install clang-format to enable format checking." >&2
-  exit 0
-fi
+check_c_cpp_format() {
+  if ! command -v git-clang-format &> /dev/null; then
+    echo "⚠️  [pre-commit hook] Warning: git-clang-format not found. Skipping C/C++ format check." >&2
+    return 0
+  fi
 
-echo "🔍 [pre-commit hook] Checking code format for staged file(s)..."
+  echo "🔍 [pre-commit hook] Checking C/C++ format..."
 
-# Note: git-clang-format does not support .clang-format-ignore.
-# To exclude specific directories from formatting, create a .clang-format file
-# in those directories with the following content:
-#     DisableFormat: true
+  # Note: git-clang-format does not support .clang-format-ignore.
+  # To exclude specific directories from formatting, create a .clang-format file
+  # in those directories with the following content:
+  #     DisableFormat: true
 
-if ! output=$(git clang-format --staged --diffstat --style=file --extensions c,h,cpp,hpp,cc,cxx,c++,h++,hh 2>&1); then
-  echo ""
-  echo "❌ [pre-commit hook] Code format check failed! The following files require formatting:" >&2
-  echo "$output" >&2
-  echo "" >&2
-  echo "💡 Run this command to fix:" >&2
-  echo "    git clang-format --staged --style=file --extensions c,h,cpp,hpp,cc,cxx,c++,h++,hh" >&2
-  exit 1
-fi
+  if ! output=$(git clang-format --staged --diffstat --style=file --extensions c,h,cpp,hpp,cc,cxx,c++,h++,hh 2>&1); then
+    echo ""
+    echo "❌ [pre-commit hook] C/C++ format check failed! The following files require formatting:" >&2
+    echo "$output" >&2
+    echo "" >&2
+    echo "💡 Run this command to fix:" >&2
+    echo "    git clang-format --staged --style=file --extensions c,h,cpp,hpp,cc,cxx,c++,h++,hh" >&2
+    return 1
+  fi
 
-echo "✅ [pre-commit hook] Code format check passed."
+  echo "✅ [pre-commit hook] C/C++ format check passed."
+  return 0
+}
 
+# ----------------------------------------------------------------------------------------------------------------------
+# Main
+# ----------------------------------------------------------------------------------------------------------------------
+echo "📝 [pre-commit hook] Running format checks..."
 echo ""
-exit 0
+
+exit_code=0
+
+check_c_cpp_format || exit_code=1
+echo ""
+
+if [[ $exit_code -eq 0 ]]; then
+  echo "🎉 [pre-commit hook] All format checks passed."
+else
+  echo "💥 [pre-commit hook] Some checks failed. Fix the issues above before committing."
+fi
+
+exit $exit_code

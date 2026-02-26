@@ -10,8 +10,8 @@ on:
       - main
 
 jobs:
-  clang-format:
-    name: Clang-Format Check
+  c-cpp:
+    name: C/C++ Format Check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -21,3 +21,14 @@ jobs:
           extensions: 'c,h,cpp,hpp,cc,hh,cxx,hxx'
           clangFormatVersion: 19
           style: file
+
+  python:
+    name: Python Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/ruff-action@v3
+        with:
+          src: >-
+            ./tools/
+          args: "format --check --diff"

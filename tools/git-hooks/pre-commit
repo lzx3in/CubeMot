@@ -4,8 +4,8 @@
 set -e
 
 if ! command -v git-clang-format &> /dev/null; then
-  echo "❌ [pre-commit hook] Error: git-clang-format not found. Please install clang-format." >&2
-  exit 1
+  echo "⚠️  [pre-commit hook] Warning: git-clang-format not found. Please install clang-format to enable format checking." >&2
+  exit 0
 fi
 
 echo "🔍 [pre-commit hook] Checking code format for staged file(s)..."

@@ -10,4 +10,9 @@ target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE
     ${TOOLCHAIN_LINK_LIBRARIES}
 )
 
+# Post-build: consolidate outputs to target/
 consolidate_outputs_to_target_dir(${CMAKE_PROJECT_NAME})
+
+# Programming targets: flash, erase, reset
+include(${CMAKE_SOURCE_DIR}/cmake/programming.cmake)
+add_programming_targets(${CMAKE_PROJECT_NAME})

@@ -13,20 +13,20 @@ apt-get update
 echo
 echo "Step 2: Installing system dependencies..."
 apt-get install -y \
-    git \
-    build-essential \
-    ninja-build \
-    gcc-arm-none-eabi \
-    binutils-arm-none-eabi \
-    libnewlib-arm-none-eabi \
-    gdb-multiarch \
-    python3 \
-    python3-pip \
-    python3-venv \
-    cmake \
-    wget \
-    ca-certificates \
-    curl
+  git \
+  build-essential \
+  ninja-build \
+  gcc-arm-none-eabi \
+  binutils-arm-none-eabi \
+  libnewlib-arm-none-eabi \
+  gdb-multiarch \
+  python3 \
+  python3-pip \
+  python3-venv \
+  cmake \
+  wget \
+  ca-certificates \
+  curl
 
 echo
 echo "Step 3: Verifying toolchain installation..."
@@ -42,10 +42,10 @@ echo "✓ Ninja installed"
 echo
 echo "Step 4: Setting up Python virtual environment..."
 if [ -d ".venv" ]; then
-    echo "Virtual environment already exists, skipping creation"
+  echo "Virtual environment already exists, skipping creation"
 else
-    python3 -m venv .venv
-    echo "✓ Python virtual environment created"
+  python3 -m venv .venv
+  echo "✓ Python virtual environment created"
 fi
 
 source .venv/bin/activate

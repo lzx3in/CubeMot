@@ -3,8 +3,8 @@
 set -e
 
 if ! command -v git-clang-format &> /dev/null; then
-    echo "Error: git-clang-format not found. Please install clang-format." >&2
-    exit 1
+  echo "Error: git-clang-format not found. Please install clang-format." >&2
+  exit 1
 fi
 
 echo "Checking code format for staged file(s)..."
@@ -15,12 +15,12 @@ echo "Checking code format for staged file(s)..."
 #     DisableFormat: true
 
 if ! output=$(git clang-format --staged --diffstat --style=file --extensions c,h,cpp,hpp,cc,cxx,c++,h++,hh 2>&1); then
-    echo "❌ Code format check failed! The following files require formatting:" >&2
-    echo "$output" >&2
-    echo "" >&2
-    echo "Run this command to fix:" >&2
-    echo "    git clang-format --staged --style=file --extensions c,h,cpp,hpp,cc,cxx,c++,h++,hh" >&2
-    exit 1
+  echo "❌ Code format check failed! The following files require formatting:" >&2
+  echo "$output" >&2
+  echo "" >&2
+  echo "Run this command to fix:" >&2
+  echo "    git clang-format --staged --style=file --extensions c,h,cpp,hpp,cc,cxx,c++,h++,hh" >&2
+  exit 1
 fi
 
 echo "✅ Code format check passed."

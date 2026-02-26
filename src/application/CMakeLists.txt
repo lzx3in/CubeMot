@@ -14,5 +14,5 @@ target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE
 consolidate_outputs_to_target_dir(${CMAKE_PROJECT_NAME})
 
 # Programming targets: flash, erase, reset
-include(${CMAKE_SOURCE_DIR}/cmake/programming.cmake)
+include(${CMAKE_SOURCE_DIR}/cmake/programming_targets.cmake)
 add_programming_targets(${CMAKE_PROJECT_NAME})

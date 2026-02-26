@@ -5,7 +5,8 @@
         "redhat.vscode-yaml",
         "asciidoctor.asciidoctor-vscode",
         "mhutchie.git-graph",
-        "ms-vscode.cmake-tools"
+        "ms-vscode.cmake-tools",
+        "ms-python.vscode-python-envs"
     ],
     "unwantedRecommendations": [
         // Avoid using C/C++ extension formatting, use clang-format instead

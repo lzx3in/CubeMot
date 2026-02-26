@@ -1,5 +1,7 @@
 add_executable(${CMAKE_PROJECT_NAME}
     main.c
+    ${BOARD_INTERRUPT_SRCS}
+    ${BOARD_STARTUP_SRC}
 )
 
 target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE

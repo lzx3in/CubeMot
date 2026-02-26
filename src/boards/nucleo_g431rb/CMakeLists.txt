@@ -18,13 +18,16 @@ set(STM32_INCLUDE_DIRS
 # STM32CubeMX sources
 set(STM32_APPLICATION_SRCS
     ${CUBEMX_GENERATED_DIR}/Core/Src/main.c
-    ${CUBEMX_GENERATED_DIR}/Core/Src/stm32g4xx_it.c
     ${CUBEMX_GENERATED_DIR}/Core/Src/stm32g4xx_hal_msp.c
     ${CUBEMX_GENERATED_DIR}/Core/Src/stm32g4xx_hal_timebase_tim.c
     ${CUBEMX_GENERATED_DIR}/Core/Src/sysmem.c
     ${CUBEMX_GENERATED_DIR}/Core/Src/syscalls.c
-    ${CUBEMX_GENERATED_DIR}/startup_stm32g431xx.s
 )
+
+set(BOARD_INTERRUPT_SRCS "${CUBEMX_GENERATED_DIR}/Core/Src/stm32g4xx_it.c"
+    CACHE INTERNAL "Board interrupt handlers")
+set(BOARD_STARTUP_SRC "${CUBEMX_GENERATED_DIR}/startup_stm32g431xx.s"
+    CACHE INTERNAL "Board startup file")
 
 set(STM32_HAL_SRCS
     ${CUBEMX_GENERATED_DIR}/Core/Src/system_stm32g4xx.c

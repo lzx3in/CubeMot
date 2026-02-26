@@ -1,0 +1,42 @@
+#!/bin/bash
+# Refer to: https://git-scm.com/docs/githooks#_post_checkout
+
+set -e
+
+prev_head="$1"
+new_head="$2"
+checkout_type="$3" # 1 = branch checkout, 0 = file checkout
+
+is_new_worktree=false
+if [[ "$prev_head" == "0000000000000000000000000000000000000000" ]]; then
+  is_new_worktree=true
+fi
+
+if [[ "$is_new_worktree" != "true" ]]; then
+  exit 0
+fi
+
+worktree_path=$(git rev-parse --show-toplevel)
+worktree_name=$(basename "$worktree_path")
+branch_name=$(git rev-parse --abbrev-ref HEAD)
+
+echo ""
+echo "🔧 [post-checkout hook] Setting up new worktree..."
+echo "   📁 Name: $worktree_name"
+echo "   🌿 Branch: $branch_name"
+
+if [[ -f "$worktree_path/tools/requirements.txt" ]]; then
+  echo "📦 [post-checkout hook] Creating Python virtual environment..."
+  python3 -m venv "$worktree_path/.venv"
+
+  echo "📥 [post-checkout hook] Installing dependencies from tools/requirements.txt..."
+  "$worktree_path/.venv/bin/pip" install -q -r "$worktree_path/tools/requirements.txt"
+
+  echo "✅ [post-checkout hook] Setup complete!"
+else
+  echo "⚠️  [post-checkout hook] tools/requirements.txt not found, skipping venv setup"
+fi
+
+echo ""
+
+exit 0

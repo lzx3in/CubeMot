@@ -48,11 +48,11 @@ NOTE: 详细配置说明，请参阅 xref:kconfig.adoc[KConfig 配置系统]。
 
 [source,bash]
 ----
-# 嵌入式 Debug 构建
+# 固件构建
 cmake --workflow --preset embedded-debug
 
-# 嵌入式 Release 构建（发布前清理）
-cmake --workflow --preset embedded-release-clean
+# 清理+构建
+cmake --workflow --preset embedded-debug-clean
 ----
 
 NOTE: 详细构建说明，请参阅 link:BUILDING.adoc[构建指导文档]。

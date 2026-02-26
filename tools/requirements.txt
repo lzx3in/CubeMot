@@ -1,2 +1,5 @@
 # Python library and CLI tools for Kconfig
 kconfiglib>=14.1.0
+
+# Code linting and formatting
+ruff>=0.15.0

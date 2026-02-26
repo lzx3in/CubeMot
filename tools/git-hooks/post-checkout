@@ -25,6 +25,12 @@ echo "🔧 [post-checkout hook] Setting up new worktree..."
 echo "   📁 Name: $worktree_name"
 echo "   🌿 Branch: $branch_name"
 
+# Uncomment the following lines to auto-initialize git submodules when
+# creating a new worktree. Note: this increases clone time and disk usage.
+#
+# echo "📦 [post-checkout hook] Initializing git submodules..."
+# git submodule update --init --recursive
+
 if [[ -f "$worktree_path/tools/requirements.txt" ]]; then
   echo "📦 [post-checkout hook] Creating Python virtual environment..."
   python3 -m venv "$worktree_path/.venv"

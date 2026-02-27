@@ -16,8 +16,6 @@ typedef struct {
 } animate_runtime_t;
 
 typedef struct led_animation {
-    const char *name;
-
     /* vtable */
     void (*on_start)(void *cfg, animate_runtime_t *runtime, uint32_t start_time_ms, uint8_t phase_offset);
     uint16_t (*on_update)(void *cfg, animate_runtime_t *runtime, uint32_t current_time_ms);
@@ -297,7 +295,6 @@ led_err_t led_animate_breathing_create(const led_animate_breathing_cfg_t *cfg, l
     anim->cfg_size = sizeof(*b);
 
     /* Set vtable */
-    anim->name = "breathing";
     anim->on_start = breathing_on_start;
     anim->on_update = breathing_on_update;
     anim->get_status = breathing_get_status;
@@ -330,7 +327,6 @@ led_err_t led_animate_blink_create(const led_animate_blink_cfg_t *cfg, led_anima
     anim->cfg = b;
     anim->cfg_size = sizeof(*b);
 
-    anim->name = "blink";
     anim->on_start = blink_on_start;
     anim->on_update = blink_on_update;
     anim->get_status = blink_get_status;
@@ -366,7 +362,6 @@ led_err_t led_animate_fade_create(const led_animate_fade_cfg_t *cfg, led_animati
     anim->cfg = f;
     anim->cfg_size = sizeof(*f);
 
-    anim->name = "fade";
     anim->on_start = fade_on_start;
     anim->on_update = fade_on_update;
     anim->get_status = fade_get_status;
@@ -402,7 +397,6 @@ led_err_t led_animate_constant_create(uint16_t brightness, led_animation_t *out_
     anim->cfg = c;
     anim->cfg_size = sizeof(*c);
 
-    anim->name = "constant";
     anim->on_start = NULL;
     anim->on_update = constant_on_update;
     anim->get_status = NULL;
@@ -424,19 +418,6 @@ led_err_t led_animate_destroy(led_animation_t anim)
     stop_animation_internal(anim);
     anim->cfg = NULL; /* Mark as free */
 
-    return LED_OK;
-}
-
-led_err_t led_animate_get_name(led_animation_t anim, const char **out_name)
-{
-    if (!is_valid_anim(anim)) {
-        return LED_ERR_NOT_FOUND;
-    }
-    if (out_name == NULL) {
-        return LED_ERR_NULL;
-    }
-
-    *out_name = anim->name ? anim->name : "unknown";
     return LED_OK;
 }
 

@@ -13,7 +13,6 @@ typedef enum {
 } level_mode_t;
 
 struct led_level {
-    char name[16];
     led_level_backend_t backend;
     bool backend_registered;
     uint16_t current_brightness;
@@ -113,7 +112,7 @@ uint16_t led_level_curve_apply(uint16_t value, led_level_curve_t curve)
     }
 }
 
-led_err_t led_level_create(const char *name, const led_level_backend_t *backend, led_level_t *out_led)
+led_err_t led_level_create(const led_level_backend_t *backend, led_level_t *out_led)
 {
     if (out_led == NULL) {
         return LED_ERR_NULL;
@@ -125,11 +124,6 @@ led_err_t led_level_create(const char *name, const led_level_backend_t *backend,
         if (!level_pool[i].backend_registered) {
             led_level_t led = &level_pool[i];
             memset(led, 0, sizeof(*led));
-
-            if (name != NULL) {
-                strncpy(led->name, name, sizeof(led->name) - 1);
-                led->name[sizeof(led->name) - 1] = '\0';
-            }
 
             led->mode = LEVEL_MODE_IDLE;
             led->current_brightness = 0;
@@ -156,7 +150,6 @@ led_err_t led_level_destroy(led_level_t led)
     }
 
     led->backend_registered = false;
-    led->name[0] = '\0';
 
     return LED_OK;
 }

@@ -37,7 +37,7 @@ class LedLevelTest : public ::testing::Test
 
         EXPECT_CALL(*mock_, set_brightness(mock_, 0)).WillOnce(Return(0));
 
-        led_err_t err = led_level_create("test_led", &backend_, &led_);
+        led_err_t err = led_level_create(&backend_, &led_);
         ASSERT_EQ(err, LED_OK);
         ASSERT_NE(led_, nullptr);
 
@@ -57,7 +57,7 @@ class LedLevelTest : public ::testing::Test
 
 TEST(LedLevelCreateTest, CreateWithNullOutParamReturnsError)
 {
-    led_err_t err = led_level_create("test", nullptr, nullptr);
+    led_err_t err = led_level_create(nullptr, nullptr);
     EXPECT_EQ(err, LED_ERR_NULL);
 }
 
@@ -66,7 +66,7 @@ TEST(LedLevelCreateTest, CreateWithDelayedBackend)
     MockLevelBackend mock;
 
     led_level_t led;
-    led_err_t err = led_level_create("delayed", nullptr, &led);
+    led_err_t err = led_level_create(nullptr, &led);
     EXPECT_EQ(err, LED_OK);
     EXPECT_NE(led, nullptr);
 
@@ -135,7 +135,7 @@ TEST_F(LedLevelTest, SetBrightnessWithNullHandleReturnsError)
 TEST_F(LedLevelTest, SetBrightnessWithoutBackendReturnsError)
 {
     led_level_t led;
-    led_err_t err = led_level_create("unregistered", nullptr, &led);
+    led_err_t err = led_level_create(nullptr, &led);
     ASSERT_EQ(err, LED_OK);
 
     err = led_level_set(led, 500);

@@ -29,7 +29,7 @@ typedef enum {
 } led_level_curve_t;
 
 /* Create LED level instance. Backend may be NULL for delayed binding. */
-led_err_t led_level_create(const char *name, const led_level_backend_t *backend, led_level_t *out_led);
+led_err_t led_level_create(const led_level_backend_t *backend, led_level_t *out_led);
 
 /* Destroy LED level instance. Returns LED_ERR_BUSY if animations active. */
 led_err_t led_level_destroy(led_level_t led);

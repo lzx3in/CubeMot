@@ -39,7 +39,7 @@ class LedAnimateTest : public ::testing::Test
 
         EXPECT_CALL(*mock_, set_brightness(mock_, 0)).WillOnce(Return(0));
 
-        led_err_t err = led_level_create("test_led", &backend_, &led_);
+        led_err_t err = led_level_create(&backend_, &led_);
         ASSERT_EQ(err, LED_OK);
         ASSERT_NE(led_, nullptr);
 
@@ -112,11 +112,6 @@ TEST(LedAnimateCreateTest, BreathingCreateSuccess)
     EXPECT_EQ(err, LED_OK);
     EXPECT_NE(anim, nullptr);
 
-    const char *name;
-    err = led_animate_get_name(anim, &name);
-    EXPECT_EQ(err, LED_OK);
-    EXPECT_STREQ(name, "breathing");
-
     led_animate_destroy(anim);
 }
 
@@ -127,11 +122,6 @@ TEST(LedAnimateCreateTest, BlinkCreateSuccess)
     led_err_t err = led_animate_blink_create(&cfg, &anim);
     EXPECT_EQ(err, LED_OK);
     EXPECT_NE(anim, nullptr);
-
-    const char *name;
-    err = led_animate_get_name(anim, &name);
-    EXPECT_EQ(err, LED_OK);
-    EXPECT_STREQ(name, "blink");
 
     led_animate_destroy(anim);
 }
@@ -145,11 +135,6 @@ TEST(LedAnimateCreateTest, FadeCreateSuccess)
     EXPECT_EQ(err, LED_OK);
     EXPECT_NE(anim, nullptr);
 
-    const char *name;
-    err = led_animate_get_name(anim, &name);
-    EXPECT_EQ(err, LED_OK);
-    EXPECT_STREQ(name, "fade");
-
     led_animate_destroy(anim);
 }
 
@@ -159,11 +144,6 @@ TEST(LedAnimateCreateTest, ConstantCreateSuccess)
     led_err_t err = led_animate_constant_create(500, &anim);
     EXPECT_EQ(err, LED_OK);
     EXPECT_NE(anim, nullptr);
-
-    const char *name;
-    err = led_animate_get_name(anim, &name);
-    EXPECT_EQ(err, LED_OK);
-    EXPECT_STREQ(name, "constant");
 
     led_animate_destroy(anim);
 }
@@ -429,7 +409,7 @@ TEST_F(LedAnimateTest, SharedEffectAcrossLeds)
     ON_CALL(mock2, set_brightness(&mock2, _)).WillByDefault(Return(0));
 
     led_level_t led2;
-    led_err_t err = led_level_create("led2", &backend2, &led2);
+    led_err_t err = led_level_create(&backend2, &led2);
     ASSERT_EQ(err, LED_OK);
 
     led_animate_breathing_cfg_t cfg = {

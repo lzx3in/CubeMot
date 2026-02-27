@@ -50,7 +50,6 @@ led_err_t led_animate_fade_create(const led_animate_fade_cfg_t *cfg, led_animati
 led_err_t led_animate_constant_create(uint16_t brightness, led_animation_t *out_anim);
 
 led_err_t led_animate_destroy(led_animation_t anim);
-led_err_t led_animate_get_name(led_animation_t anim, const char **out_name);
 led_err_t led_animate_get_status(led_animation_t anim, led_animate_status_t *out_status);
 
 led_err_t led_animate_play(led_level_t led, led_animation_t anim);

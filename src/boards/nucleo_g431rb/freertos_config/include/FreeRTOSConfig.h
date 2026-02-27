@@ -52,8 +52,11 @@
  * interrupt. The default value is set to 20MHz and matches the QEMU demo
  * settings.  Your application will certainly need a different value so set this
  * correctly. This is very often, but not always, equal to the main system clock
- * frequency. */
-#define configCPU_CLOCK_HZ    ( ( unsigned long ) 20000000 )
+ * frequency.
+ *
+ *
+ * [App-specific] SystemClock_Config() configures PLL for 170 MHz SYSCLK */
+#define configCPU_CLOCK_HZ ((unsigned long)170000000)
 
 /* configSYSTICK_CLOCK_HZ is an optional parameter for ARM Cortex-M ports only.
  *
@@ -135,8 +138,11 @@
  * TickType_t to be defined (typedef'ed) as an unsigned 32-bit type.
  *
  * Defining configTICK_TYPE_WIDTH_IN_BITS as TICK_TYPE_WIDTH_64_BITS causes
- * TickType_t to be defined (typedef'ed) as an unsigned 64-bit type. */
-#define configTICK_TYPE_WIDTH_IN_BITS              TICK_TYPE_WIDTH_64_BITS
+ * TickType_t to be defined (typedef'ed) as an unsigned 64-bit type.
+ *
+ * [Arch-specific] 32-bit Cortex-M4: Use 32-bit tick to match native word size
+ * and avoid overflow warnings in heap_4.c when casting portMAX_DELAY to size_t. */
+#define configTICK_TYPE_WIDTH_IN_BITS TICK_TYPE_WIDTH_32_BITS
 
 /* Set configIDLE_SHOULD_YIELD to 1 to have the Idle task yield to an
  * application task if there is an Idle priority (priority 0) application task
@@ -314,7 +320,10 @@
 /* configKERNEL_INTERRUPT_PRIORITY sets the priority of the tick and context
  * switch performing interrupts.  Not supported by all FreeRTOS ports.  See
  * https://www.freertos.org/RTOS-Cortex-M3-M4.html for information specific to
- * ARM Cortex-M devices. */
+ * ARM Cortex-M devices.
+ *
+ * [Arch-specific] Cortex-M uses BASEPRI for critical sections. Value 0 means
+ * no masking, so kernel interrupts must use lowest priority (highest numeric). */
 #define configKERNEL_INTERRUPT_PRIORITY          0
 
 /* configMAX_SYSCALL_INTERRUPT_PRIORITY sets the interrupt priority above which
@@ -322,12 +331,19 @@
  * never disabled, so never delayed by RTOS activity.  The default value is set
  * to the highest interrupt priority (0).  Not supported by all FreeRTOS ports.
  * See https://www.freertos.org/RTOS-Cortex-M3-M4.html for information specific
- * to ARM Cortex-M devices. */
-#define configMAX_SYSCALL_INTERRUPT_PRIORITY     0
+ * to ARM Cortex-M devices.
+ *
+ *
+ * [Chip-specific] STM32G4 implements 4 NVIC priority bits (16 levels).
+ * Hardware stores priority in upper nibble, so software value 5 becomes 0x50.
+ * Must be non-zero for BASEPRI masking to work correctly. */
+#define configMAX_SYSCALL_INTERRUPT_PRIORITY (5 << 4)
 
 /* Another name for configMAX_SYSCALL_INTERRUPT_PRIORITY - the name used depends
- * on the FreeRTOS port. */
-#define configMAX_API_CALL_INTERRUPT_PRIORITY    0
+ * on the FreeRTOS port.
+ *
+ * [Chip-specific] Same value as configMAX_SYSCALL_INTERRUPT_PRIORITY. */
+#define configMAX_API_CALL_INTERRUPT_PRIORITY (5 << 4)
 
 /******************************************************************************/
 /* Hook and callback function related definitions. ****************************/
@@ -579,22 +595,33 @@
 /* Set configENABLE_TRUSTZONE to 1 when running FreeRTOS on the non-secure side
  * to enable the TrustZone support in FreeRTOS ARMv8-M ports which allows the
  * non-secure FreeRTOS tasks to call the (non-secure callable) functions
- * exported from secure side. */
-#define configENABLE_TRUSTZONE            1
+ * exported from secure side.
+ *
+ *
+ * [Arch-specific] Cortex-M4 does not implement TrustZone. */
+#define configENABLE_TRUSTZONE 0
 
 /* If the application writer does not want to use TrustZone, but the hardware
  * does not support disabling TrustZone then the entire application (including
  * the FreeRTOS scheduler) can run on the secure side without ever branching to
  * the non-secure side. To do that, in addition to setting
- * configENABLE_TRUSTZONE to 0, also set configRUN_FREERTOS_SECURE_ONLY to 1. */
-#define configRUN_FREERTOS_SECURE_ONLY    1
+ * configENABLE_TRUSTZONE to 0, also set configRUN_FREERTOS_SECURE_ONLY to 1.
+ *
+ *
+ * [Arch-specific] Cortex-M4 does not implement TrustZone. */
+#define configRUN_FREERTOS_SECURE_ONLY 0
 
 /* Set configENABLE_MPU to 1 to enable the Memory Protection Unit (MPU), or 0
- * to leave the Memory Protection Unit disabled. */
-#define configENABLE_MPU                  1
+ * to leave the Memory Protection Unit disabled.
+ *
+ *
+ * [Arch-specific] Cortex-M4 has optional MPU; disabled for simplicity. */
+#define configENABLE_MPU 0
 
 /* Set configENABLE_FPU to 1 to enable the Floating Point Unit (FPU), or 0
- * to leave the Floating Point Unit disabled. */
+ * to leave the Floating Point Unit disabled.
+ *
+ * [Arch-specific] Cortex-M4 includes single-precision FPU (ARMv7E-M). */
 #define configENABLE_FPU                  1
 
 /* Set configENABLE_MVE to 1 to enable the M-Profile Vector Extension (MVE)
@@ -602,8 +629,10 @@
  * applicable to Cortex-M55 and Cortex-M85 ports as M-Profile Vector Extension
  * (MVE) is available only on these architectures. configENABLE_MVE must be left
  * undefined, or defined to 0 for the Cortex-M23,Cortex-M33 and Cortex-M35P
- * ports. */
-#define configENABLE_MVE                  1
+ * ports.
+ *
+ * [Arch-specific] Cortex-M4 does not implement MVE (Helium). */
+#define configENABLE_MVE 0
 
 /******************************************************************************/
 /* ARMv7-M and ARMv8-M port Specific Configuration definitions. ***************/
@@ -623,7 +652,10 @@
  * applications that use Indirect Routing must set
  * configCHECK_HANDLER_INSTALLATION to 0.
  *
- * Defaults to 1 if left undefined. */
+ * Defaults to 1 if left undefined.
+ *
+ * [Port-specific] Verifies vector table entries match FreeRTOS port handlers.
+ * Disable if using indirect routing or custom startup files. */
 #define configCHECK_HANDLER_INSTALLATION    1
 
 /******************************************************************************/
@@ -661,5 +693,19 @@
 #define INCLUDE_xTaskAbortDelay                0
 #define INCLUDE_xTaskGetHandle                 0
 #define INCLUDE_xTaskResumeFromISR             1
+
+/******************************************************************************/
+/* Interrupt Handler Mappings *************************************************/
+/******************************************************************************/
+
+/* Map FreeRTOS handler names to CMSIS handler names used in startup code.
+ * The startup file uses CMSIS names (SVC_Handler, etc.) while FreeRTOS port
+ * uses its own names. These defines ensure the linker resolves them correctly.
+ *
+ * [Port-specific] Required for ARM_CM4F port to link with standard CMSIS
+ * startup files. Must match handler names in startup_stm32g431xx.s vector table. */
+#define vPortSVCHandler SVC_Handler
+#define xPortPendSVHandler PendSV_Handler
+#define xPortSysTickHandler SysTick_Handler
 
 #endif /* FREERTOS_CONFIG_H */

@@ -1,6 +1,6 @@
 = CubeMot 构建指导
 :toc: left
-:toclevels: 2
+:toclevels: 3
 :icons: font
 :sectlinks:
 
@@ -64,11 +64,15 @@ CubeMot/
 └── target/                 # 最终构建产物（生成，ELF/MAP/OpenOCD 配置）
 ----
 
-== 快速构建
+== 构建方式
 
-项目使用 **CMake Presets** 管理构建配置。
+项目提供两种构建方式：**CMake Presets（推荐）** 适合日常开发，**手动配置** 适合需要完全控制的场景。
 
-=== 完整工作流（推荐）
+=== 使用 CMake Presets（推荐）
+
+CMake Presets 将常用配置封装为命名配置，简化命令并确保一致性。
+
+==== 完整工作流
 
 [source,bash]
 ----
@@ -82,7 +86,7 @@ cmake --workflow --preset embedded-release
 cmake --workflow --preset test-debug
 ----
 
-=== 列出可用预设
+==== 列出可用预设
 
 [source,bash]
 ----
@@ -93,7 +97,7 @@ cmake --list-presets
 cmake --workflow --list-presets
 ----
 
-=== 分步构建
+==== 分步构建
 
 [source,bash]
 ----
@@ -106,6 +110,63 @@ cmake --build --preset embedded-debug
 # 清理构建
 cmake --build --preset embedded-debug-clean
 ----
+
+=== 手动配置（传统方式）
+
+如需自定义工具链路径、CI/CD 环境不支持 Presets，或希望完全控制构建参数，使用传统方式：
+
+==== 嵌入式固件构建
+
+[source,bash]
+----
+# 配置（等价于 embedded-debug 预设）
+cmake -B build \
+  -G Ninja \
+  -DCMAKE_TOOLCHAIN_FILE=cmake/gcc_arm_none_eabi_toolchain.cmake \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DBOARD=nucleo_g431rb
+
+# 构建
+cmake --build build -j$(nproc)
+
+# 清理
+rm -rf build target
+----
+
+==== 单元测试构建
+
+[source,bash]
+----
+# 配置（等价于 test-debug 预设）
+cmake -B build_test \
+  -G Ninja \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DBUILD_TESTING=ON
+
+# 构建
+cmake --build build_test -j$(nproc)
+
+# 运行测试
+ctest --test-dir build_test
+----
+
+==== 常用配置选项
+
+|===
+| 选项 | 说明 | 示例值
+
+| `-DCMAKE_TOOLCHAIN_FILE` | 工具链配置文件 | `cmake/gcc_arm_none_eabi_toolchain.cmake`
+| `-DCMAKE_BUILD_TYPE` | 构建类型 | `Debug`, `Release`, `MinSizeRel`, `RelWithDebInfo`
+| `-DBOARD` | 目标板型 | `nucleo_g431rb`
+| `-DBUILD_TESTING` | 启用测试构建 | `ON`, `OFF`
+| `-DCMAKE_C_FLAGS` | 额外 C 编译器标志 | `-DMY_DEFINE=1`
+| `-DCMAKE_CXX_FLAGS` | 额外 C++ 编译器标志 | `-std=c++17`
+|===
+
+[NOTE]
+====
+手动配置时，构建目录和输出目录结构与 Preset 方式一致，便于切换。
+====
 
 == 构建预设详解
 

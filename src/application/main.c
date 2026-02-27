@@ -18,6 +18,7 @@ int main(void)
     }
 #else
     for (;;) {
+        board_delay_ms(1000);
     }
 #endif
 }

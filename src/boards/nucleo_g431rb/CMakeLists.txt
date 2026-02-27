@@ -1,3 +1,6 @@
+# Include FreeRTOS configuration for this board
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/freertos_config)
+
 set(CUBEMX_GENERATED_DIR ${CMAKE_CURRENT_LIST_DIR}/stm32cubemx_generated)
 
 # STM32CubeMX defines and paths

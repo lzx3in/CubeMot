@@ -55,6 +55,7 @@ set(BOARD_SRCS
     ${CMAKE_CURRENT_LIST_DIR}/led.c
     ${CMAKE_CURRENT_LIST_DIR}/init.c
     ${CMAKE_CURRENT_LIST_DIR}/delay.c
+    ${CMAKE_CURRENT_LIST_DIR}/hooks.c
 )
 
 # STM32 HAL interface library
@@ -85,4 +86,5 @@ endif()
 target_link_libraries(boards PUBLIC
     stm32_hal_drivers
     stm32_hal
+    freertos_kernel
 )

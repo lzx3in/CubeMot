@@ -32,7 +32,7 @@ cmake --workflow --preset embedded-release
 
 构建完成后，产物位于 `target/nucleo_g431rb/Debug/` 目录。
 
-=== 2. 启动调试会话
+=== 2. 启动调试会话（手动方式）
 
 开启两个终端：
 
@@ -70,6 +70,27 @@ gdb-multiarch CubeMot.elf
 openocd -f target/nucleo_g431rb/Debug/openocd.cfg \
   -c "program target/nucleo_g431rb/Debug/CubeMot.elf verify reset exit"
 ----
+
+=== 使用 CMake 目标（可选）
+
+项目提供了若干 CMake 自定义目标，可与 VS Code CMake Tools 等插件配合使用：
+
+[source,bash]
+----
+# 启动 OpenOCD GDB 服务器
+cmake --build --preset embedded-debug --target gdb-server
+
+# 启动 GDB 客户端（自动连接）
+cmake --build --preset embedded-debug --target gdb-client
+
+# 目标复位
+cmake --build --preset embedded-debug --target target-reset-halt
+
+# 内存查看
+cmake --build --preset embedded-debug --target mem-read -DMEM_ADDR=0x20000000
+----
+
+可用目标定义见 `cmake/debugging_targets.cmake` 和 `cmake/programming_targets.cmake`。
 
 == 环境准备
 

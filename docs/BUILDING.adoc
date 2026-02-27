@@ -358,6 +358,24 @@ openocd -f target/nucleo_g431rb/Debug/openocd.cfg \
   -c "program target/nucleo_g431rb/Debug/CubeMot.elf verify reset exit"
 ----
 
+=== 使用 CMake 目标（可选）
+
+项目还提供了若干 CMake 自定义目标简化常见操作，可与 VS Code CMake Tools 等插件配合使用：
+
+[source,bash]
+----
+# 烧录
+cmake --build --preset embedded-debug --target flash
+
+# 查看内存占用
+cmake --build --preset embedded-debug --target show-size
+
+# 擦除 Flash
+cmake --build --preset embedded-debug --target flash-erase
+----
+
+可用目标定义见 `cmake/programming_targets.cmake`。
+
 == 工具链配置
 
 === GCC ARM 工具链

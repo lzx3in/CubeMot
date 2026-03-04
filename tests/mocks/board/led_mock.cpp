@@ -1,4 +1,4 @@
-#include "board_led_mock.h"
+#include "led_mock.h"
 #include <cassert>
 
 static BoardLedMock *g_mock = nullptr;

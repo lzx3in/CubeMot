@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
-#include "mocks/board_led_mock.h"
+#include "mocks/board/led_mock.h"
 
 extern "C" {
 #include "drivers/led/led.h"

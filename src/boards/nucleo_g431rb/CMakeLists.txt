@@ -84,7 +84,9 @@ endif()
 
 # Link HAL libraries to boards
 target_link_libraries(boards PUBLIC
-    stm32_hal_drivers
     stm32_hal
+)
+target_link_libraries(boards PRIVATE
+    stm32_hal_drivers
     freertos_kernel
 )

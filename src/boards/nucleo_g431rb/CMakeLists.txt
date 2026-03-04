@@ -64,7 +64,7 @@ target_include_directories(stm32_hal INTERFACE ${STM32_INCLUDE_DIRS})
 target_compile_definitions(stm32_hal INTERFACE ${STM32_DEFINES})
 
 # STM32 HAL drivers library
-add_library(stm32_hal_drivers OBJECT)
+add_library(stm32_hal_drivers STATIC)
 target_sources(stm32_hal_drivers PRIVATE ${STM32_HAL_SRCS})
 target_link_libraries(stm32_hal_drivers PUBLIC stm32_hal)
 

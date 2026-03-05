@@ -3,6 +3,15 @@ add_subdirectory(test_common)
 add_subdirectory(mocks)
 add_subdirectory(drivers)
 
+add_subdirectory(${CMAKE_SOURCE_DIR}/src/msghub ${CMAKE_BINARY_DIR}/src/msghub)
+
+target_include_directories(msghub PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/mocks
+    ${CMAKE_CURRENT_SOURCE_DIR}/mocks/freertos
+)
+
+add_subdirectory(msghub)
+
 add_executable(cubemot-test
     $<TARGET_OBJECTS:driver_tests>
 )

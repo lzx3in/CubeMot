@@ -40,8 +40,7 @@
  * generic file, if one is available.
  ******************************************************************************/
 
-#ifndef FREERTOS_CONFIG_H
-#define FREERTOS_CONFIG_H
+#pragma once
 
 /******************************************************************************/
 /* Hardware description related definitions. **********************************/
@@ -706,5 +705,3 @@
 #define vPortSVCHandler SVC_Handler
 #define xPortPendSVHandler PendSV_Handler
 #define xPortSysTickHandler SysTick_Handler
-
-#endif /* FREERTOS_CONFIG_H */

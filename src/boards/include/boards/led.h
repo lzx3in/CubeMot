@@ -1,5 +1,4 @@
-#ifndef BOARDS_LED_H
-#define BOARDS_LED_H
+#pragma once
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -30,6 +29,4 @@ bool board_led_get_state(board_led_t led);
 
 #ifdef __cplusplus
 }
-#endif
-
 #endif

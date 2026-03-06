@@ -1,5 +1,4 @@
-#ifndef FREERTOS_STUBS_H
-#define FREERTOS_STUBS_H
+#pragma once
 
 #include <stdint.h>
 #include <time.h>
@@ -25,5 +24,3 @@ static inline void vTaskDelay(TickType_t xTicksToDelay)
 #ifdef __cplusplus
 }
 #endif
-
-#endif // FREERTOS_STUBS_H

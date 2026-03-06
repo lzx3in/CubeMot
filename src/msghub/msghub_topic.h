@@ -1,5 +1,4 @@
-#ifndef MSGHUB_TOPIC_H
-#define MSGHUB_TOPIC_H
+#pragma once
 
 #include "msghub/msghub.h"
 
@@ -46,5 +45,3 @@ int8_t msghub_core_decode_sub_handle(msghub_subscriber_t handle, uint8_t *slot_i
 #ifdef __cplusplus
 }
 #endif
-
-#endif // MSGHUB_TOPIC_H

@@ -1,5 +1,4 @@
-#ifndef MSGHUB_H
-#define MSGHUB_H
+#pragma once
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -158,5 +157,3 @@ bool msghub_subscriber_valid(msghub_subscriber_t sub);
 #ifdef __cplusplus
 }
 #endif
-
-#endif // MSGHUB_H

@@ -1,5 +1,4 @@
-#ifndef BOARDS_DELAY_H
-#define BOARDS_DELAY_H
+#pragma once
 
 #include <stdint.h>
 
@@ -12,6 +11,4 @@ uint32_t board_get_tick(void);
 
 #ifdef __cplusplus
 }
-#endif
-
 #endif

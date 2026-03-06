@@ -1,5 +1,4 @@
-#ifndef DRIVERS_LED_H
-#define DRIVERS_LED_H
+#pragma once
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -31,5 +30,3 @@ led_err_t led_toggle(led_t *led);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* DRIVERS_LED_H */

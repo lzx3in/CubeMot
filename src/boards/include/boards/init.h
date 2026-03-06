@@ -1,5 +1,4 @@
-#ifndef BOARDS_INIT_H
-#define BOARDS_INIT_H
+#pragma once
 
 #ifdef __cplusplus
 extern "C" {
@@ -9,6 +8,4 @@ void board_init(void);
 
 #ifdef __cplusplus
 }
-#endif
-
 #endif

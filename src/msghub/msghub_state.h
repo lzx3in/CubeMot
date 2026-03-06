@@ -1,5 +1,4 @@
-#ifndef MSGHUB_STATE_H
-#define MSGHUB_STATE_H
+#pragma once
 
 #include "msghub/msghub.h"
 
@@ -80,5 +79,3 @@ void msghub_reset(void);
 #ifdef __cplusplus
 }
 #endif
-
-#endif // MSGHUB_STATE_H

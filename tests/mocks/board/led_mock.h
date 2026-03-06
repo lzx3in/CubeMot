@@ -1,5 +1,4 @@
-#ifndef BOARD_LED_MOCK_H
-#define BOARD_LED_MOCK_H
+#pragma once
 
 #include <gmock/gmock.h>
 #include <stdint.h>
@@ -22,5 +21,3 @@ class BoardLedMock
 
 // Get the global mock instance
 BoardLedMock &GetBoardLedMock();
-
-#endif // BOARD_LED_MOCK_H

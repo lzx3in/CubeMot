@@ -38,7 +38,7 @@ msghub_subscriber_t msghub_create_subscriber(msghub_topic_t topic, uint8_t insta
 
     // Initialize generation tracking
     msghub_instance_t *inst = &g_topics[topic_idx].instances[instance];
-    if (inst->advertised) {
+    if (inst->allocated) {
         g_sub_slots[slot_idx].last_generation = inst->generation;
     } else {
         g_sub_slots[slot_idx].last_generation = 0;
@@ -76,14 +76,16 @@ msghub_err_t msghub_receive(msghub_subscriber_t handle, void *buffer)
 
     msghub_sub_slot_t *slot = &g_sub_slots[slot_idx];
     msghub_topic_state_t *topic_state = &g_topics[slot->topic_idx];
-    msghub_instance_t *inst = &topic_state->instances[slot->instance];
 
-    // Check instance validity
-    if (!inst->advertised) {
+    // Validate topic exists
+    if (topic_state->topic == NULL) {
         return MSGHUB_ERR_NOT_FOUND;
     }
 
+    msghub_instance_t *inst = &topic_state->instances[slot->instance];
+
     // Copy data and update generation
+    // Note: We do NOT check inst->allocated to support temporary publish pattern
     memcpy(buffer, inst->data, topic_state->topic->msg_size);
     slot->last_generation = inst->generation;
     return MSGHUB_OK;
@@ -103,14 +105,19 @@ msghub_err_t msghub_subscriber_check(msghub_subscriber_t handle, bool *updated)
 
     msghub_sub_slot_t *slot = &g_sub_slots[slot_idx];
     msghub_topic_state_t *topic_state = &g_topics[slot->topic_idx];
-    msghub_instance_t *inst = &topic_state->instances[slot->instance];
 
-    // Check instance validity
-    if (!inst->advertised) {
+    // Validate topic exists (topic pointer is always valid once allocated)
+    if (topic_state->topic == NULL) {
         return MSGHUB_ERR_NOT_FOUND;
     }
 
-    // Compare generation
+    msghub_instance_t *inst = &topic_state->instances[slot->instance];
+
+    // Compare generation to check for updates
+    // Note: We do NOT check inst->allocated here because:
+    // 1. Publisher may be destroyed but data is still valid
+    // 2. Temporary publish pattern requires this behavior
+    // 3. Subscriber owns its slot and can continue reading
     *updated = (inst->generation != slot->last_generation);
     return MSGHUB_OK;
 }
@@ -131,7 +138,7 @@ uint16_t msghub_get_generation(msghub_subscriber_t handle)
     msghub_topic_state_t *topic_state = &g_topics[slot->topic_idx];
     msghub_instance_t *inst = &topic_state->instances[slot->instance];
 
-    if (!inst->advertised) {
+    if (!inst->allocated) {
         return 0;
     }
 

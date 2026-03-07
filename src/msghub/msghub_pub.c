@@ -24,20 +24,19 @@ msghub_publisher_t msghub_create_publisher(msghub_topic_t topic)
     uint8_t instance = 0;
     msghub_instance_t *inst = &g_topics[topic_idx].instances[instance];
 
-    // Check if already advertised
-    if (inst->advertised) {
-        return MSGHUB_PUBLISHER_INVALID;
-    }
-
     // Allocate publisher slot
     int8_t slot_idx = msghub_core_alloc_pub_slot();
     if (slot_idx < 0) {
         return MSGHUB_PUBLISHER_INVALID;
     }
 
-    // Initialize instance data
-    inst->advertised = 1;
-    inst->generation = 0;
+    // Mark instance as allocated on first creation
+    // Do NOT reset generation to preserve data for existing subscribers
+    if (!inst->allocated) {
+        inst->allocated = true;
+        // generation initialized to 0 by global/static initialization
+        // Subsequent publishers reuse the same instance without resetting generation
+    }
 
     // Initialize publisher slot
     g_pub_slots[slot_idx].magic = MSGHUB_PUBLISHER_MAGIC;
@@ -61,8 +60,10 @@ msghub_err_t msghub_destroy_publisher(msghub_publisher_t handle)
     msghub_pub_slot_t *slot = &g_pub_slots[slot_idx];
     msghub_instance_t *inst = &g_topics[slot->topic_idx].instances[slot->instance];
 
-    // Mark instance as unadvertised
-    inst->advertised = 0;
+    // Clear instance allocated flag to allow reallocation
+    // Note: Data is preserved, only the flag is cleared
+    // Subscribers can still access the data via subscriber_check
+    inst->allocated = false;
     slot->magic = 0;
 
     return MSGHUB_OK;
@@ -85,7 +86,7 @@ msghub_err_t msghub_publish(msghub_publisher_t handle, const void *data)
     msghub_instance_t *inst = &topic_state->instances[slot->instance];
 
     // Check instance validity
-    if (!inst->advertised) {
+    if (!inst->allocated) {
         return MSGHUB_ERR_NOT_FOUND;
     }
 
@@ -119,7 +120,7 @@ msghub_publisher_t msghub_create_publisher_multi(msghub_topic_t topic, int *inst
         // Auto-allocate: find first free instance
         target_instance = 0xFF;
         for (uint8_t i = 0; i < MSGHUB_MAX_INSTANCES; i++) {
-            if (!g_topics[topic_idx].instances[i].advertised) {
+            if (!g_topics[topic_idx].instances[i].allocated) {
                 target_instance = i;
                 break;
             }
@@ -132,7 +133,7 @@ msghub_publisher_t msghub_create_publisher_multi(msghub_topic_t topic, int *inst
         if ((uint8_t)*instance >= MSGHUB_MAX_INSTANCES) {
             return MSGHUB_PUBLISHER_INVALID;
         }
-        if (g_topics[topic_idx].instances[*instance].advertised) {
+        if (g_topics[topic_idx].instances[*instance].allocated) {
             return MSGHUB_PUBLISHER_INVALID;
         }
         target_instance = (uint8_t)*instance;
@@ -146,8 +147,8 @@ msghub_publisher_t msghub_create_publisher_multi(msghub_topic_t topic, int *inst
 
     // Initialize instance data
     msghub_instance_t *inst = &g_topics[topic_idx].instances[target_instance];
-    inst->advertised = 1;
-    inst->generation = 0;
+    inst->allocated = true;
+    // Note: Do NOT reset generation to preserve data for existing subscribers
 
     // Initialize publisher slot
     g_pub_slots[slot_idx].magic = MSGHUB_PUBLISHER_MAGIC;
@@ -177,7 +178,7 @@ bool msghub_topic_exists(msghub_topic_t topic, uint8_t instance)
     if (instance >= MSGHUB_MAX_INSTANCES) {
         return false;
     }
-    return g_topics[topic_idx].instances[instance].advertised != 0;
+    return g_topics[topic_idx].instances[instance].allocated != 0;
 }
 
 // Get number of published topic instances
@@ -190,7 +191,7 @@ int msghub_topic_publisher_count(msghub_topic_t topic)
 
     int count = 0;
     for (uint8_t i = 0; i < MSGHUB_MAX_INSTANCES; i++) {
-        if (g_topics[topic_idx].instances[i].advertised) {
+        if (g_topics[topic_idx].instances[i].allocated) {
             count++;
         }
     }

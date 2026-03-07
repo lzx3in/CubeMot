@@ -35,9 +35,9 @@ extern "C" {
 
 // Topic instance (each topic can have multiple instances)
 typedef struct {
-    uint8_t advertised;  // Is advertised
+    bool allocated;      // Is this instance slot allocated to a publisher
     uint16_t generation; // Data generation counter
-    uint8_t data[128];   // Data buffer
+    uint8_t data[128];   // Data buffer (preserved after publisher destroy)
 } msghub_instance_t;
 
 // Topic runtime state (internal use only)

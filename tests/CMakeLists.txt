@@ -1,9 +1,12 @@
+# add the libraries in src/ first so that tests/ can link to them.
+add_subdirectory(${CMAKE_SOURCE_DIR}/src/lib ${CMAKE_BINARY_DIR}/src/lib)
+add_subdirectory(${CMAKE_SOURCE_DIR}/src/msghub ${CMAKE_BINARY_DIR}/src/msghub)
+
 add_subdirectory(deps)
 add_subdirectory(test_common)
 add_subdirectory(mocks)
 add_subdirectory(drivers)
-
-add_subdirectory(${CMAKE_SOURCE_DIR}/src/msghub ${CMAKE_BINARY_DIR}/src/msghub)
+add_subdirectory(lib)
 
 target_include_directories(msghub PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/mocks

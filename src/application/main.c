@@ -1,35 +1,26 @@
 #include "drivers/led/led.h"
-#include "boards/led.h"
-#include "boards/delay.h"
+#include "drivers/led/led_msg.h"
 #include "boards/init.h"
-#include "cubemot_config.h"
 #include "FreeRTOS.h"
 #include "task.h"
 
-static void vTaskLED(void *pvParameters)
+static void vTaskBlink(void *pvParameters)
 {
     (void)pvParameters;
 
-#if CONFIG_BOARD_HAS_LED1
-    led_t led1;
-    if (led_init(&led1, BOARD_LED_1) == LED_OK) {
-        for (;;) {
-            led_toggle(&led1);
-            vTaskDelay(pdMS_TO_TICKS(500));
-        }
-    }
-#else
     for (;;) {
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        led_toggle(0);
+        vTaskDelay(pdMS_TO_TICKS(500));
     }
-#endif
 }
 
 int main(void)
 {
     board_init();
 
-    xTaskCreate(vTaskLED, "LED", 256, NULL, 1, NULL);
+    led_driver_init();
+
+    xTaskCreate(vTaskBlink, "Blink", 256, NULL, 1, NULL);
 
     vTaskStartScheduler();
 

@@ -30,6 +30,7 @@ target_include_directories(cubemot-test PRIVATE
 target_link_libraries(cubemot-test PRIVATE
     board_mocks
     drivers
+    msghub
     test_common
     GTest::gtest_main
     GTest::gmock

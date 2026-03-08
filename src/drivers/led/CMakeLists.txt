@@ -2,6 +2,7 @@ add_library(led_driver STATIC)
 
 target_sources(led_driver PRIVATE
     led.c
+    led_topic.c
 )
 
 target_include_directories(led_driver PUBLIC

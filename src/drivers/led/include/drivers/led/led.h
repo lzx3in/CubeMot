@@ -1,31 +1,47 @@
 #pragma once
 
-#include <stdbool.h>
 #include <stdint.h>
-#include "boards/led.h"
+#include "msghub/msghub.h"
+#include "drivers/led/led_topic.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef enum {
-    LED_OK = 0,             /**< Success */
-    LED_ERR_NULL = -1,      /**< Null pointer parameter */
-    LED_ERR_INVALID = -2,   /**< Invalid parameter or ID */
-    LED_ERR_NOMEM = -3,     /**< No memory / pool exhausted */
-    LED_ERR_NOT_FOUND = -4, /**< Handle not found */
-    LED_ERR_BUSY = -5,      /**< Resource busy */
-    LED_ERR_BACKEND = -6,   /**< Backend operation failed */
-} led_err_t;
+// ============================================================================
+// LED Driver API
+// ============================================================================
 
-typedef struct {
-    board_led_t board_handle;
-} led_t;
+/**
+ * Initialize LED driver
+ * Creates internal driver task and msghub topics
+ *
+ * @return 0 on success, negative on failure
+ */
+int led_driver_init(void);
 
-led_err_t led_init(led_t *led, int led_id);
-led_err_t led_set(led_t *led, bool on);
-led_err_t led_get(led_t *led, bool *out_on);
-led_err_t led_toggle(led_t *led);
+/**
+ * Set LED state
+ *
+ * @param led_id LED ID (0, 1, 2...)
+ * @param on true = ON, false = OFF
+ */
+void led_set(uint8_t led_id, bool on);
+
+/**
+ * Toggle LED state
+ *
+ * @param led_id LED ID (0, 1, 2...)
+ */
+void led_toggle(uint8_t led_id);
+
+/**
+ * Get LED state subscriber handle
+ *
+ * @param instance Subscriber instance ID (0 = primary instance)
+ * @return Subscriber handle, MSGHUB_SUBSCRIBER_INVALID on failure
+ */
+msghub_subscriber_t led_get_state_subscriber(uint8_t instance);
 
 #ifdef __cplusplus
 }

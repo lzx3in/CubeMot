@@ -14,8 +14,8 @@ set(STM32_INCLUDE_DIRS
     ${CUBEMX_GENERATED_DIR}/Core/Inc
     ${CUBEMX_GENERATED_DIR}/Drivers/STM32G4xx_HAL_Driver/Inc
     ${CUBEMX_GENERATED_DIR}/Drivers/STM32G4xx_HAL_Driver/Inc/Legacy
-    ${CUBEMX_GENERATED_DIR}/Drivers/CMSIS/Device/ST/STM32G4xx/Include
-    ${CUBEMX_GENERATED_DIR}/Drivers/CMSIS/Include
+    ${CMAKE_SOURCE_DIR}/src/hal/stm32g4/Drivers/CMSIS/Device/ST/STM32G4xx/Include
+    ${CMAKE_SOURCE_DIR}/src/hal/stm32g4/Drivers/CMSIS/Include
 )
 
 # STM32CubeMX sources

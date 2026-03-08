@@ -1,7 +1,7 @@
 # Driver tests library
 # Creates an object library containing all driver test files
 
-add_library(driver_tests OBJECT
+add_library(driver_tests STATIC
     test_led.cpp
 )
 
@@ -12,7 +12,7 @@ target_include_directories(driver_tests PRIVATE
 
 target_link_libraries(driver_tests PRIVATE
     board_mocks
-    drivers_for_test
+    drivers
     GTest::gtest
     GTest::gmock
 )

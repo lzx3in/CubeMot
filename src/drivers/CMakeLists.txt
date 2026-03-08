@@ -1,13 +1,4 @@
-add_library(drivers OBJECT)
+add_library(drivers INTERFACE)
 
-target_sources(drivers PRIVATE
-    led/led.c
-)
-
-target_include_directories(drivers PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
-
-target_link_libraries(drivers PRIVATE
-    boards
-)
+add_subdirectory(led)
+target_link_libraries(drivers INTERFACE led_driver)

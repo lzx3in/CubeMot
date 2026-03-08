@@ -74,10 +74,6 @@ target_sources(boards PRIVATE
     ${STM32_APPLICATION_SRCS}
 )
 
-target_include_directories(boards PUBLIC
-    ${CMAKE_SOURCE_DIR}
-)
-
 if(DEFINED BOARD_COMPILE_DEFINITIONS)
     target_compile_definitions(boards PUBLIC ${BOARD_COMPILE_DEFINITIONS})
 endif()

@@ -1,6 +1,9 @@
 # add the libraries in src/ first so that tests/ can link to them.
+# Note: src/boards is added for header files only - tests use board_mocks for implementation
 add_subdirectory(${CMAKE_SOURCE_DIR}/src/lib ${CMAKE_BINARY_DIR}/src/lib)
+add_subdirectory(${CMAKE_SOURCE_DIR}/src/boards ${CMAKE_BINARY_DIR}/src/boards)
 add_subdirectory(${CMAKE_SOURCE_DIR}/src/msghub ${CMAKE_BINARY_DIR}/src/msghub)
+add_subdirectory(${CMAKE_SOURCE_DIR}/src/drivers ${CMAKE_BINARY_DIR}/src/drivers)
 
 add_subdirectory(deps)
 add_subdirectory(test_common)
@@ -26,7 +29,7 @@ target_include_directories(cubemot-test PRIVATE
 
 target_link_libraries(cubemot-test PRIVATE
     board_mocks
-    drivers_for_test
+    drivers
     test_common
     GTest::gtest_main
     GTest::gmock

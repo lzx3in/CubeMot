@@ -27,7 +27,10 @@ set(STM32_APPLICATION_SRCS
     ${CUBEMX_GENERATED_DIR}/Core/Src/syscalls.c
 )
 
-set(BOARD_INTERRUPT_SRCS "${CUBEMX_GENERATED_DIR}/Core/Src/stm32g4xx_it.c"
+set(BOARD_INTERRUPT_SRCS
+    ${CMAKE_CURRENT_LIST_DIR}/interrupt_handlers/fault_handlers.c
+    ${CMAKE_CURRENT_LIST_DIR}/interrupt_handlers/exception_handlers.c
+    ${CMAKE_CURRENT_LIST_DIR}/interrupt_handlers/peripheral_handlers.c
     CACHE INTERNAL "Board interrupt handlers")
 set(BOARD_STARTUP_SRC "${CMAKE_CURRENT_LIST_DIR}/startup/startup_stm32g431xx.s"
     CACHE INTERNAL "Board startup file")

@@ -12,8 +12,8 @@ set(STM32_DEFINES
 
 set(STM32_INCLUDE_DIRS
     ${CUBEMX_GENERATED_DIR}/Core/Inc
-    ${CUBEMX_GENERATED_DIR}/Drivers/STM32G4xx_HAL_Driver/Inc
-    ${CUBEMX_GENERATED_DIR}/Drivers/STM32G4xx_HAL_Driver/Inc/Legacy
+    ${CMAKE_SOURCE_DIR}/src/hal/stm32g4/Drivers/STM32G4xx_HAL_Driver/Inc
+    ${CMAKE_SOURCE_DIR}/src/hal/stm32g4/Drivers/STM32G4xx_HAL_Driver/Inc/Legacy
     ${CMAKE_SOURCE_DIR}/src/hal/stm32g4/Drivers/CMSIS/Device/ST/STM32G4xx/Include
     ${CMAKE_SOURCE_DIR}/src/hal/stm32g4/Drivers/CMSIS/Include
 )
@@ -37,21 +37,21 @@ set(BOARD_STARTUP_SRC "${CMAKE_CURRENT_LIST_DIR}/startup/startup_stm32g431xx.s"
 
 set(STM32_HAL_SRCS
     ${CUBEMX_GENERATED_DIR}/Core/Src/system_stm32g4xx.c
-    ${CUBEMX_GENERATED_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_tim.c
-    ${CUBEMX_GENERATED_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_tim_ex.c
-    ${CUBEMX_GENERATED_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_pwr_ex.c
-    ${CUBEMX_GENERATED_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal.c
-    ${CUBEMX_GENERATED_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_rcc.c
-    ${CUBEMX_GENERATED_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_rcc_ex.c
-    ${CUBEMX_GENERATED_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_flash.c
-    ${CUBEMX_GENERATED_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_flash_ex.c
-    ${CUBEMX_GENERATED_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_flash_ramfunc.c
-    ${CUBEMX_GENERATED_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_gpio.c
-    ${CUBEMX_GENERATED_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_exti.c
-    ${CUBEMX_GENERATED_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_dma.c
-    ${CUBEMX_GENERATED_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_dma_ex.c
-    ${CUBEMX_GENERATED_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_pwr.c
-    ${CUBEMX_GENERATED_DIR}/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_cortex.c
+    ${CMAKE_SOURCE_DIR}/src/hal/stm32g4/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_tim.c
+    ${CMAKE_SOURCE_DIR}/src/hal/stm32g4/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_tim_ex.c
+    ${CMAKE_SOURCE_DIR}/src/hal/stm32g4/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_pwr_ex.c
+    ${CMAKE_SOURCE_DIR}/src/hal/stm32g4/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal.c
+    ${CMAKE_SOURCE_DIR}/src/hal/stm32g4/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_rcc.c
+    ${CMAKE_SOURCE_DIR}/src/hal/stm32g4/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_rcc_ex.c
+    ${CMAKE_SOURCE_DIR}/src/hal/stm32g4/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_flash.c
+    ${CMAKE_SOURCE_DIR}/src/hal/stm32g4/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_flash_ex.c
+    ${CMAKE_SOURCE_DIR}/src/hal/stm32g4/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_flash_ramfunc.c
+    ${CMAKE_SOURCE_DIR}/src/hal/stm32g4/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_gpio.c
+    ${CMAKE_SOURCE_DIR}/src/hal/stm32g4/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_exti.c
+    ${CMAKE_SOURCE_DIR}/src/hal/stm32g4/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_dma.c
+    ${CMAKE_SOURCE_DIR}/src/hal/stm32g4/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_dma_ex.c
+    ${CMAKE_SOURCE_DIR}/src/hal/stm32g4/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_pwr.c
+    ${CMAKE_SOURCE_DIR}/src/hal/stm32g4/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_cortex.c
 )
 
 set(BOARD_SRCS

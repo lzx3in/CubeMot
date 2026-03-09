@@ -18,8 +18,8 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
-#include "main.h"
 /* USER CODE BEGIN Includes */
+#include "stm32g4xx_hal.h"
 
 /* USER CODE END Includes */
 

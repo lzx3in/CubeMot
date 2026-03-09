@@ -1,6 +1,5 @@
 #include "boards/led.h"
 #include "cubemot_config.h"
-#include "main.h"
 #include "stm32g4xx_hal.h"
 
 static inline GPIO_TypeDef *gpio_from_index(int index)

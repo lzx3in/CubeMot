@@ -1,4 +1,4 @@
-#include "main.h"
+#include "stm32g4xx_hal.h"
 
 extern void SystemClock_Config(void);
 extern void MX_GPIO_Init(void);

@@ -14,9 +14,8 @@ else()
     )
     # Only add board-specific implementation in non-test mode
     add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/${BOARD})
+    target_link_libraries(boards PRIVATE
+        stm32g4_hal
+        freertos_kernel
+    )
 endif()
-
-target_link_libraries(boards PRIVATE
-    stm32g4_hal
-    freertos_kernel
-)

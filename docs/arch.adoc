@@ -1,0 +1,82 @@
+== 系统分层架构
+
+[graphviz]
+....
+digraph cubemot_architecture {
+    // 图属性
+    rankdir=TB
+    node [shape=box, style=filled, fontname="Helvetica", fontsize=10]
+    edge [fontname="Helvetica", fontsize=9]
+
+    // ============ 节点定义（从底向上）============
+
+    // 硬件平台
+    hardware_platform [label="硬件平台 (Hardware Platform)\nSTM32G431 MCU + NUCLEO-G431RB 开发板", 
+                       fillcolor="#E0E0E0"]
+
+    // 芯片级抽象层 - 新增
+    chip_abstraction [label="芯片抽象层 (Chips)\nCMSIS + STM32G4xx_HAL_Driver + 芯片级接口 (chips/gpio)\nsrc/chips/", 
+                      fillcolor="#B0BEC5"]
+
+    // RTOS 层
+    rtos [label="实时操作系统 (RTOS)\nFreeRTOS 内核 (tasks/queue/timers)\nsrc/freertos/", 
+          fillcolor="#CE93D8"]
+
+    // 消息总线中间件
+    middleware [label="消息总线 (msghub)\n发布/订阅模式 / Topic 管理 / 多实例支持\nsrc/msghub/", 
+                fillcolor="#FFAB91"]
+
+    // 板级支持包 - 系统入口所在层
+    board_support_pkg [label="板级支持包 (BSP)\n板级初始化 / 时钟配置 / 驱动实例注册\nsrc/boards/", 
+                       fillcolor="#80CBC4"]
+
+    // 驱动层 - 空壳化（虚线框表示空壳）
+    driver [label="驱动层 (Drivers)\n设备实例注册框架 / 弱定义接口 / 无业务逻辑\nsrc/drivers/", 
+            fillcolor="#90CAF9", style="filled,dashed"]
+
+    // 算法库层
+    lib [label="算法库 (Libs)\n通用算法 (PID/CRC) / 无硬件依赖\nsrc/libs/", 
+         fillcolor="#FFF9C4"]
+
+    // 功能模块层 - 自治
+    core_module [label="功能模块 (Modules)\nISR 回调 / 事件发布 / 行为识别 / 业务逻辑\nsrc/modules/", 
+                 fillcolor="#FFCC80"]
+    core_module -> rtos [label="使用 FreeRTOS\n任务/队列/延时"]
+
+    // 应用层 - 新增
+    app_layer [label="应用层 (App)\n系统入口 / 模块编排 / 状态管理\nsrc/app/", 
+               fillcolor="#A5D6A7"]
+
+    // 主题定义层 - 新增
+    topics [label="主题定义 (Topics)\nmsghub 消息类型定义\nsrc/topics/", 
+            fillcolor="#FFCCBC"]
+
+    // ============ 依赖关系（从上层指向下层）============
+
+    // 应用层依赖
+    app_layer -> core_module [label="初始化/启动模块"]
+    app_layer -> rtos [label="启动调度器"]
+
+    // 模块层依赖
+    core_module -> middleware [label="发布/订阅事件"]
+    core_module -> driver [label="调用驱动实例方法\n(如 inst->init/enable_irq)"]
+    core_module -> lib [label="使用算法库"]
+
+    // 板级支持包依赖
+    board_support_pkg -> chip_abstraction [label="调用芯片级接口\n(如 chip_gpio_init)"]
+    board_support_pkg -> driver [label="实现驱动实例接口\n(覆盖弱定义函数)"]
+
+    // 模块层通过驱动实例间接访问硬件
+    driver -> board_support_pkg [style=dotted, label="实例方法由板级实现", dir=none]
+
+    // 中间件依赖
+    middleware -> rtos [label="使用 FreeRTOS\n任务/队列/信号量"]
+    topics -> middleware [label="定义消息类型"]
+
+    // 芯片抽象层依赖
+    chip_abstraction -> hardware_platform [label="寄存器访问"]
+    chip_abstraction -> rtos [label="Port 层依赖"]
+
+    // 算法库独立（无依赖，已在上面定义）
+}
+....

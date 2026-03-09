@@ -8,7 +8,6 @@ target_compile_definitions(stm32g4_hal PUBLIC
 
 target_sources(stm32g4_hal PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/system_stm32g4xx.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/main.c
     ${CMAKE_CURRENT_SOURCE_DIR}/stm32g4xx_hal_timebase_tim.c
     ${CMAKE_CURRENT_SOURCE_DIR}/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_tim.c
     ${CMAKE_CURRENT_SOURCE_DIR}/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_tim_ex.c

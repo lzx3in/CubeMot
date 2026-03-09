@@ -18,4 +18,5 @@ endif()
 
 target_link_libraries(boards PRIVATE
     stm32g4_hal
+    freertos_kernel
 )

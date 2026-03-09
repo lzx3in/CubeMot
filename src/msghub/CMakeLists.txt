@@ -10,5 +10,6 @@ target_include_directories(msghub PUBLIC
 )
 
 target_link_libraries(msghub PUBLIC
+    common
     freertos_kernel
 )

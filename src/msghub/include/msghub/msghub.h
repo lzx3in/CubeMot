@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include "cubemot_error.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -17,11 +18,12 @@ typedef uint16_t msghub_publisher_t;
 typedef uint16_t msghub_subscriber_t;
 
 typedef enum {
-    MSGHUB_OK = 0,
-    MSGHUB_ERR_INVALID = -1,
-    MSGHUB_ERR_NOT_FOUND = -2,
-    MSGHUB_ERR_NO_MEM = -3,
-    MSGHUB_ERR_TIMEOUT = -5,
+    MSGHUB_OK = CUBEMOT_MSGHUB_OK,
+    MSGHUB_ERR = CUBEMOT_MSGHUB_ERR,
+    MSGHUB_ERR_INVALID = CUBEMOT_MSGHUB_ERR_INVALID,
+    MSGHUB_ERR_NOT_FOUND = CUBEMOT_MSGHUB_ERR_NOT_FOUND,
+    MSGHUB_ERR_NO_MEM = CUBEMOT_MSGHUB_ERR_NO_MEM,
+    MSGHUB_ERR_TIMEOUT = CUBEMOT_MSGHUB_ERR_TIMEOUT,
 } msghub_err_t;
 
 #define MSGHUB_PUBLISHER_INVALID 0xFFFF

@@ -22,6 +22,30 @@ target_sources(boards PRIVATE
     msp.c
 )
 
-if(DEFINED BOARD_COMPILE_DEFINITIONS)
-    target_compile_definitions(boards PUBLIC ${BOARD_COMPILE_DEFINITIONS})
-endif()
+add_executable(${CMAKE_PROJECT_NAME}
+    main.c
+    ${BOARD_INTERRUPT_SRCS}
+    ${BOARD_STARTUP_SRC}
+)
+
+target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE
+    stm32g4_hal
+    boards
+    modules
+    freertos_kernel
+    ${TOOLCHAIN_LINK_LIBRARIES}
+)
+
+target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
+    ${BOARD_COMPILE_DEFINITIONS}
+)
+
+consolidate_outputs_to_target_dir(${CMAKE_PROJECT_NAME})
+
+# Programming targets
+include(${CMAKE_SOURCE_DIR}/cmake/programming_targets.cmake)
+add_programming_targets(${CMAKE_PROJECT_NAME})
+
+# Debugging targets
+include(${CMAKE_SOURCE_DIR}/cmake/debugging_targets.cmake)
+add_debugging_targets(${CMAKE_PROJECT_NAME})

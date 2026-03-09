@@ -1,0 +1,18 @@
+menu "Modules Configuration"
+
+# Blink Module
+config MODULE_BLINK_ENABLE
+    bool "Blink Module"
+    default y
+    help
+        Enable LED blink module
+
+config MODULE_BLINK_PERIOD_MS
+    int "Blink Period (ms)"
+    default 500
+    range 100 5000
+    depends on MODULE_BLINK_ENABLE
+    help
+        LED blink period in milliseconds
+
+endmenu

@@ -6,6 +6,7 @@ include(${CMAKE_SOURCE_DIR}/cmake/post_build.cmake)
 set(FREERTOS_PORT GCC_ARM_CM4F CACHE STRING "FreeRTOS port" FORCE)
 set(FREERTOS_HEAP 4 CACHE STRING "FreeRTOS heap implementation" FORCE)
 
+add_subdirectory(common)
 add_subdirectory(hal/stm32g4)
 add_subdirectory(lib)
 add_subdirectory(modules)

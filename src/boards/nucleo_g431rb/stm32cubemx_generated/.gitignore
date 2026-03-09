@@ -1,5 +1,0 @@
-cmake/
-.mxproject
-CMakeLists.txt
-CMakePresets.json
-Core/Src/stm32g4xx_it.c

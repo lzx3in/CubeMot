@@ -5,6 +5,7 @@ add_executable(${CMAKE_PROJECT_NAME}
 )
 
 target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE
+    stm32g4_hal
     boards
     drivers
     freertos_kernel

@@ -120,6 +120,9 @@ msghub_publisher_t msghub_create_publisher(msghub_topic_t topic);
 msghub_err_t msghub_destroy_publisher(msghub_publisher_t pub);
 msghub_err_t msghub_publish(msghub_publisher_t pub, const void *data);
 
+// ISR-safe publish (call from interrupt context only)
+msghub_err_t msghub_publish_from_isr(msghub_publisher_t pub, const void *data);
+
 // 多实例支持
 msghub_publisher_t msghub_create_publisher_multi(msghub_topic_t topic, int *instance);
 

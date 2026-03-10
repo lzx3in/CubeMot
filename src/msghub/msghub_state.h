@@ -23,6 +23,83 @@ extern "C" {
 #endif
 
 // ============================================================================
+// Critical Section Macros - Environment-aware (3 environments)
+// ============================================================================
+
+#ifdef UNIT_TEST_HOST
+// ============================================================================
+// PC Unit Testing: pthread-based
+// ============================================================================
+#include <pthread.h>
+
+extern pthread_mutex_t g_msghub_crit_mutex; // Data path (simulated critical section)
+extern pthread_mutex_t g_msghub_mgr_mutex;  // Management path (mutex)
+
+#define MSGHUB_ENTER_CRITICAL() pthread_mutex_lock(&g_msghub_crit_mutex)
+#define MSGHUB_EXIT_CRITICAL() pthread_mutex_unlock(&g_msghub_crit_mutex)
+#define MSGHUB_ENTER_CRITICAL_ISR() pthread_mutex_lock(&g_msghub_crit_mutex)
+#define MSGHUB_EXIT_CRITICAL_ISR() pthread_mutex_unlock(&g_msghub_crit_mutex)
+#define MSGHUB_LOCK_MGR() pthread_mutex_lock(&g_msghub_mgr_mutex)
+#define MSGHUB_UNLOCK_MGR() pthread_mutex_unlock(&g_msghub_mgr_mutex)
+
+#elif defined(RTTHREAD_ENV)
+// ============================================================================
+// RT-Thread: Native RT-Thread primitives
+// ============================================================================
+#include <rtthread.h>
+
+extern rt_mutex_t g_msghub_mgr_mutex; // Management mutex
+
+// Task context critical section (disable scheduler)
+#define MSGHUB_ENTER_CRITICAL() rt_enter_critical()
+#define MSGHUB_EXIT_CRITICAL() rt_exit_critical()
+
+// ISR context critical section (disable interrupts)
+#define MSGHUB_ENTER_CRITICAL_ISR() rt_hw_interrupt_disable()
+#define MSGHUB_EXIT_CRITICAL_ISR() rt_hw_interrupt_enable()
+
+// Management lock (mutex, task context only)
+#define MSGHUB_LOCK_MGR() rt_mutex_take(g_msghub_mgr_mutex, RT_WAITING_FOREVER)
+#define MSGHUB_UNLOCK_MGR() rt_mutex_release(g_msghub_mgr_mutex)
+
+#elif defined(FREERTOS_ENV)
+// ============================================================================
+// FreeRTOS: Native FreeRTOS primitives
+// ============================================================================
+#include "FreeRTOS.h"
+#include "semphr.h"
+
+extern SemaphoreHandle_t g_msghub_mgr_mutex; // Management mutex
+
+// Task context critical section (disable scheduler)
+#define MSGHUB_ENTER_CRITICAL() taskENTER_CRITICAL()
+#define MSGHUB_EXIT_CRITICAL() taskEXIT_CRITICAL()
+
+// ISR context critical section (disable interrupts)
+#define MSGHUB_ENTER_CRITICAL_ISR()                                                                                    \
+    {                                                                                                                  \
+        UBaseType_t uxSavedInterruptStatus = taskENTER_CRITICAL_FROM_ISR()
+#define MSGHUB_EXIT_CRITICAL_ISR()                                                                                     \
+    taskEXIT_CRITICAL_FROM_ISR(uxSavedInterruptStatus);                                                                \
+    }
+
+// Management lock (mutex, task context only)
+#define MSGHUB_LOCK_MGR() xSemaphoreTake(g_msghub_mgr_mutex, portMAX_DELAY)
+#define MSGHUB_UNLOCK_MGR() xSemaphoreGive(g_msghub_mgr_mutex)
+
+#else
+// ============================================================================
+// Bare-metal: No protection (single-threaded)
+// ============================================================================
+#define MSGHUB_ENTER_CRITICAL()
+#define MSGHUB_EXIT_CRITICAL()
+#define MSGHUB_ENTER_CRITICAL_ISR()
+#define MSGHUB_EXIT_CRITICAL_ISR()
+#define MSGHUB_LOCK_MGR()
+#define MSGHUB_UNLOCK_MGR()
+#endif
+
+// ============================================================================
 // Handle encoding magic numbers
 // ============================================================================
 
@@ -69,6 +146,17 @@ extern msghub_topic_state_t g_topics[MSGHUB_MAX_TOPICS];
 extern msghub_pub_slot_t g_pub_slots[MSGHUB_MAX_TOPICS * MSGHUB_MAX_INSTANCES];
 extern msghub_sub_slot_t g_sub_slots[MSGHUB_MAX_SUBSCRIBERS];
 extern uint8_t g_num_topics;
+
+// ============================================================================
+// Initialization (must be called before any other msghub function)
+// ============================================================================
+
+// Initialize msghub (create management mutex, etc.)
+// Returns MSGHUB_OK on success, error code on failure
+msghub_err_t msghub_init(void);
+
+// Cleanup msghub (destroy management mutex, etc.)
+void msghub_deinit(void);
 
 // ============================================================================
 // Test support functions (for testing only)

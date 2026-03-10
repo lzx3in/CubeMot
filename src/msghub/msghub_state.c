@@ -22,6 +22,57 @@ msghub_sub_slot_t g_sub_slots[MSGHUB_MAX_SUBSCRIBERS];
 uint8_t g_num_topics = 0;
 
 // ============================================================================
+// Initialization
+// ============================================================================
+
+msghub_err_t msghub_init(void)
+{
+#if defined(RTTHREAD_ENV)
+    // Create management mutex (IPC flag = priority inheritance)
+    g_msghub_mgr_mutex = rt_mutex_create("msghub_mgr", RT_IPC_FLAG_PRIO);
+    if (g_msghub_mgr_mutex == RT_NULL) {
+        return MSGHUB_ERR_NO_MEM;
+    }
+#elif defined(FREERTOS_ENV)
+    // Create management mutex (recursive for safety)
+    g_msghub_mgr_mutex = xSemaphoreCreateMutex();
+    if (g_msghub_mgr_mutex == NULL) {
+        return MSGHUB_ERR_NO_MEM;
+    }
+#elif defined(UNIT_TEST_HOST)
+    // Initialize pthread mutexes
+    pthread_mutex_init(&g_msghub_crit_mutex, NULL);
+    pthread_mutex_init(&g_msghub_mgr_mutex, NULL);
+#endif
+
+    // Zero-initialize all global state
+    memset(g_topics, 0, sizeof(g_topics));
+    memset(g_pub_slots, 0, sizeof(g_pub_slots));
+    memset(g_sub_slots, 0, sizeof(g_sub_slots));
+    g_num_topics = 0;
+
+    return MSGHUB_OK;
+}
+
+void msghub_deinit(void)
+{
+#if defined(RTTHREAD_ENV)
+    if (g_msghub_mgr_mutex != RT_NULL) {
+        rt_mutex_delete(g_msghub_mgr_mutex);
+        g_msghub_mgr_mutex = RT_NULL;
+    }
+#elif defined(FREERTOS_ENV)
+    if (g_msghub_mgr_mutex != NULL) {
+        vSemaphoreDelete(g_msghub_mgr_mutex);
+        g_msghub_mgr_mutex = NULL;
+    }
+#elif defined(UNIT_TEST_HOST)
+    pthread_mutex_destroy(&g_msghub_crit_mutex);
+    pthread_mutex_destroy(&g_msghub_mgr_mutex);
+#endif
+}
+
+// ============================================================================
 // Test support functions
 // ============================================================================
 

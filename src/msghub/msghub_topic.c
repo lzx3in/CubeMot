@@ -4,9 +4,12 @@
 
 // ============================================================================
 // Topic management
+// Note: These functions are called from management paths (create/destroy)
+//       The caller is responsible for holding MSGHUB_LOCK_MGR().
 // ============================================================================
 
 // Find registered topic by topic handle. Returns topic index, -1 on failure.
+// Read-only operation, no lock needed.
 int8_t msghub_core_find_topic(msghub_topic_t topic)
 {
     for (uint8_t i = 0; i < g_num_topics; i++) {
@@ -18,9 +21,10 @@ int8_t msghub_core_find_topic(msghub_topic_t topic)
 }
 
 // Allocate new topic slot. Returns existing index if topic already exists.
+// Caller MUST hold MSGHUB_LOCK_MGR() before calling.
 int8_t msghub_core_alloc_topic(msghub_topic_t topic)
 {
-    // Check if already exists
+    // Check if already exists (read-only, no lock needed for find)
     int8_t existing = msghub_core_find_topic(topic);
     if (existing >= 0) {
         return existing;
@@ -31,7 +35,7 @@ int8_t msghub_core_alloc_topic(msghub_topic_t topic)
         return -1;
     }
 
-    // Allocate new slot
+    // Allocate new slot (caller holds MSGHUB_LOCK_MGR)
     uint8_t idx = g_num_topics++;
     g_topics[idx].topic = topic;
     memset(g_topics[idx].instances, 0, sizeof(g_topics[idx].instances));
@@ -40,9 +44,12 @@ int8_t msghub_core_alloc_topic(msghub_topic_t topic)
 
 // ============================================================================
 // Publisher handle management
+// Note: These functions are called from management paths (create/destroy)
+//       The caller is responsible for holding MSGHUB_LOCK_MGR().
 // ============================================================================
 
 // Allocate publisher slot. Returns slot index, -1 on failure.
+// Caller MUST hold MSGHUB_LOCK_MGR() before calling.
 int8_t msghub_core_alloc_pub_slot(void)
 {
     const uint8_t max_slots = sizeof(g_pub_slots) / sizeof(g_pub_slots[0]);
@@ -55,12 +62,14 @@ int8_t msghub_core_alloc_pub_slot(void)
 }
 
 // Encode publisher handle from slot index
+// No lock needed (pure computation)
 void msghub_core_encode_pub_handle(msghub_publisher_t *handle, uint8_t slot_idx)
 {
     *handle = ((uint16_t)MSGHUB_PUBLISHER_MAGIC << 8) | slot_idx;
 }
 
 // Decode publisher handle. Returns 0 success, -1 failure.
+// Read-only validation, no lock needed.
 int8_t msghub_core_decode_pub_handle(msghub_publisher_t handle, uint8_t *slot_idx)
 {
     uint8_t magic = (handle >> 8) & 0xFF;
@@ -88,9 +97,12 @@ int8_t msghub_core_decode_pub_handle(msghub_publisher_t handle, uint8_t *slot_id
 
 // ============================================================================
 // Subscriber handle management
+// Note: These functions are called from management paths (create/destroy)
+//       The caller is responsible for holding MSGHUB_LOCK_MGR().
 // ============================================================================
 
 // Allocate subscriber slot. Returns slot index, -1 on failure.
+// Caller MUST hold MSGHUB_LOCK_MGR() before calling.
 int8_t msghub_core_alloc_sub_slot(void)
 {
     const uint8_t max_slots = sizeof(g_sub_slots) / sizeof(g_sub_slots[0]);
@@ -103,12 +115,14 @@ int8_t msghub_core_alloc_sub_slot(void)
 }
 
 // Encode subscriber handle from slot index
+// No lock needed (pure computation)
 void msghub_core_encode_sub_handle(msghub_subscriber_t *handle, uint8_t slot_idx)
 {
     *handle = ((uint16_t)MSGHUB_SUBSCRIBER_MAGIC << 8) | slot_idx;
 }
 
 // Decode subscriber handle. Returns 0 success, -1 failure.
+// Read-only validation, no lock needed.
 int8_t msghub_core_decode_sub_handle(msghub_subscriber_t handle, uint8_t *slot_idx)
 {
     uint8_t magic = (handle >> 8) & 0xFF;

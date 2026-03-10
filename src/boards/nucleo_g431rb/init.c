@@ -1,6 +1,8 @@
 #include "boards/init.h"
 #include "stm32g4xx_hal.h"
 #include "boards/error_handles.h"
+#include "led_hal_stm32g4.h"
+#include "drivers/framework/hal_framework.h"
 
 static void board_systemclock_config(void)
 {
@@ -61,7 +63,13 @@ static void board_gpio_init(void)
 
 void board_init(void)
 {
+    // must be before any HAL registration
+    hal_framework_init();
+
     HAL_Init();
     board_systemclock_config();
     board_gpio_init();
+
+    // Register HAL implementations
+    stm32g4_led_hal_init();
 }

@@ -7,12 +7,12 @@ set(FREERTOS_PORT GCC_ARM_CM4F CACHE STRING "FreeRTOS port" FORCE)
 set(FREERTOS_HEAP 4 CACHE STRING "FreeRTOS heap implementation" FORCE)
 
 add_subdirectory(common)
-add_subdirectory(hal/stm32g4)
+add_subdirectory(drivers)      # Framework first (provides interfaces)
+add_subdirectory(hal/stm32g4)   # HAL implementations
 add_subdirectory(lib)
 add_subdirectory(modules)
-add_subdirectory(boards)
+add_subdirectory(boards)        # Board code (registers HAL implementations)
 add_subdirectory(freertos)
-add_subdirectory(drivers)
 add_subdirectory(msghub)
 add_subdirectory(app)
 

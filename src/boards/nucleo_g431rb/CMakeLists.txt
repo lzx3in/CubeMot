@@ -13,7 +13,6 @@ set(BOARD_STARTUP_SRC "${CMAKE_CURRENT_LIST_DIR}/startup/startup_stm32g431xx.s"
 
 # Configure the boards library target
 target_sources(boards PRIVATE
-    led.c
     init.c
     delay.c
     hooks.c
@@ -29,13 +28,25 @@ add_executable(${CMAKE_PROJECT_NAME}
     error_handlers.c
 )
 
+# Linking order:
+# - stm32g4_hal: Vendor HAL (ST's code)
+# - hal_stm32g4_impl: Our HAL implementation using framework
+# - boards: Board code (calls stm32g4_led_hal_init)
+# Framework ensures correct initialization order through registration
 target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE
     stm32g4_hal
-    boards
-    modules
     freertos_kernel
     app
+    msghub
+    modules
+    hal_stm32g4_impl  # HAL implementations (must be before boards)
+    boards
     ${TOOLCHAIN_LINK_LIBRARIES}
+)
+
+# Add HAL include path for board code
+target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/hal/stm32g4/led
 )
 
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE

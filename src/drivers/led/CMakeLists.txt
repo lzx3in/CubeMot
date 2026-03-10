@@ -11,5 +11,7 @@ target_include_directories(driver_led PUBLIC
 
 target_link_libraries(driver_led PUBLIC
     msghub
-    boards
+    driver_framework  # Use HAL framework interface
 )
+
+# Driver layer depends only on framework, not on HAL implementations

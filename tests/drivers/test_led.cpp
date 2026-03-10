@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
-#include "mocks/board/led_mock.h"
+#include "mocks/board/led_hal_mock.h"
 
 extern "C" {
 #include "drivers/led/led.h"
@@ -20,7 +20,8 @@ class LedDriverTest : public ::testing::Test
   protected:
     void SetUp() override
     {
-        mock_ = &GetBoardLedMock();
+        mock_ = &GetLedHalMock();
+        setup_led_hal_mock();
 
         // Reset msghub and LED driver state before each test
         msghub_reset();
@@ -32,14 +33,13 @@ class LedDriverTest : public ::testing::Test
         // Cleanup handled by mock reset between tests
     }
 
-    // Helper: Setup mock expectations for a valid LED handle
-    void ExpectValidHandle(int id, board_led_t handle)
+    // Helper: Setup mock expectations for LED operations
+    void ExpectLedState(uint8_t id, bool state)
     {
-        EXPECT_CALL(*mock_, get_handle(id)).WillOnce(Return(handle));
-        EXPECT_CALL(*mock_, is_valid(handle)).WillRepeatedly(Return(true));
+        EXPECT_CALL(*mock_, set_state(id, state)).Times(1);
     }
 
-    BoardLedMock *mock_;
+    LedHalMock *mock_;
 };
 
 // ============================================================================
@@ -48,9 +48,8 @@ class LedDriverTest : public ::testing::Test
 
 TEST_F(LedDriverTest, InitReturnsSuccess)
 {
-    // Setup mock for LED 0
-    board_led_t dummy_handle = (board_led_t)0x1234;
-    ExpectValidHandle(0, dummy_handle);
+    // Setup mock expectations
+    EXPECT_CALL(*mock_, get_count()).WillRepeatedly(Return(1));
 
     int result = led_driver_init();
     EXPECT_EQ(result, 0);
@@ -58,8 +57,7 @@ TEST_F(LedDriverTest, InitReturnsSuccess)
 
 TEST_F(LedDriverTest, InitFailsWhenCalledTwice)
 {
-    board_led_t dummy_handle = (board_led_t)0x1234;
-    ExpectValidHandle(0, dummy_handle);
+    EXPECT_CALL(*mock_, get_count()).WillRepeatedly(Return(1));
 
     // First init should succeed
     EXPECT_EQ(led_driver_init(), 0);
@@ -74,26 +72,22 @@ TEST_F(LedDriverTest, InitFailsWhenCalledTwice)
 
 TEST_F(LedDriverTest, SetTurnsLedOn)
 {
-    board_led_t dummy_handle = (board_led_t)0x1234;
-    ExpectValidHandle(0, dummy_handle);
-
+    EXPECT_CALL(*mock_, get_count()).WillRepeatedly(Return(1));
     ASSERT_EQ(led_driver_init(), 0);
 
     // Expect hardware operation
-    EXPECT_CALL(*mock_, set_state(dummy_handle, true));
+    ExpectLedState(0, true);
 
     led_set(0, true);
 }
 
 TEST_F(LedDriverTest, SetTurnsLedOff)
 {
-    board_led_t dummy_handle = (board_led_t)0x1234;
-    ExpectValidHandle(0, dummy_handle);
-
+    EXPECT_CALL(*mock_, get_count()).WillRepeatedly(Return(1));
     ASSERT_EQ(led_driver_init(), 0);
 
     // Expect hardware operation
-    EXPECT_CALL(*mock_, set_state(dummy_handle, false));
+    ExpectLedState(0, false);
 
     led_set(0, false);
 }
@@ -118,30 +112,26 @@ TEST_F(LedDriverTest, SetBeforeInitDoesNothing)
 
 TEST_F(LedDriverTest, ToggleChangesStateFromOffToOn)
 {
-    board_led_t dummy_handle = (board_led_t)0x1234;
-    ExpectValidHandle(0, dummy_handle);
-
+    EXPECT_CALL(*mock_, get_count()).WillRepeatedly(Return(1));
     ASSERT_EQ(led_driver_init(), 0);
 
     // Initial state is off, toggle should turn on
-    EXPECT_CALL(*mock_, set_state(dummy_handle, true));
+    ExpectLedState(0, true);
 
     led_toggle(0);
 }
 
 TEST_F(LedDriverTest, ToggleChangesStateFromOnToOff)
 {
-    board_led_t dummy_handle = (board_led_t)0x1234;
-    ExpectValidHandle(0, dummy_handle);
-
+    EXPECT_CALL(*mock_, get_count()).WillRepeatedly(Return(1));
     ASSERT_EQ(led_driver_init(), 0);
 
     // First toggle: off -> on
-    EXPECT_CALL(*mock_, set_state(dummy_handle, true));
+    ExpectLedState(0, true);
     led_toggle(0);
 
     // Second toggle: on -> off
-    EXPECT_CALL(*mock_, set_state(dummy_handle, false));
+    ExpectLedState(0, false);
     led_toggle(0);
 }
 
@@ -179,15 +169,12 @@ TEST_F(LedDriverTest, GetStateSubscriberReturnsValidHandle)
 
 TEST_F(LedDriverTest, MultipleLedsCanBeControlledIndependently)
 {
-    board_led_t handle1 = (board_led_t)0x1000;
-    board_led_t handle2 = (board_led_t)0x2000;
-
-    ExpectValidHandle(0, handle1);
+    EXPECT_CALL(*mock_, get_count()).WillRepeatedly(Return(2));
     ASSERT_EQ(led_driver_init(), 0);
 
     // Setup expectations for both LEDs
-    EXPECT_CALL(*mock_, set_state(handle1, true));
-    EXPECT_CALL(*mock_, set_state(handle2, false));
+    ExpectLedState(0, true);
+    ExpectLedState(1, false);
 
     led_set(0, true);
     led_set(1, false);

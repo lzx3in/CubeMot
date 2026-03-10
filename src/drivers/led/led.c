@@ -1,6 +1,6 @@
 #include "drivers/led/led.h"
 #include "drivers/led/led_msg.h"
-#include "boards/led.h"
+#include "drivers/framework/led_hal_framework.h"
 #include "FreeRTOS.h"
 #include "task.h"
 
@@ -79,13 +79,10 @@ static void vTaskLED_Driver(void *pvParameters)
 
             // Validate LED ID
             if (cmd.led_id < 3) {
-                // Execute hardware operation
-                board_led_t handle = board_led_get_handle(cmd.led_id);
-                if (board_led_is_valid(handle)) {
-                    board_led_set_state(handle, cmd.state);
-                    g_led_driver.current_state[cmd.led_id] = cmd.state;
-                    publish_state(cmd.led_id, cmd.state);
-                }
+                // Execute hardware operation using framework API
+                led_hal_set(cmd.led_id, cmd.state);
+                g_led_driver.current_state[cmd.led_id] = cmd.state;
+                publish_state(cmd.led_id, cmd.state);
             }
         }
     }

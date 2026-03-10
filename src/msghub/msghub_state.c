@@ -22,6 +22,19 @@ msghub_sub_slot_t g_sub_slots[MSGHUB_MAX_SUBSCRIBERS];
 uint8_t g_num_topics = 0;
 
 // ============================================================================
+// Management mutex (environment-specific)
+// ============================================================================
+
+#if defined(RTTHREAD_ENV)
+rt_mutex_t g_msghub_mgr_mutex = RT_NULL;
+#elif defined(FREERTOS_ENV)
+SemaphoreHandle_t g_msghub_mgr_mutex = NULL;
+#elif defined(UNIT_TEST_HOST)
+pthread_mutex_t g_msghub_mgr_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t g_msghub_crit_mutex = PTHREAD_MUTEX_INITIALIZER;
+#endif
+
+// ============================================================================
 // Initialization
 // ============================================================================
 

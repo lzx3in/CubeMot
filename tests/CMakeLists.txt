@@ -1,8 +1,6 @@
 # add the libraries in src/ first so that tests/ can link to them.
-# Note: src/boards is added for header files only - tests use board_mocks for implementation
 add_subdirectory(${CMAKE_SOURCE_DIR}/src/common ${CMAKE_BINARY_DIR}/src/common)
 add_subdirectory(${CMAKE_SOURCE_DIR}/src/lib ${CMAKE_BINARY_DIR}/src/lib)
-add_subdirectory(${CMAKE_SOURCE_DIR}/src/boards ${CMAKE_BINARY_DIR}/src/boards)
 add_subdirectory(${CMAKE_SOURCE_DIR}/src/msghub ${CMAKE_BINARY_DIR}/src/msghub)
 add_subdirectory(${CMAKE_SOURCE_DIR}/src/drivers ${CMAKE_BINARY_DIR}/src/drivers)
 

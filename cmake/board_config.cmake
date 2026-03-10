@@ -57,8 +57,3 @@ if(EXISTS ${BOARD_CONFIG_FILE})
 else()
     message(FATAL_ERROR "Board configuration file not found: ${BOARD_CONFIG_FILE}")
 endif()
-
-# Debug build definitions
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    list(APPEND BOARD_COMPILE_DEFINITIONS DEBUG)
-endif()

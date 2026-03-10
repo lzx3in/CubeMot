@@ -1,13 +1,10 @@
 #include "boards/init.h"
-#include "modules/blink/blink.h"
-#include "FreeRTOS.h"
-#include "task.h"
+#include "app/app.h"
 
 int main(void)
 {
     board_init();
-    blink_module_init();
-    vTaskStartScheduler();
+    app_launch();
 
     // Should never reach here
     for (;;) {

@@ -14,6 +14,7 @@ add_subdirectory(boards)
 add_subdirectory(freertos)
 add_subdirectory(drivers)
 add_subdirectory(msghub)
+add_subdirectory(app)
 
 # Remove incorrect libob.a dependency
 list(REMOVE_ITEM CMAKE_C_IMPLICIT_LINK_LIBRARIES ob)

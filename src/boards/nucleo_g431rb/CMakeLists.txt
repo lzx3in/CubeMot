@@ -34,6 +34,7 @@ target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE
     boards
     modules
     freertos_kernel
+    app
     ${TOOLCHAIN_LINK_LIBRARIES}
 )
 

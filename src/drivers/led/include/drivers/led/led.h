@@ -43,6 +43,18 @@ void led_toggle(uint8_t led_id);
  */
 msghub_subscriber_t led_get_state_subscriber(uint8_t instance);
 
+// ============================================================================
+// Test Support (BUILD_TESTING only)
+// ============================================================================
+
+#ifdef BUILD_TESTING
+/**
+ * Deinitialize LED driver (test only)
+ * Resets driver state for next test
+ */
+void led_driver_deinit(void);
+#endif
+
 #ifdef __cplusplus
 }
 #endif

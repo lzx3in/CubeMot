@@ -136,6 +136,38 @@ msghub_err_t msghub_receive(msghub_subscriber_t sub, void *data);
 msghub_err_t msghub_subscriber_check(msghub_subscriber_t sub, bool *updated);
 
 // ============================================================================
+// Callback API (Passive Wake-up)
+// ============================================================================
+
+// Subscriber callback function type
+// Called automatically when new data is published to the subscribed topic
+// Parameters:
+//   - sub: Subscriber handle that received the update
+//   - context: User-provided context pointer (set during callback registration)
+// Warning: This callback may be called from ISR context if publish is from ISR!
+//          Use ISR-safe APIs (e.g., xTaskNotifyFromISR) in the callback.
+typedef void (*msghub_sub_callback_t)(msghub_subscriber_t sub, void *context);
+
+// Register a callback for passive wake-up
+// When new data is published to this subscriber's topic, the callback will be invoked
+// Parameters:
+//   - sub: Subscriber handle
+//   - callback: Callback function (NULL to disable callback)
+//   - context: User-provided context pointer (passed to callback)
+// Returns:
+//   - MSGHUB_OK on success
+//   - MSGHUB_ERR_INVALID if sub is invalid
+msghub_err_t msghub_subscriber_set_callback(msghub_subscriber_t sub, msghub_sub_callback_t callback, void *context);
+
+// Clear the callback (switch back to polling mode)
+// Parameters:
+//   - sub: Subscriber handle
+// Returns:
+//   - MSGHUB_OK on success
+//   - MSGHUB_ERR_INVALID if sub is invalid
+msghub_err_t msghub_subscriber_clear_callback(msghub_subscriber_t sub);
+
+// ============================================================================
 // 高级功能
 // ============================================================================
 

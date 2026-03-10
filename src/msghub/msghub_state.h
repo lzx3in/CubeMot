@@ -130,12 +130,22 @@ typedef struct {
     uint8_t instance;  // Instance number
 } msghub_pub_slot_t;
 
+// Subscriber callback function type
+// Called when new data is published to the subscribed topic
+// Parameters:
+//   - sub: Subscriber handle
+//   - context: User-provided context pointer
+// Note: This callback may be called from ISR context if publish is from ISR
+typedef void (*msghub_sub_callback_t)(msghub_subscriber_t sub, void *context);
+
 // Subscriber handle slot
 typedef struct {
-    uint8_t magic;            // Magic number validation
-    uint8_t topic_idx;        // Topic index
-    uint8_t instance;         // Instance number
-    uint16_t last_generation; // Last read generation
+    uint8_t magic;                  // Magic number validation
+    uint8_t topic_idx;              // Topic index
+    uint8_t instance;               // Instance number
+    uint16_t last_generation;       // Last read generation
+    msghub_sub_callback_t callback; // Callback function (NULL = polling mode)
+    void *callback_context;         // User-provided context for callback
 } msghub_sub_slot_t;
 
 // ============================================================================

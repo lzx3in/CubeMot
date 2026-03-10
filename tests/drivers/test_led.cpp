@@ -6,6 +6,10 @@ extern "C" {
 #include "drivers/led/led.h"
 #include "drivers/led/led_msg.h"
 #include "msghub/msghub.h"
+
+// Test support functions
+void msghub_reset(void);
+void led_driver_deinit(void);
 }
 
 using ::testing::_;
@@ -17,6 +21,10 @@ class LedDriverTest : public ::testing::Test
     void SetUp() override
     {
         mock_ = &GetBoardLedMock();
+
+        // Reset msghub and LED driver state before each test
+        msghub_reset();
+        led_driver_deinit();
     }
 
     void TearDown() override

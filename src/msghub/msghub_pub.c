@@ -78,6 +78,35 @@ msghub_err_t msghub_destroy_publisher(msghub_publisher_t handle)
     return MSGHUB_OK;
 }
 
+// Internal helper: trigger callbacks for all subscribers of a topic
+// Must be called outside critical section
+static void msghub_trigger_callbacks(uint8_t topic_idx, uint8_t instance, uint16_t generation)
+{
+    // Iterate all subscriber slots and trigger callbacks for matching subscribers
+    for (int i = 0; i < MSGHUB_MAX_SUBSCRIBERS; i++) {
+        msghub_sub_slot_t *sub_slot = &g_sub_slots[i];
+
+        // Check if this subscriber is valid and subscribed to this topic
+        if (sub_slot->magic == MSGHUB_SUBSCRIBER_MAGIC && sub_slot->topic_idx == topic_idx &&
+            sub_slot->instance == instance && sub_slot->callback != NULL) {
+
+            // Update subscriber's generation before calling callback
+            sub_slot->last_generation = generation;
+
+            // Save callback info (may change during callback execution)
+            msghub_sub_callback_t cb = sub_slot->callback;
+            void *ctx = sub_slot->callback_context;
+
+            // Encode subscriber handle
+            msghub_subscriber_t sub_handle;
+            msghub_core_encode_sub_handle(&sub_handle, (uint8_t)i);
+
+            // Call callback outside critical section
+            cb(sub_handle, ctx);
+        }
+    }
+}
+
 // Publish data to topic (task context)
 msghub_err_t msghub_publish(msghub_publisher_t handle, const void *data)
 {
@@ -100,15 +129,22 @@ msghub_err_t msghub_publish(msghub_publisher_t handle, const void *data)
     }
 
     // Critical section: protect against concurrent access from other tasks or ISRs
+    uint16_t new_generation;
     MSGHUB_ENTER_CRITICAL();
     memcpy(inst->data, data, topic_state->topic->msg_size);
     inst->generation++;
+    new_generation = inst->generation;
     MSGHUB_EXIT_CRITICAL();
+
+    // Trigger callbacks for all subscribers (outside critical section)
+    msghub_trigger_callbacks(slot->topic_idx, slot->instance, new_generation);
 
     return MSGHUB_OK;
 }
 
 // Publish data to topic from ISR context
+// Note: Subscriber callbacks will also be called from ISR context!
+//       Callbacks must use ISR-safe APIs (e.g., xTaskNotifyFromISR).
 msghub_err_t msghub_publish_from_isr(msghub_publisher_t handle, const void *data)
 {
     if (data == NULL) {
@@ -130,10 +166,37 @@ msghub_err_t msghub_publish_from_isr(msghub_publisher_t handle, const void *data
     }
 
     // Critical section: protect against concurrent access from tasks or other ISRs
+    uint16_t new_generation;
     MSGHUB_ENTER_CRITICAL_ISR();
     memcpy(inst->data, data, topic_state->topic->msg_size);
     inst->generation++;
+    new_generation = inst->generation;
     MSGHUB_EXIT_CRITICAL_ISR();
+
+    // Trigger callbacks for all subscribers from ISR context
+    // Callbacks must use ISR-safe APIs!
+    for (int i = 0; i < MSGHUB_MAX_SUBSCRIBERS; i++) {
+        msghub_sub_slot_t *sub_slot = &g_sub_slots[i];
+
+        // Check if this subscriber is valid and subscribed to this topic
+        if (sub_slot->magic == MSGHUB_SUBSCRIBER_MAGIC && sub_slot->topic_idx == slot->topic_idx &&
+            sub_slot->instance == slot->instance && sub_slot->callback != NULL) {
+
+            // Update subscriber's generation before calling callback
+            sub_slot->last_generation = new_generation;
+
+            // Save callback info
+            msghub_sub_callback_t cb = sub_slot->callback;
+            void *ctx = sub_slot->callback_context;
+
+            // Encode subscriber handle
+            msghub_subscriber_t sub_handle;
+            msghub_core_encode_sub_handle(&sub_handle, (uint8_t)i);
+
+            // Call callback from ISR context - must use ISR-safe APIs!
+            cb(sub_handle, ctx);
+        }
+    }
 
     return MSGHUB_OK;
 }

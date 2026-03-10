@@ -224,6 +224,31 @@ msghub_err_t msghub_subscriber_update(msghub_subscriber_t handle, void *buffer, 
 }
 
 // ============================================================================
+// Callback API (Passive Wake-up)
+// ============================================================================
+
+msghub_err_t msghub_subscriber_set_callback(msghub_subscriber_t handle, msghub_sub_callback_t callback, void *context)
+{
+    uint8_t slot_idx;
+    if (msghub_core_decode_sub_handle(handle, &slot_idx) < 0) {
+        return MSGHUB_ERR_INVALID;
+    }
+
+    // Management path: use mutex lock
+    MSGHUB_LOCK_MGR();
+    g_sub_slots[slot_idx].callback = callback;
+    g_sub_slots[slot_idx].callback_context = context;
+    MSGHUB_UNLOCK_MGR();
+
+    return MSGHUB_OK;
+}
+
+msghub_err_t msghub_subscriber_clear_callback(msghub_subscriber_t handle)
+{
+    return msghub_subscriber_set_callback(handle, NULL, NULL);
+}
+
+// ============================================================================
 // Utility functions
 // ============================================================================
 

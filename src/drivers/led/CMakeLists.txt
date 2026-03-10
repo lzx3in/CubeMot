@@ -1,15 +1,15 @@
-add_library(led_driver STATIC)
+add_library(driver_led STATIC)
 
-target_sources(led_driver PRIVATE
+target_sources(driver_led PRIVATE
     led.c
     led_topic.c
 )
 
-target_include_directories(led_driver PUBLIC
+target_include_directories(driver_led PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(led_driver PUBLIC
+target_link_libraries(driver_led PUBLIC
     msghub
     boards
 )

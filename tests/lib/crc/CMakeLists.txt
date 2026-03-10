@@ -3,7 +3,7 @@ add_executable(crc-test
 )
 
 target_link_libraries(crc-test PRIVATE
-    crc
+    lib_crc
     GTest::gtest_main
 )
 

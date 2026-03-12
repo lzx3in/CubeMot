@@ -1,4 +1,5 @@
 #include "stm32g4xx_hal.h"
+#include "drivers/button/button.h"
 
 extern TIM_HandleTypeDef htim3;
 
@@ -18,4 +19,18 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   {
     HAL_IncTick();
   }
+}
+
+void EXTI15_10_IRQHandler(void)
+{
+    HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_13);
+}
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+    if (GPIO_Pin == GPIO_PIN_13)
+    {
+        // Notify button driver (driver will read state and publish event)
+        button_driver_isr_callback(0);
+    }
 }

@@ -49,6 +49,7 @@ add_library(hal_stm32g4_impl STATIC)
 
 target_sources(hal_stm32g4_impl PRIVATE
     led/led_hal_stm32g4.c
+    button/button_hal_stm32g4.c
 )
 
 target_include_directories(hal_stm32g4_impl PUBLIC

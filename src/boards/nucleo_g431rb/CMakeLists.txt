@@ -4,6 +4,7 @@ target_include_directories(boards PRIVATE
     ${CMAKE_SOURCE_DIR}/src/hal/stm32g4/CMSIS/Include
     ${CMAKE_SOURCE_DIR}/src/hal/stm32g4/STM32G4xx_HAL_Driver/Inc
     ${CMAKE_SOURCE_DIR}/src/hal/stm32g4/led
+    ${CMAKE_SOURCE_DIR}/src/hal/stm32g4/button
     ${CMAKE_SOURCE_DIR}/src/drivers/framework/include
 )
 

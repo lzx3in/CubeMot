@@ -46,6 +46,14 @@ static inline TickType_t xTaskGetTickCount(void)
     return (TickType_t)(ts.tv_sec * 1000 + ts.tv_nsec / 1000000);
 }
 
+// xTaskGetTickCountFromISR stub - ISR-safe version (same as xTaskGetTickCount in test env)
+static inline TickType_t xTaskGetTickCountFromISR(void)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (TickType_t)(ts.tv_sec * 1000 + ts.tv_nsec / 1000000);
+}
+
 // xTaskCreate stub - no-op for testing
 static inline BaseType_t xTaskCreate(void *pvTaskCode, const char *const pcName, uint32_t usStackDepth,
                                      void *pvParameters, UBaseType_t uxPriority, TaskHandle_t *pxCreatedTask)

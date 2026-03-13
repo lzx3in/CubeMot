@@ -3,6 +3,7 @@
 #include "drivers/framework/led_hal_framework.h"
 #include "FreeRTOS.h"
 #include "task.h"
+#include "common_time.h"
 
 // ============================================================================
 // Driver Private State
@@ -20,23 +21,13 @@ static struct {
     led_cmd_t pending_cmd;
 } g_led_driver;
 
-// ============================================================================
-// Internal Functions
-// ============================================================================
-
-// Get system timestamp
-static uint32_t get_timestamp_ms(void)
-{
-    return xTaskGetTickCount() * portTICK_PERIOD_MS;
-}
-
 // Publish LED state (use corresponding LED's publisher instance)
 static void publish_state(uint8_t led_id, bool state)
 {
     if (led_id >= LED_DRIVER_MAX_LEDS) {
         return;
     }
-    led_state_t msg = {.led_id = led_id, .state = state, .timestamp = get_timestamp_ms()};
+    led_state_t msg = {.led_id = led_id, .state = state, .timestamp = common_get_timestamp_ms()};
     msghub_publish(g_led_driver.state_pub[led_id], &msg);
 }
 

@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include "msghub/msghub.h"
 #include "drivers/button/button_topic.h"
-#include "cubemot_error.h"
+#include "common_error.h"
 
 #ifdef __cplusplus
 extern "C" {

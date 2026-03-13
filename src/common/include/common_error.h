@@ -1,10 +1,10 @@
 #pragma once
 
-#include <stdint.h>
-
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#include <stdint.h>
 
 // CubeMot error code type. Negative values indicate errors, zero indicates success.
 typedef int32_t cubemot_err_t;

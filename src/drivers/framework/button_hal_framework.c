@@ -6,7 +6,7 @@
 
 #include <stddef.h>
 #include "drivers/framework/button_hal_framework.h"
-#include "cubemot_error.h"
+#include "common_error.h"
 
 static const button_hal_ops_t *g_button_ops = NULL;
 

@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
-#include "cubemot_error.h"
+#include "common_error.h"
 
 #ifdef __cplusplus
 extern "C" {

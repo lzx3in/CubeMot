@@ -9,7 +9,7 @@ set(FREERTOS_HEAP 4 CACHE STRING "FreeRTOS heap implementation" FORCE)
 add_subdirectory(common)
 add_subdirectory(drivers)      # Framework first (provides interfaces)
 add_subdirectory(hal/stm32g4)   # HAL implementations
-add_subdirectory(lib)
+add_subdirectory(libs)
 add_subdirectory(modules)
 add_subdirectory(boards)        # Board code (registers HAL implementations)
 add_subdirectory(freertos)

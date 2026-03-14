@@ -3,7 +3,7 @@
 #include <limits>
 
 extern "C" {
-#include "lib/pid/pid.h"
+#include "libs/pid/pid.h"
 }
 
 class PIDTest : public ::testing::Test

@@ -6,7 +6,7 @@
 #include <vector>
 
 extern "C" {
-#include "src/lib/crc/crc.h"
+#include "src/libs/crc/crc.h"
 }
 
 namespace cubemot::test

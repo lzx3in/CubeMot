@@ -1,5 +1,11 @@
 menu "Driver Configuration"
 
+# Load LED driver configuration
+source "src/drivers/led/Kconfig"
+
+# Load Button driver configuration
+source "src/drivers/button/Kconfig"
+
 menu "UART Drivers"
 
 config DRIVER_UART_ENABLE

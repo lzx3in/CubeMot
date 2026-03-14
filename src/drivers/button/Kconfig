@@ -1,0 +1,28 @@
+menu "Button Driver Configuration"
+
+config HAS_DRIVER_BUTTON_0
+    bool "Button 0 resource"
+    default y
+    help
+        Enable Button 0 resource. Board code binds hardware to this resource.
+
+config HAS_DRIVER_BUTTON_1
+    bool "Button 1 resource"
+    default n
+    help
+        Enable Button 1 resource.
+
+config HAS_DRIVER_BUTTON_2
+    bool "Button 2 resource"
+    default n
+    help
+        Enable Button 2 resource.
+
+config DRIVER_BUTTON_COUNT
+    int "Number of Button resources"
+    default 1
+    range 0 3
+    help
+        Total number of Button resources. Should match the number of HAS_DRIVER_BUTTON_X enabled.
+
+endmenu

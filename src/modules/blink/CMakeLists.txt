@@ -3,12 +3,12 @@ add_library(module_blink STATIC
 )
 
 target_include_directories(module_blink PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(module_blink PUBLIC
-    drivers
+target_link_libraries(module_blink PRIVATE
+    common
+    msghub
     freertos_kernel
     topics
 )

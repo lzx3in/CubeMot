@@ -9,9 +9,9 @@ add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/${BOARD})
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/${BOARD}/freertos_config)
 
 target_link_libraries(boards PRIVATE
-    stm32g4_hal
-    hal_stm32g4_impl
+    chips
     freertos_kernel
-    driver_button
+    driver_led
     msghub
+    modules
 )

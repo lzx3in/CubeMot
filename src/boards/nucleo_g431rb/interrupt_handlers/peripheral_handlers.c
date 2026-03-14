@@ -1,18 +1,15 @@
 #include "stm32g4xx_hal.h"
+#include "chips/gpio.h"
 #include "drivers/button/button.h"
+#include "common_device.h"
 
 extern TIM_HandleTypeDef htim3;
 
-// TIM3 global interrupt
 void TIM3_IRQHandler(void)
 {
     HAL_TIM_IRQHandler(&htim3);
 }
 
-// Period elapsed callback in non blocking mode
-// This function is called  when TIM3 interrupt took place, inside
-// HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
-// a global variable "uwTick" used as application time base.
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
   if (htim->Instance == TIM3)
@@ -23,14 +20,15 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 void EXTI15_10_IRQHandler(void)
 {
-    HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_13);
+    chip_gpio_exti_irq_handler(CHIP_GPIO_PIN_13);
 }
 
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+void chip_gpio_exti_callback(chip_gpio_pin_t pin)
 {
-    if (GPIO_Pin == GPIO_PIN_13)
-    {
-        // Notify button driver (driver will read state and publish event)
-        button_driver_isr_callback(0);
+    if (pin == CHIP_GPIO_PIN_13) {
+        const driver_button_instance *inst = driver_button_get_instance(CUBEMOT_DEVICE_BUTTON_0);
+        if (inst && inst->irq_handler) {
+            inst->irq_handler(inst->ctx);
+        }
     }
 }

@@ -1,58 +1,31 @@
 #pragma once
 
-#include <stdint.h>
-#include <stdbool.h>
-#include "msghub/msghub.h"
-#include "topics/topics.h"
-#include "common_error.h"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-// ============================================================================
-// Button Driver API
-// ============================================================================
+#include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include "common_device.h"
 
-/**
- * Initialize Button driver
- * Creates internal driver task and msghub topics
- *
- * @return CUBEMOT_DRIVER_BUTTON_OK on success, negative error code on failure
- */
-cubemot_err_t button_driver_init(void);
+typedef struct {
+    cubemot_device_button id;
+    void *ctx;
+    int (*init)(void *ctx);
+    bool (*read)(void *ctx);
+    int (*enable_irq)(void *ctx);
+    int (*disable_irq)(void *ctx);
+    void (*irq_handler)(void *ctx);
+} driver_button_instance;
 
-/**
- * Get button state subscriber handle
- *
- * @param instance Subscriber instance ID (0 = primary instance)
- * @return Subscriber handle, MSGHUB_SUBSCRIBER_INVALID on failure
- */
-msghub_subscriber_t button_get_state_subscriber(uint8_t instance);
+static inline bool cubemot_device_button_is_valid(cubemot_device_button id)
+{
+    return id >= CUBEMOT_DEVICE_BUTTON_0 && id < CUBEMOT_DEVICE_BUTTON_COUNT;
+}
 
-// ============================================================================
-// ISR Callback (called from HAL GPIO EXTI callback)
-// ============================================================================
-
-/**
- * Button driver ISR callback
- * Called from HAL_GPIO_EXTI_Callback when button interrupt occurs
- *
- * @param button_id Button ID that triggered the interrupt
- */
-void button_driver_isr_callback(uint8_t button_id);
-
-// ============================================================================
-// Test Support (BUILD_TESTING only)
-// ============================================================================
-
-#ifdef BUILD_TESTING
-/**
- * Deinitialize Button driver (test only)
- * Resets driver state for next test
- */
-void button_driver_deinit(void);
-#endif
+// Weak default implementation - board layer overrides this
+driver_button_instance *driver_button_get_instance(cubemot_device_button id);
 
 #ifdef __cplusplus
 }

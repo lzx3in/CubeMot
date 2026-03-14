@@ -4,15 +4,15 @@ menu "Modules Configuration"
 config MODULE_BLINK_ENABLE
     bool "Blink Module"
     default y
-    help
-        Enable LED blink module
 
-config MODULE_BLINK_PERIOD_MS
-    int "Blink Period (ms)"
-    default 500
-    range 100 5000
-    depends on MODULE_BLINK_ENABLE
-    help
-        LED blink period in milliseconds
+# Button Detector Module
+config MODULE_BUTTON_DETECTOR_ENABLE
+    bool "Button Detector Module"
+    default y
+
+# LED Controller Module
+config MODULE_LED_CONTROLLER_ENABLE
+    bool "LED Controller Module"
+    default y
 
 endmenu

@@ -1,11 +1,3 @@
-# STM32G4 HAL Implementation
-# This has two parts:
-# 1. stm32g4_hal - Vendor HAL library (ST's code)
-# 2. hal_stm32g4 - Our HAL implementation using the framework
-
-# ============================================================================
-# Part 1: Vendor HAL Library (ST's code)
-# ============================================================================
 add_library(stm32g4_hal STATIC)
 
 target_sources(stm32g4_hal PRIVATE
@@ -42,33 +34,25 @@ target_include_directories(stm32g4_hal PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/STM32G4xx_HAL_Driver/Inc/Legacy
 )
 
-# ============================================================================
-# Part 2: Our HAL Implementation (using framework)
-# ============================================================================
-add_library(hal_stm32g4_impl STATIC)
+add_library(chip_gpio_stm32g4 STATIC)
 
-target_sources(hal_stm32g4_impl PRIVATE
-    led/led_hal_stm32g4.c
-    button/button_hal_stm32g4.c
+target_sources(chip_gpio_stm32g4 PRIVATE
+    chip_gpio.c
 )
 
-target_include_directories(hal_stm32g4_impl PUBLIC
+target_include_directories(chip_gpio_stm32g4 PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/CMSIS/Device/ST/STM32G4xx/Include
     ${CMAKE_CURRENT_SOURCE_DIR}/CMSIS/Include
     ${CMAKE_CURRENT_SOURCE_DIR}/STM32G4xx_HAL_Driver/Inc
+    ${CMAKE_CURRENT_SOURCE_DIR}/../gpio/include
 )
 
-target_include_directories(hal_stm32g4_impl PRIVATE
-    ${CMAKE_SOURCE_DIR}/src/drivers/framework/include
-)
-
-target_link_libraries(hal_stm32g4_impl PUBLIC
-    driver_framework
+target_link_libraries(chip_gpio_stm32g4 PUBLIC
     stm32g4_hal
 )
 
-target_compile_definitions(hal_stm32g4_impl PUBLIC
+target_compile_definitions(chip_gpio_stm32g4 PUBLIC
     USE_HAL_DRIVER
     STM32G431xx
 )

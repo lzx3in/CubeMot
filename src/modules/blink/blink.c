@@ -1,9 +1,10 @@
-#include "blink.h"
-#include "drivers/led/led.h"
+#include "modules/blink/blink.h"
 #include "topics/topics.h"
 #include "FreeRTOS.h"
 #include "msghub/msghub.h"
 #include "task.h"
+#include "msghub/msghub.h"
+#include "common_device.h"
 
 static msghub_subscriber_t s_button_sub;
 static TaskHandle_t s_blink_task_handle;
@@ -14,6 +15,8 @@ static void vTaskBlink(void *pvParameters)
 {
     (void)pvParameters;
 
+    msghub_publisher_t pub = msghub_create_publisher(MSGHUB_TOPIC(led_command));
+    led_cmd_t data = {.led_id = CUBEMOT_DEVICE_LED_0, .state = false};
     s_button_sub = msghub_create_subscriber(MSGHUB_TOPIC(button_event), 0);
     uint32_t count = 20;
 
@@ -23,7 +26,6 @@ static void vTaskBlink(void *pvParameters)
         if (err == MSGHUB_OK && updated) {
             button_event_t msg;
             if (msghub_receive(s_button_sub, &msg) == MSGHUB_OK) {
-                // Button pressed - switch frequency
                 if (msg.pressed) {
                     s_blink_freq_index = (s_blink_freq_index + 1) % 3;
                     count = s_blink_periods_ms[s_blink_freq_index] / 50;
@@ -35,7 +37,8 @@ static void vTaskBlink(void *pvParameters)
             count--;
         } else {
             count = s_blink_periods_ms[s_blink_freq_index] / 50;
-            led_toggle(0);
+            data.state = !data.state;
+            (void)msghub_publish(pub, &data);
         }
         vTaskDelay(pdMS_TO_TICKS(50));
     }
@@ -43,6 +46,5 @@ static void vTaskBlink(void *pvParameters)
 
 void blink_module_init(void)
 {
-    led_driver_init();
     xTaskCreate(vTaskBlink, "Blink", 512, NULL, 2, &s_blink_task_handle);
 }

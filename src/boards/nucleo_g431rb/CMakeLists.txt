@@ -4,8 +4,9 @@ target_include_directories(boards PRIVATE
     ${CMAKE_SOURCE_DIR}/src/chips/stm32g4/CMSIS/Include
     ${CMAKE_SOURCE_DIR}/src/chips/stm32g4/STM32G4xx_HAL_Driver/Inc
     ${CMAKE_SOURCE_DIR}/src/chips/stm32g4/led
-    ${CMAKE_SOURCE_DIR}/src/chips/stm32g4/button
-    ${CMAKE_SOURCE_DIR}/src/drivers/framework/include
+    ${CMAKE_SOURCE_DIR}/src/common/include
+    ${CMAKE_SOURCE_DIR}/src/drivers/led/include
+    ${CMAKE_SOURCE_DIR}/src/drivers/button/include
 )
 
 set(BOARD_INTERRUPT_SRCS
@@ -24,6 +25,8 @@ target_sources(boards PRIVATE
     syscalls.c
     msp.c
     error_handlers.c
+    led.c
+    button.c
     ${BOARD_INTERRUPT_SRCS}
     ${BOARD_STARTUP_SRC}
 )

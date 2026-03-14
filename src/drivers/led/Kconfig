@@ -1,0 +1,28 @@
+menu "LED Driver Configuration"
+
+config HAS_DRIVER_LED_0
+    bool "LED 0 resource"
+    default y
+    help
+        Enable LED 0 resource. Board code binds hardware to this resource.
+
+config HAS_DRIVER_LED_1
+    bool "LED 1 resource"
+    default n
+    help
+        Enable LED 1 resource.
+
+config HAS_DRIVER_LED_2
+    bool "LED 2 resource"
+    default n
+    help
+        Enable LED 2 resource.
+
+config DRIVER_LED_COUNT
+    int "Number of LED resources"
+    default 1
+    range 0 3
+    help
+        Total number of LED resources. Should match the number of HAS_DRIVER_LED_X enabled.
+
+endmenu

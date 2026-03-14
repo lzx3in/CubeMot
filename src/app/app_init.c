@@ -1,6 +1,8 @@
 #include "app.h"
 #include "cubemot_config.h"
 #include "modules/blink/blink.h"
+#include "modules/led_controller/led_controller.h"
+#include "modules/button_detector/button_detector.h"
 #include <stdint.h>
 
 volatile app_state_t g_app_state = APP_STATE_UNINITIALIZED;
@@ -10,6 +12,14 @@ static const app_config_t k_default_config = {
 
 static int init_modules(void)
 {
+#if CONFIG_MODULE_LED_CONTROLLER_ENABLE
+    led_controller_init();
+#endif
+
+#if CONFIG_MODULE_BUTTON_DETECTOR_ENABLE
+    button_detector_init();
+#endif
+
 #if CONFIG_MODULE_BLINK_ENABLE
     blink_module_init();
 #endif

@@ -1,59 +1,31 @@
 #pragma once
 
-#include <stdint.h>
-#include "msghub/msghub.h"
-#include "drivers/led/led_topic.h"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-// ============================================================================
-// LED Driver API
-// ============================================================================
+#include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include "common_device.h"
 
-/**
- * Initialize LED driver
- * Creates internal driver task and msghub topics
- *
- * @return 0 on success, negative on failure
- */
-int led_driver_init(void);
+typedef struct {
+    cubemot_device_led id;
+    void *ctx;
+    int (*init)(void *ctx);
+    int (*on)(void *ctx);
+    int (*off)(void *ctx);
+    int (*toggle)(void *ctx);
+    bool (*get_state)(void *ctx);
+} driver_led_instance;
 
-/**
- * Set LED state
- *
- * @param led_id LED ID (0, 1, 2...)
- * @param on true = ON, false = OFF
- */
-void led_set(uint8_t led_id, bool on);
+static inline bool cubemot_device_led_is_valid(cubemot_device_led id)
+{
+    return id >= 0 && id < CUBEMOT_DEVICE_LED_COUNT;
+}
 
-/**
- * Toggle LED state
- *
- * @param led_id LED ID (0, 1, 2...)
- */
-void led_toggle(uint8_t led_id);
-
-/**
- * Get LED state subscriber handle
- *
- * @param instance Subscriber instance ID (0 = primary instance)
- * @return Subscriber handle, MSGHUB_SUBSCRIBER_INVALID on failure
- */
-msghub_subscriber_t led_get_state_subscriber(uint8_t instance);
-
-// ============================================================================
-// Test Support (BUILD_TESTING only)
-// ============================================================================
-
-#ifdef BUILD_TESTING
-/**
- * Deinitialize LED driver (test only)
- * Resets driver state for next test
- */
-void led_driver_deinit(void);
-#endif
+// Weak default implementation - board layer overrides this
+const driver_led_instance *driver_led_get_instance(cubemot_device_led id);
 
 #ifdef __cplusplus
 }

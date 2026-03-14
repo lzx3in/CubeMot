@@ -1,22 +1,17 @@
 #include "boards/init.h"
 #include "stm32g4xx_hal.h"
 #include "boards/error_handles.h"
-#include "led_hal_stm32g4.h"
-#include "button_hal_stm32g4.h"
-#include "drivers/framework/hal_framework.h"
+#include "drivers/led/led.h"
 #include "drivers/button/button.h"
-#include "modules/blink/blink.h"
+#include "chips/gpio.h"
 
 static void board_systemclock_config(void)
 {
     RCC_OscInitTypeDef RCC_OscInitStruct = {0};
     RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
-    // Configure the main internal regulator output voltage
-
     HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1_BOOST);
 
-    // Initializes the RCC Oscillators according to the specified parameters in the RCC_OscInitTypeDef structure.
     RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
     RCC_OscInitStruct.HSEState = RCC_HSE_ON;
     RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
@@ -31,7 +26,6 @@ static void board_systemclock_config(void)
         Error_Handler();
     }
 
-    // Initializes the CPU, AHB and APB buses clocks
     RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK
                                 | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
     RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
@@ -47,54 +41,27 @@ static void board_systemclock_config(void)
 
 static void board_gpio_init(void)
 {
-    GPIO_InitTypeDef GPIO_InitStruct = {0};
-
-    // GPIO Ports Clock Enable
     __HAL_RCC_GPIOA_CLK_ENABLE();
     __HAL_RCC_GPIOC_CLK_ENABLE();
     __HAL_RCC_GPIOF_CLK_ENABLE();
 
-    // Configure GPIO pin Output Level
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
+    chip_gpio_port_t *port_a = chip_gpio_get_port(CHIP_GPIO_PORT_A);
 
-    // Configure GPIO pin : PA5
-    GPIO_InitStruct.Pin = GPIO_PIN_5;
-    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+    chip_gpio_write(port_a, CHIP_GPIO_PIN_5, CHIP_GPIO_RESET);
 
-    // Configure GPIO pin : PC13 (Button) with EXTI
-    GPIO_InitStruct.Pin = GPIO_PIN_13;
-    GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
-}
-
-static void board_nvic_init(void)
-{
-    __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_13);
-    HAL_NVIC_SetPriority(EXTI15_10_IRQn, 8, 0);
-    HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+    chip_gpio_init_t led_init = {
+        .pin = CHIP_GPIO_PIN_5,
+        .mode = CHIP_GPIO_MODE_OUTPUT_PP,
+        .pull = CHIP_GPIO_NOPULL,
+        .speed = CHIP_GPIO_SPEED_LOW,
+        .alternate = 0
+    };
+    chip_gpio_init(port_a, &led_init);
 }
 
 void board_init(void)
 {
-    // must be before any HAL registration
-    hal_framework_init();
-
     HAL_Init();
     board_systemclock_config();
     board_gpio_init();
-    board_nvic_init();
-
-    // Register HAL implementations
-    stm32g4_led_hal_init();
-    stm32g4_button_hal_init();
-
-    // Initialize button driver (before enabling interrupts)
-    button_driver_init();
-
-    // Initialize blink module (includes button event subscriber)
-    blink_module_init();
 }

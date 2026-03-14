@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "msghub/msghub.h"
-#include "drivers/button/button_topic.h"
+#include "topics/topics.h"
 #include "common_error.h"
 
 #ifdef __cplusplus

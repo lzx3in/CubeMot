@@ -3,6 +3,7 @@ add_subdirectory(${CMAKE_SOURCE_DIR}/src/common ${CMAKE_BINARY_DIR}/src/common)
 add_subdirectory(${CMAKE_SOURCE_DIR}/src/lib ${CMAKE_BINARY_DIR}/src/lib)
 add_subdirectory(${CMAKE_SOURCE_DIR}/src/msghub ${CMAKE_BINARY_DIR}/src/msghub)
 add_subdirectory(${CMAKE_SOURCE_DIR}/src/drivers ${CMAKE_BINARY_DIR}/src/drivers)
+add_subdirectory(${CMAKE_SOURCE_DIR}/src/topics ${CMAKE_BINARY_DIR}/src/topics)
 
 add_subdirectory(deps)
 add_subdirectory(test_common)
@@ -33,6 +34,7 @@ target_link_libraries(cubemot-test PRIVATE
     test_common
     GTest::gtest_main
     GTest::gmock
+    topics
 )
 
 # Register tests with CTest

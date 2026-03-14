@@ -1,7 +1,6 @@
 #pragma once
 
-#include <stdint.h>
-#include <stdbool.h>
+#include "msghub/msghub.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -12,6 +11,8 @@ typedef struct {
     bool pressed;       // true = pressed, false = released
     uint32_t timestamp; // System tick time (ms)
 } button_event_t;
+
+MSGHUB_TOPIC_DECLARE(button_event);
 
 #ifdef __cplusplus
 }

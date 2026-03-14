@@ -15,6 +15,7 @@ add_subdirectory(boards)        # Board code (registers HAL implementations)
 add_subdirectory(freertos)
 add_subdirectory(msghub)
 add_subdirectory(app)
+add_subdirectory(topics)
 
 # Remove incorrect libob.a dependency
 list(REMOVE_ITEM CMAKE_C_IMPLICIT_LINK_LIBRARIES ob)

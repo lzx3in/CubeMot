@@ -1,8 +1,8 @@
 #include "blink.h"
 #include "drivers/led/led.h"
-#include "drivers/button/button_topic.h"
-#include "drivers/button/button_msg.h"
+#include "topics/topics.h"
 #include "FreeRTOS.h"
+#include "msghub/msghub.h"
 #include "task.h"
 
 static msghub_subscriber_t s_button_sub;
@@ -14,7 +14,7 @@ static void vTaskBlink(void *pvParameters)
 {
     (void)pvParameters;
 
-    s_button_sub = msghub_create_subscriber(button_event_topic, 0);
+    s_button_sub = msghub_create_subscriber(MSGHUB_TOPIC(button_event), 0);
     uint32_t count = 20;
 
     for (;;) {

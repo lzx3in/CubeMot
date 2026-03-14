@@ -10,4 +10,5 @@ target_include_directories(module_blink PUBLIC
 target_link_libraries(module_blink PUBLIC
     drivers
     freertos_kernel
+    topics
 )

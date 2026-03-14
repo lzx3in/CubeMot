@@ -1,5 +1,4 @@
 #include "drivers/button/button.h"
-#include "drivers/button/button_msg.h"
 #include "drivers/framework/button_hal_framework.h"
 #include "common_error.h"
 #include "common_time.h"
@@ -36,7 +35,7 @@ cubemot_err_t button_driver_init(void)
 
     for (int i = 0; i < BUTTON_DRIVER_MAX_BUTTONS; i++) {
         int instance = i;
-        g_button_driver.event_pub[i] = msghub_create_publisher_multi(button_event_topic, &instance);
+        g_button_driver.event_pub[i] = msghub_create_publisher_multi(MSGHUB_TOPIC(button_event), &instance);
         if (g_button_driver.event_pub[i] == MSGHUB_PUBLISHER_INVALID) {
             // Cleanup previously created publishers
             for (int j = 0; j < i; j++) {
@@ -53,7 +52,7 @@ cubemot_err_t button_driver_init(void)
 
 msghub_subscriber_t button_get_state_subscriber(uint8_t instance)
 {
-    return msghub_create_subscriber(button_event_topic, instance);
+    return msghub_create_subscriber(MSGHUB_TOPIC(button_event), instance);
 }
 
 #ifdef BUILD_TESTING

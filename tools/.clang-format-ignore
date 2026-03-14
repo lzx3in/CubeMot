@@ -2,4 +2,4 @@
 # Refer to: https://clang.llvm.org/docs/ClangFormat.html#clang-format-ignore
 
 # Exclude STM32CubeMX generated code
-./src/hal/stm32g4/**
+./src/chips/stm32g4/**

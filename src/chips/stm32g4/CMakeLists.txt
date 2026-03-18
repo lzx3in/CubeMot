@@ -51,8 +51,3 @@ target_include_directories(chip_gpio_stm32g4 PUBLIC
 target_link_libraries(chip_gpio_stm32g4 PUBLIC
     stm32g4_hal
 )
-
-target_compile_definitions(chip_gpio_stm32g4 PUBLIC
-    USE_HAL_DRIVER
-    STM32G431xx
-)

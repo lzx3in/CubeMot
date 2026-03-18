@@ -45,7 +45,7 @@ target_include_directories(chip_gpio_stm32g4 PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/CMSIS/Device/ST/STM32G4xx/Include
     ${CMAKE_CURRENT_SOURCE_DIR}/CMSIS/Include
     ${CMAKE_CURRENT_SOURCE_DIR}/STM32G4xx_HAL_Driver/Inc
-    ${CMAKE_CURRENT_SOURCE_DIR}/../gpio/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
 )
 
 target_link_libraries(chip_gpio_stm32g4 PUBLIC

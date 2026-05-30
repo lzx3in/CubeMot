@@ -155,7 +155,7 @@ chmod +x .git/hooks/pre-commit
 - **摘要行不超过 72 字符**
 - **引用 issue**：footer 中使用 `Closes #123`、`Refs #456`
 - **摘要行末尾不加句号**
-- **中文描述**：type、scope 使用英文，description 使用中文（如 `refactor(chips): 更新 GPIO 头文件 include 路径`）
+- **中文内容**：type、scope 使用英文，description 和 body 使用中文（如 `refactor(chips): 更新 GPIO 头文件 include 路径`）
 
 ## 验证清单
 

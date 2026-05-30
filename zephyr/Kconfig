@@ -1,0 +1,13 @@
+mainmenu "CubeMot Zephyr Configuration"
+
+config MODULE_BLINK
+    bool "Blink Module"
+    default y
+
+config MODULE_LED_CONTROLLER
+    bool "LED Controller Module"
+    default y
+
+config MODULE_BUTTON_DETECTOR
+    bool "Button Detector Module"
+    default y

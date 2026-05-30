@@ -1,0 +1,12 @@
+/ {
+    aliases {
+        led0 = &green_led_2;
+    };
+};
+
+&gpioc {
+    button0: button0 {
+        gpios = <&gpioc 13 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+        label = "User Button B1";
+    };
+};

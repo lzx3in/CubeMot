@@ -1,0 +1,165 @@
+#!/usr/bin/env bash
+#
+# Pre-commit hook — quality gate for git commits.
+# Installed by the git-commit skill.
+#
+# Checks:
+#   1. Secrets detection
+#   2. Large file check
+#   3. C/C++ format (git-clang-format)
+#   4. Python format (ruff)
+#   5. Shell format (shfmt)
+#   6. Commit message format (informational)
+#
+# Installation:
+#   cp .agents/skills/git-commit/scripts/pre-commit .git/hooks/pre-commit
+#   chmod +x .git/hooks/pre-commit
+#
+# Bypass (when absolutely necessary):
+#   git commit --no-verify
+#
+
+set -euo pipefail
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+NC='\033[0m'
+
+pass() { echo -e "  ${GREEN}✓${NC} $1"; }
+warn() { echo -e "  ${YELLOW}⚠${NC} $1"; }
+fail() { echo -e "  ${RED}✗${NC} $1"; }
+
+ERRORS=0
+TOTAL=6
+
+echo "Running pre-commit checks..."
+echo ""
+
+# ─── 1. Secrets Detection ────────────────────────────────────────────────────
+echo "1/${TOTAL} Secrets detection"
+
+SECRET_PATTERNS='(password|passwd|secret|api_key|apikey|access_key|private_key|token|auth_token|bearer)\s*[:=]\s*["\x27][^"\x27]{8,}'
+SECRET_FILES_PATTERNS='(\.env|\.env\.local|\.env\.production|credentials\.json|service-account.*\.json|.*\.pem|.*\.p12)$'
+
+SECRET_FILE_HITS=$(git diff --cached --name-only --diff-filter=ACM | grep -iE "$SECRET_FILES_PATTERNS" || true)
+if [ -n "$SECRET_FILE_HITS" ]; then
+  fail "Sensitive files detected in staging:"
+  echo "$SECRET_FILE_HITS" | while read -r f; do echo "    $f"; done
+  ERRORS=$((ERRORS + 1))
+else
+  SECRET_HITS=$(git diff --cached --diff-filter=ACM -U0 | grep -iE "$SECRET_PATTERNS" | grep -v '^[-+]\s*#' || true)
+  if [ -n "$SECRET_HITS" ]; then
+    fail "Potential secrets found in staged changes:"
+    echo "$SECRET_HITS" | head -5 | while read -r line; do echo "    $line"; done
+    ERRORS=$((ERRORS + 1))
+  else
+    pass "No secrets detected"
+  fi
+fi
+
+# ─── 2. Large File Check ────────────────────────────────────────────────────
+echo "2/${TOTAL} Large file check"
+
+MAX_FILE_SIZE=$((1024 * 1024))
+LARGE_FILES=""
+
+for FILE in $(git diff --cached --name-only --diff-filter=ACM); do
+  if [ -f "$FILE" ]; then
+    FILE_SIZE=$(wc -c < "$FILE" 2>/dev/null || echo 0)
+    if [ "$FILE_SIZE" -gt "$MAX_FILE_SIZE" ]; then
+      SIZE_KB=$((FILE_SIZE / 1024))
+      LARGE_FILES="${LARGE_FILES}\n    ${FILE} (${SIZE_KB}KB)"
+    fi
+  fi
+done
+
+if [ -n "$LARGE_FILES" ]; then
+  warn "Large files (>1MB) detected:"
+  echo -e "$LARGE_FILES"
+  echo "    If intentional, this is just a warning."
+else
+  pass "No large files"
+fi
+
+# ─── 3. C/C++ Format Check ──────────────────────────────────────────────────
+echo "3/${TOTAL} C/C++ format (clang-format)"
+
+if ! command -v git-clang-format &> /dev/null; then
+  warn "git-clang-format not found, skipping C/C++ format check"
+else
+  if output=$(git clang-format --staged --diffstat --style=file --extensions c,h,cpp,hpp,cc,cxx,c++,h++,hh 2>&1); then
+    pass "C/C++ format check passed"
+  else
+    fail "C/C++ format check failed:"
+    echo "$output"
+    echo "    Fix: git clang-format --staged --style=file --extensions c,h,cpp,hpp,cc,cxx,c++,h++,hh"
+    ERRORS=$((ERRORS + 1))
+  fi
+fi
+
+# ─── 4. Python Format Check ─────────────────────────────────────────────────
+echo "4/${TOTAL} Python format (ruff)"
+
+if ! command -v ruff &> /dev/null; then
+  warn "ruff not found, skipping Python format check"
+else
+  failed=0
+  if ! ruff format --check --diff ./tools/ 2>&1; then
+    failed=1
+  fi
+  if [[ $failed -eq 1 ]]; then
+    fail "Python format check failed"
+    echo "    Fix: ruff format ./tools/"
+    ERRORS=$((ERRORS + 1))
+  else
+    pass "Python format check passed"
+  fi
+fi
+
+# ─── 5. Shell Format Check ──────────────────────────────────────────────────
+echo "5/${TOTAL} Shell format (shfmt)"
+
+if ! command -v shfmt &> /dev/null; then
+  warn "shfmt not found, skipping Shell format check"
+else
+  if shfmt -f ./tools/ | xargs shfmt -d -i 2 -ci -bn -sr 2>&1; then
+    pass "Shell format check passed"
+  else
+    fail "Shell format check failed"
+    echo "    Fix: shfmt -f ./tools/ | xargs shfmt -w -i 2 -ci -bn -sr"
+    ERRORS=$((ERRORS + 1))
+  fi
+fi
+
+# ─── 6. Commit Message Format ───────────────────────────────────────────────
+echo "6/${TOTAL} Commit message format"
+
+if ! git rev-parse MERGE_HEAD &>/dev/null 2>&1; then
+  COMMIT_MSG_FILE="${1:-.git/COMMIT_EDITMSG}"
+  if [ -f "$COMMIT_MSG_FILE" ]; then
+    SUBJECT=$(head -1 "$COMMIT_MSG_FILE")
+    if echo "$SUBJECT" | grep -qE '^[a-z]+(\(.+\))?!?:\s.+'; then
+      pass "Commit message follows Conventional Commits format"
+    else
+      warn "Commit message may not follow Conventional Commits format"
+      echo "    Expected: <type>(<scope>): <description>"
+      echo "    Got:      $SUBJECT"
+    fi
+  else
+    pass "Message check skipped (no COMMIT_EDITMSG)"
+  fi
+else
+  pass "Merge commit — message check skipped"
+fi
+
+# ─── Result ──────────────────────────────────────────────────────────────────
+echo ""
+if [ "$ERRORS" -gt 0 ]; then
+  echo -e "${RED}Pre-commit checks failed (${ERRORS} error(s)).${NC}"
+  echo "Fix the issues above or use 'git commit --no-verify' to bypass."
+  exit 1
+else
+  echo -e "${GREEN}All pre-commit checks passed.${NC}"
+  exit 0
+fi

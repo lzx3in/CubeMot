@@ -29,6 +29,8 @@ uint8_t g_num_topics = 0;
 rt_mutex_t g_msghub_mgr_mutex = RT_NULL;
 #elif defined(FREERTOS_ENV)
 SemaphoreHandle_t g_msghub_mgr_mutex = NULL;
+#elif defined(ZEPHYR_ENV)
+struct k_mutex g_msghub_mgr_mutex;
 #elif defined(UNIT_TEST_HOST)
 pthread_mutex_t g_msghub_mgr_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t g_msghub_crit_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -52,6 +54,9 @@ msghub_err_t msghub_init(void)
     if (g_msghub_mgr_mutex == NULL) {
         return MSGHUB_ERR_NO_MEM;
     }
+#elif defined(ZEPHYR_ENV)
+    // Initialize management mutex
+    k_mutex_init(&g_msghub_mgr_mutex);
 #elif defined(UNIT_TEST_HOST)
     // Initialize pthread mutexes
     pthread_mutex_init(&g_msghub_crit_mutex, NULL);
@@ -79,6 +84,8 @@ void msghub_deinit(void)
         vSemaphoreDelete(g_msghub_mgr_mutex);
         g_msghub_mgr_mutex = NULL;
     }
+#elif defined(ZEPHYR_ENV)
+    // Zephyr k_mutex does not need explicit deinit
 #elif defined(UNIT_TEST_HOST)
     pthread_mutex_destroy(&g_msghub_crit_mutex);
     pthread_mutex_destroy(&g_msghub_mgr_mutex);

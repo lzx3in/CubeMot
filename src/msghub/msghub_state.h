@@ -23,7 +23,7 @@ extern "C" {
 #endif
 
 // ============================================================================
-// Critical Section Macros - Environment-aware (3 environments)
+// Critical Section Macros - Environment-aware (4 environments)
 // ============================================================================
 
 #ifdef UNIT_TEST_HOST
@@ -61,6 +61,30 @@ extern rt_mutex_t g_msghub_mgr_mutex; // Management mutex
 // Management lock (mutex, task context only)
 #define MSGHUB_LOCK_MGR() rt_mutex_take(g_msghub_mgr_mutex, RT_WAITING_FOREVER)
 #define MSGHUB_UNLOCK_MGR() rt_mutex_release(g_msghub_mgr_mutex)
+
+#elif defined(ZEPHYR_ENV)
+// ============================================================================
+// Zephyr RTOS: Native Zephyr primitives
+// ============================================================================
+#include <zephyr/kernel.h>
+
+extern struct k_mutex g_msghub_mgr_mutex; // Management mutex
+
+// Task context critical section (disable scheduler)
+#define MSGHUB_ENTER_CRITICAL() k_sched_lock()
+#define MSGHUB_EXIT_CRITICAL() k_sched_unlock()
+
+// ISR context critical section (disable interrupts)
+#define MSGHUB_ENTER_CRITICAL_ISR()                                                                                    \
+    {                                                                                                                  \
+        unsigned int uxSavedInterruptStatus = irq_lock()
+#define MSGHUB_EXIT_CRITICAL_ISR()                                                                                     \
+    irq_unlock(uxSavedInterruptStatus);                                                                                \
+    }
+
+// Management lock (mutex, task context only)
+#define MSGHUB_LOCK_MGR() k_mutex_lock(&g_msghub_mgr_mutex, K_FOREVER)
+#define MSGHUB_UNLOCK_MGR() k_mutex_unlock(&g_msghub_mgr_mutex)
 
 #elif defined(FREERTOS_ENV)
 // ============================================================================

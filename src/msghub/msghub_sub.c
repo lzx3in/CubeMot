@@ -175,7 +175,9 @@ msghub_err_t msghub_subscriber_poll(msghub_subscriber_t handle, uint32_t timeout
             return MSGHUB_OK;
         }
         // TODO: Use RTOS-specific wait mechanism instead of polling
-#if defined(FREERTOS_ENV)
+#if defined(ZEPHYR_ENV)
+        k_sleep(K_MSEC(1));
+#elif defined(FREERTOS_ENV)
         vTaskDelay(pdMS_TO_TICKS(1));
 #elif defined(RTTHREAD_ENV)
         rt_thread_mdelay(1);

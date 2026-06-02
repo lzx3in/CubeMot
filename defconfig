@@ -1,3 +1,0 @@
-# Default CubeMot configuration
-# Board selection
-CONFIG_BOARD_NUCLEO_G431RB=y

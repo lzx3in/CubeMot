@@ -1,30 +1,38 @@
-# Include post-build functions before subdirectories that need them
-include(${CMAKE_SOURCE_DIR}/cmake/post_build.cmake)
+# CubeMot Zephyr Application
+# ZEPHYR_ENV is defined so app code knows it's on Zephyr
 
-# FreeRTOS configuration
-# Note: freertos_config target is defined in boards/<BOARD>/freertos_config/CMakeLists.txt
-set(FREERTOS_PORT GCC_ARM_CM4F CACHE STRING "FreeRTOS port" FORCE)
-set(FREERTOS_HEAP 4 CACHE STRING "FreeRTOS heap implementation" FORCE)
+target_include_directories(app PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/common/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/msghub/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/topics/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/include
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/modules/blink/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/modules/led_controller/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/modules/button_detector/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/libs/pid
+    ${CMAKE_CURRENT_SOURCE_DIR}/libs/crc
+)
 
-add_subdirectory(common)
-add_subdirectory(drivers)      # Framework first (provides interfaces)
-add_subdirectory(chips)
-add_subdirectory(libs)
-add_subdirectory(modules)
-add_subdirectory(boards)        # Board code (registers HAL implementations)
-add_subdirectory(freertos)
-add_subdirectory(msghub)
-add_subdirectory(app)
-add_subdirectory(topics)
+target_sources(app PRIVATE
+    app/main.c
+    app/app_main.c
+    app/app_init.c
+    common/common_time.c
+    msghub/msghub_state.c
+    msghub/msghub_topic.c
+    msghub/msghub_pub.c
+    msghub/msghub_sub.c
+    topics/topics.c
+    libs/pid/pid.c
+    libs/crc/crc.c
 
-# Remove incorrect libob.a dependency
-list(REMOVE_ITEM CMAKE_C_IMPLICIT_LINK_LIBRARIES ob)
+    modules/blink/blink.c
+    modules/led_controller/led_controller.c
+    modules/button_detector/button_detector.c
 
-# Programming targets
-include(${CMAKE_SOURCE_DIR}/cmake/programming_targets.cmake)
-add_programming_targets(${CMAKE_PROJECT_NAME})
+    drivers/led.c
+    drivers/button.c
+)
 
-# Debugging targets
-include(${CMAKE_SOURCE_DIR}/cmake/debugging_targets.cmake)
-add_debugging_targets(${CMAKE_PROJECT_NAME})
-
+target_compile_definitions(app PRIVATE ZEPHYR_ENV=1)

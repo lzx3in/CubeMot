@@ -1,0 +1,15 @@
+/ {
+	aliases {
+		led0 = &green_led;
+		sw0 = &user_button;
+	};
+};
+
+&user_button {
+	/*
+	 * PC13 on Nucleo-G431RB is active-low (pull-up, GND when pressed).
+	 * The base board DTS incorrectly uses GPIO_ACTIVE_HIGH.
+	 * Override with correct polarity and enable pull-up.
+	 */
+	gpios = <&gpioc 13 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+};

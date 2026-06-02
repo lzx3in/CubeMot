@@ -1,24 +1,21 @@
 #include "modules/blink/blink.h"
+#include "drivers/led.h"
 #include "topics/topics.h"
-#include "FreeRTOS.h"
-#include "msghub/msghub.h"
-#include "task.h"
 #include "msghub/msghub.h"
 #include "common_device.h"
+#include <zephyr/kernel.h>
 
 static msghub_subscriber_t s_button_sub;
-static TaskHandle_t s_blink_task_handle;
 static uint8_t s_blink_freq_index = 0;
 static const uint32_t s_blink_periods_ms[3] = {100, 500, 1000};
 
-static void vTaskBlink(void *pvParameters)
+static void blink_thread_fn(void *arg1, void *arg2, void *arg3)
 {
-    (void)pvParameters;
+    (void)arg1;
+    (void)arg2;
+    (void)arg3;
 
-    msghub_publisher_t pub = msghub_create_publisher(MSGHUB_TOPIC(led_command));
-    led_cmd_t data = {.led_id = CUBEMOT_DEVICE_LED_0, .state = false};
-    s_button_sub = msghub_create_subscriber(MSGHUB_TOPIC(button_event), 0);
-    uint32_t count = 20;
+    uint32_t count = s_blink_periods_ms[s_blink_freq_index] / 50;
 
     for (;;) {
         bool updated = false;
@@ -37,14 +34,16 @@ static void vTaskBlink(void *pvParameters)
             count--;
         } else {
             count = s_blink_periods_ms[s_blink_freq_index] / 50;
-            data.state = !data.state;
-            (void)msghub_publish(pub, &data);
+            cubemot_led_toggle(CUBEMOT_DEVICE_LED_0);
         }
-        vTaskDelay(pdMS_TO_TICKS(50));
+        k_msleep(50);
     }
 }
 
+K_THREAD_DEFINE(blink_thread, 512, blink_thread_fn, NULL, NULL, NULL, 2, 0, 0);
+
 void blink_module_init(void)
 {
-    xTaskCreate(vTaskBlink, "Blink", 512, NULL, 2, &s_blink_task_handle);
+    cubemot_led_init();
+    s_button_sub = msghub_create_subscriber(MSGHUB_TOPIC(button_event), 0);
 }

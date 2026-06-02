@@ -1,5 +1,9 @@
 #include "app.h"
+
+#if !defined(ZEPHYR_ENV)
 #include "cubemot_config.h"
+#endif
+
 #include "modules/blink/blink.h"
 #include "modules/led_controller/led_controller.h"
 #include "modules/button_detector/button_detector.h"

@@ -1,9 +1,12 @@
+#include "modules/led_controller/led_controller.h"
+#include "drivers/led.h"
 #include "topics/topics.h"
-#include "drivers/led/led.h"
 #include "common_device.h"
-#include "FreeRTOS.h"
-#include "task.h"
 #include "common_time.h"
+#include "msghub/msghub.h"
+#include <zephyr/kernel.h>
+
+K_SEM_DEFINE(g_led_cmd_sem, 0, 1);
 
 static struct {
     msghub_publisher_t state_pub[CUBEMOT_DEVICE_LED_COUNT];
@@ -11,8 +14,7 @@ static struct {
     bool current_state[CUBEMOT_DEVICE_LED_COUNT];
     volatile bool cmd_pending;
     led_cmd_t pending_cmd;
-    TaskHandle_t task_handle;
-} g_led_controller;
+} g_led;
 
 static void publish_led_state(cubemot_device_led led_id, bool state)
 {
@@ -20,79 +22,72 @@ static void publish_led_state(cubemot_device_led led_id, bool state)
         return;
     }
     led_state_t msg = {.led_id = (uint8_t)led_id, .state = state, .timestamp = common_get_timestamp_ms()};
-    msghub_publish(g_led_controller.state_pub[led_id], &msg);
+    msghub_publish(g_led.state_pub[led_id], &msg);
 }
 
 static void on_led_command(msghub_subscriber_t sub, void *context)
 {
     (void)context;
-
-    led_cmd_t cmd;
-    msghub_receive(sub, &cmd);
-
-    g_led_controller.pending_cmd = cmd;
-    g_led_controller.cmd_pending = true;
-
-    xTaskNotifyFromISR(g_led_controller.task_handle, 1, eSetBits, NULL);
+    msghub_receive(sub, &g_led.pending_cmd);
+    g_led.cmd_pending = true;
+    k_sem_give(&g_led_cmd_sem);
 }
 
-static void vTaskLED_Controller(void *pvParameters)
+static void led_ctrl_thread_fn(void *arg1, void *arg2, void *arg3)
 {
-    (void)pvParameters;
+    (void)arg1;
+    (void)arg2;
+    (void)arg3;
 
     for (;;) {
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        k_sem_take(&g_led_cmd_sem, K_FOREVER);
 
-        if (g_led_controller.cmd_pending) {
-            g_led_controller.cmd_pending = false;
-            const led_cmd_t cmd = g_led_controller.pending_cmd;
+        if (g_led.cmd_pending) {
+            g_led.cmd_pending = false;
+            const led_cmd_t cmd = g_led.pending_cmd;
 
             if (cubemot_device_led_is_valid((cubemot_device_led)cmd.led_id)) {
-                const driver_led_instance *led = driver_led_get_instance((cubemot_device_led)cmd.led_id);
-                if (led) {
-                    if (cmd.state) {
-                        led->on(led->ctx);
-                    } else {
-                        led->off(led->ctx);
-                    }
-                    g_led_controller.current_state[cmd.led_id] = cmd.state;
-                    publish_led_state((cubemot_device_led)cmd.led_id, cmd.state);
+                if (cmd.state) {
+                    cubemot_led_on(cmd.led_id);
+                } else {
+                    cubemot_led_off(cmd.led_id);
                 }
+                g_led.current_state[cmd.led_id] = cmd.state;
+                publish_led_state((cubemot_device_led)cmd.led_id, cmd.state);
             }
         }
     }
 }
 
+K_THREAD_DEFINE(led_ctrl_thread, 256, led_ctrl_thread_fn, NULL, NULL, NULL, 2, 0, 0);
+
 int led_controller_init(void)
 {
-    // Create independent state publisher for each LED
     for (int i = 0; i < CUBEMOT_DEVICE_LED_COUNT; i++) {
         int instance = i;
-        g_led_controller.state_pub[i] = msghub_create_publisher_multi(MSGHUB_TOPIC(led_state), &instance);
-        if (g_led_controller.state_pub[i] == MSGHUB_PUBLISHER_INVALID) {
+        g_led.state_pub[i] = msghub_create_publisher_multi(MSGHUB_TOPIC(led_state), &instance);
+        if (g_led.state_pub[i] == MSGHUB_PUBLISHER_INVALID) {
             for (int j = 0; j < i; j++) {
-                msghub_destroy_publisher(g_led_controller.state_pub[j]);
+                msghub_destroy_publisher(g_led.state_pub[j]);
             }
             return -1;
         }
     }
 
-    g_led_controller.cmd_sub = msghub_create_subscriber(MSGHUB_TOPIC(led_command), 0);
-    if (g_led_controller.cmd_sub == MSGHUB_SUBSCRIBER_INVALID) {
+    g_led.cmd_sub = msghub_create_subscriber(MSGHUB_TOPIC(led_command), 0);
+    if (g_led.cmd_sub == MSGHUB_SUBSCRIBER_INVALID) {
         for (int i = 0; i < CUBEMOT_DEVICE_LED_COUNT; i++) {
-            msghub_destroy_publisher(g_led_controller.state_pub[i]);
+            msghub_destroy_publisher(g_led.state_pub[i]);
         }
         return -2;
     }
 
-    msghub_subscriber_set_callback(g_led_controller.cmd_sub, on_led_command, NULL);
+    msghub_subscriber_set_callback(g_led.cmd_sub, on_led_command, NULL);
 
     for (int i = 0; i < CUBEMOT_DEVICE_LED_COUNT; i++) {
-        g_led_controller.current_state[i] = false;
+        g_led.current_state[i] = false;
     }
-    g_led_controller.cmd_pending = false;
-
-    xTaskCreate(vTaskLED_Controller, "LED_Ctrl", 256, NULL, 2, &g_led_controller.task_handle);
+    g_led.cmd_pending = false;
 
     return 0;
 }

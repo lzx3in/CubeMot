@@ -1,12 +1,34 @@
 #include "pid.h"
 #include <math.h>
 #include <stdbool.h>
+#include <stdint.h>
+#include <string.h>
 
 #define SIGMA 0.000001f
 
+/* Zephyr minimal libc does not provide these math functions */
+static inline float pid_fabsf(float x)
+{
+    return (x < 0.0f) ? -x : x;
+}
+
+static inline float pid_fmaxf(float a, float b)
+{
+    return (a > b) ? a : b;
+}
+
+static inline bool pid_isfinite(float x)
+{
+    /* Check if x is not NaN and not infinity */
+    uint32_t bits;
+    memcpy(&bits, &x, sizeof(bits));
+    uint32_t exp = (bits >> 23) & 0xFF;
+    return (exp != 0xFF); /* NaN or Inf have exponent 0xFF */
+}
+
 static inline bool is_finite(float val)
 {
-    return isfinite(val);
+    return pid_isfinite(val);
 }
 
 void pid_init(PID_t *pid, pid_mode_t mode, float dt_min)
@@ -71,11 +93,11 @@ float pid_calculate(PID_t *pid, float sp, float val, float val_dot, float dt)
 
     if (pid->kd > SIGMA && pid->mode < PID_MODE_DERIVATIV_COUNT) {
         if (pid->mode == PID_MODE_DERIVATIV_CALC) {
-            d = (error - pid->error_previous) / fmaxf(dt, pid->dt_min);
+            d = (error - pid->error_previous) / pid_fmaxf(dt, pid->dt_min);
             pid->error_previous = error;
 
         } else if (pid->mode == PID_MODE_DERIVATIV_CALC_NO_SP) {
-            d = (-val - pid->error_previous) / fmaxf(dt, pid->dt_min);
+            d = (-val - pid->error_previous) / pid_fmaxf(dt, pid->dt_min);
             pid->error_previous = -val;
 
         } else if (pid->mode == PID_MODE_DERIVATIV_SET) {
@@ -93,8 +115,8 @@ float pid_calculate(PID_t *pid, float sp, float val, float val_dot, float dt)
         i = pid->integral + (error * dt);
 
         if (is_finite(i)) {
-            if ((pid->output_limit < SIGMA || (fabsf(output + (i * pid->ki)) <= pid->output_limit)) &&
-                fabsf(i) <= pid->integral_limit) {
+            if ((pid->output_limit < SIGMA || (pid_fabsf(output + (i * pid->ki)) <= pid->output_limit)) &&
+                pid_fabsf(i) <= pid->integral_limit) {
                 pid->integral = i;
             }
         }

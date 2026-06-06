@@ -8,6 +8,10 @@ target_include_directories(msghub PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/mocks/freertos
 )
 
+target_include_directories(common PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/mocks/freertos
+)
+
 add_subdirectory(deps)
 add_subdirectory(test_common)
 add_subdirectory(mocks/freertos)

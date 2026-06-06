@@ -1,0 +1,23 @@
+using sysbus
+
+# STM32G431RB Renode Platform Configuration
+# Based on Renode's built-in STM32G4 support
+
+# Load the platform
+$platform?=@https://raw.githubusercontent.com/renode/renode-infrastructure/master/src/Emulator/Platforms/STM32G4.repl
+
+# Load ELF file
+sysbus LoadELF @zephyr/zephyr.elf
+
+# Create UART terminal
+emulation CreateServerUartTerminal uartTerm
+uartTerm CreateUartWindow
+
+# Connect UART to terminal
+sysbus.usart2 uartTerm
+
+# Enable logging for debugging (optional)
+# logLevel 3
+
+# Start simulation
+start

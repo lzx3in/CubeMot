@@ -5,6 +5,7 @@
 #include "modules/button_detector/button_detector.h"
 #include "modules/commander/commander.h"
 #include "modules/vehicle/vehicle.h"
+#include "comm/serial_cmd.h"
 #include <stdint.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
@@ -37,6 +38,10 @@ static int init_modules(void)
     vehicle_init(NULL);  // Use default config
 #endif
 
+#if CONFIG_MODULE_SERIAL_CMD_ENABLE
+    serial_cmd_init();
+#endif
+
     return 0;
 }
 
@@ -52,6 +57,15 @@ static struct k_thread commander_thread_data;
 #define VEHICLE_STACK_SIZE 2048
 K_THREAD_STACK_DEFINE(vehicle_stack, VEHICLE_STACK_SIZE);
 static struct k_thread vehicle_thread_data;
+#endif
+
+#if CONFIG_MODULE_SERIAL_CMD_ENABLE
+#define SERIAL_RX_STACK_SIZE 2048
+#define SERIAL_TX_STACK_SIZE 2048
+K_THREAD_STACK_DEFINE(serial_rx_stack, SERIAL_RX_STACK_SIZE);
+K_THREAD_STACK_DEFINE(serial_tx_stack, SERIAL_TX_STACK_SIZE);
+static struct k_thread serial_rx_thread_data;
+static struct k_thread serial_tx_thread_data;
 #endif
 
 static void start_threads(void)
@@ -72,6 +86,22 @@ static void start_threads(void)
                     NULL, NULL, NULL,
                     K_PRIO_COOP(7), 0, K_NO_WAIT);
     k_thread_name_set(&vehicle_thread_data, "vehicle");
+#endif
+
+#if CONFIG_MODULE_SERIAL_CMD_ENABLE
+    k_thread_create(&serial_rx_thread_data, serial_rx_stack,
+                    SERIAL_RX_STACK_SIZE,
+                    (k_thread_entry_t)serial_cmd_rx_thread,
+                    NULL, NULL, NULL,
+                    SERIAL_RX_THREAD_PRIORITY, 0, K_NO_WAIT);
+    k_thread_name_set(&serial_rx_thread_data, "serial_rx");
+    
+    k_thread_create(&serial_tx_thread_data, serial_tx_stack,
+                    SERIAL_TX_STACK_SIZE,
+                    (k_thread_entry_t)serial_cmd_tx_thread,
+                    NULL, NULL, NULL,
+                    SERIAL_TX_THREAD_PRIORITY, 0, K_NO_WAIT);
+    k_thread_name_set(&serial_tx_thread_data, "serial_tx");
 #endif
 }
 

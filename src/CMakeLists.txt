@@ -108,3 +108,12 @@ if(CONFIG_MODULE_VEHICLE_ENABLE)
         modules/vehicle/vehicle.c
     )
 endif()
+
+if(CONFIG_MODULE_SERIAL_CMD_ENABLE)
+    target_include_directories(app PRIVATE
+        comm/serial_cmd/include
+    )
+    target_sources(app PRIVATE
+        comm/serial_cmd/serial_cmd.c
+    )
+endif()

@@ -1,0 +1,6 @@
+config MODULE_SERIAL_CMD_ENABLE
+	bool "Serial Command Module"
+	default y
+	help
+	  Enables UART serial command protocol bridge (UART ↔ msghub).
+	  USART2 @ 115200 baud, binary frame protocol.

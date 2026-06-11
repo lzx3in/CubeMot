@@ -9,6 +9,7 @@
  *   - Speed loop runs at 1kHz in Zephyr thread
  *   - Startup sequence: Alignment → Forced Ramp → Switchover → Closed Loop
  *   - Publishes motor_state via msghub at 100Hz
+ *   - Supports multiple motor instances (V2: 1 motor, V3: 2+ motors)
  */
 
 #ifdef __cplusplus
@@ -18,6 +19,10 @@ extern "C" {
 #include <stdint.h>
 #include <stdbool.h>
 #include "foc_types.h"
+
+/* ── Configuration ───────────────────────────────────── */
+
+#define MAX_MOTORS 2  // V2: 1 motor, V3: 2 motors
 
 /* ── Motor instance ──────────────────────────────────── */
 

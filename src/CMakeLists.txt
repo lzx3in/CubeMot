@@ -20,6 +20,7 @@ target_include_directories(app PRIVATE
     libs/pid
     libs/crc
     libs/math
+    libs/foc
 )
 
 # ── Core sources (always compiled) ───────────────────────
@@ -41,6 +42,9 @@ target_sources(app PRIVATE
     # Math / data processing
     libs/pid/pid.c
     libs/crc/crc.c
+    # FOC library
+    libs/foc/foc_core.c
+    libs/foc/observer.c
     # Hardware drivers
     drivers/led.c
     drivers/button.c

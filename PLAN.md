@@ -1,7 +1,7 @@
 # CubeMot 实施计划
 
 > 四轮驱动 + 转向舵机小车 | Zephyr RTOS | STM32G431RB
-> 最后更新: 2026-06-12 00:58 GMT+8
+> 最后更新: 2026-06-12 01:30 GMT+8
 
 ---
 
@@ -10,7 +10,7 @@
 | 阶段 | 内容 | 状态 |
 |------|------|------|
 | **V1** | 1 电机 FOC + 无感启动 + msghub 集成 | ✅ 代码完成，⏸ 待硬件验证 |
-| **V2** | 2 电机 + 1 舵机 + Ackermann + MQTT 遥控 | ⬜ 待实施 |
+| **V2** | 2 电机 + 1 舵机 + Commander + Serial 遥控 | ✅ 代码完成，⏸ 待硬件验证 |
 | **V3** | 4 电机 + 2 舵机 + 完整四轮 | ⬜ 远期 |
 | **V4** | IMU + 里程计 + 自主导航 | ⬜ 远期 |
 
@@ -48,9 +48,9 @@
 
 ---
 
-## V2 实施计划（下次会话）
+## V2 实施计划（已完成 ✅）
 
-### 2.1 Commander 状态机 ⬜
+### 2.1 Commander 状态机 ✅
 
 ```
 INIT → STANDBY → ARMED → ACTIVE
@@ -58,36 +58,36 @@ INIT → STANDBY → ARMED → ACTIVE
               └─ FAULT ←┘
 ```
 
-| 任务 | 文件 | 说明 |
+| 任务 | 文件 | 状态 |
 |------|------|------|
-| 消息流：MQTT/serial → commander → cmd_vel → vehicle | `modules/commander/` | PX4 风格状态机 |
-| 模式管理：STANDBY/ARMED/ACTIVE/FAULT | 同上 | 管理启停逻辑 |
-| 紧急停止流：cmd_emergency → 全电机断电 | 同上 | 高优先级中断处理 |
+| 消息流：serial → commander → cmd_vel → vehicle | `modules/commander/commander.c` | ✅ |
+| 模式管理：STANDBY/ARMED/ACTIVE/FAULT | 同上 | ✅ |
+| 紧急停止流：cmd_emergency → 全电机断电 | 同上 | ✅ |
 
-### 2.2 MQTT 上位机 ⬜
+### 2.2 Serial 命令协议 ✅
 
-| 任务 | 文件 | 说明 |
+| 任务 | 文件 | 状态 |
 |------|------|------|
-| MQTT 客户端 (Zephyr net/mqtt) | `comm/mqtt/mqtt_link.c` | 连接 broker |
-| MQTT ↔ msghub 话题桥接 | `comm/mqtt/mqtt_topics.c` | 双向翻译 |
-| 话题设计 | 见 `docs/hardware-reference.md` §5.5 | cubemot/cmd_vel, cubemot/telemetry |
-| 外部 WiFi 模块连接 | 确认 ESP32 波特率/协议 | USART2 1.8Mbps |
+| 二进制帧协议 [0xAA 0x55] [CMD] [LEN] [DATA] [CRC8] | `comm/serial_cmd/serial_cmd.c` | ✅ |
+| USART1 @ 115200 baud (PC4/PC5) | 同上 | ✅ |
+| 命令：CMD_VEL/ARM/DISARM/ESTOP/PING | 同上 | ✅ |
+| 响应：RSP_STATUS(10Hz)/RSP_TELEMETRY(20Hz)/RSP_MOTOR | 同上 | ✅ |
 
-### 2.3 Vehicle 运动学 ⬜
+### 2.3 Vehicle 运动学 ✅
 
-| 任务 | 文件 | 说明 |
+| 任务 | 文件 | 状态 |
 |------|------|------|
-| Ackermann 混控器 | `modules/vehicle/mixer.c` | cmd_vel → motor/servo 指令 |
-| 里程计 | `modules/vehicle/odometry.c` | 速度积分 + 编码器 |
-| Ackermann 几何公式 | 同上 | 内外轮差速计算 |
+| 差速驱动混控器 | `modules/vehicle/vehicle.c` | ✅ |
+| 里程计（Euler 积分） | 同上 | ✅ |
+| 使用 fast_sincos LUT（无 libm 依赖） | 同上 | ✅ |
 
-### 2.4 第二电机 + 舵机 ⬜
+### 2.4 第二电机 + 舵机 ✅
 
-| 任务 | 文件 | 说明 |
+| 任务 | 文件 | 状态 |
 |------|------|------|
-| 舵机 PWM 驱动 | `drivers/servo/servo.c` | 50Hz PWM, 500-2500μs 脉宽 |
-| motor_ctrl 多实例化 | `modules/motor_ctrl/motor_ctrl.c` | 支持 motor_id=0,1 |
-| servo_ctrl 模块 | `modules/servo_ctrl/servo_ctrl.c` | 角度控制 + msghub |
+| motor_ctrl 多实例化（MAX_MOTORS=2） | `modules/motor_ctrl/motor_ctrl.c` | ✅ |
+| 舵机 PWM 驱动（TIM3 CH1/CH2, 50Hz） | `drivers/servo/servo.c` | ✅ |
+| servo_ctrl 模块（角度控制 + 平滑插值） | `modules/servo_ctrl/servo_ctrl.c` | ✅ |
 
 ---
 

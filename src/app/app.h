@@ -8,13 +8,11 @@ extern "C" {
 #include <stdbool.h>
 
 int app_init(void);
-int app_start(void);
 void app_launch(void);
 
 typedef enum {
     APP_STATE_UNINITIALIZED = 0,
     APP_STATE_INITIALIZING,
-    APP_STATE_READY,
     APP_STATE_RUNNING,
     APP_STATE_ERROR,
     APP_STATE_STOPPED

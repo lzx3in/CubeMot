@@ -145,7 +145,7 @@ msghub_err_t msghub_subscriber_check(msghub_subscriber_t sub, bool *updated);
 //   - sub: Subscriber handle that received the update
 //   - context: User-provided context pointer (set during callback registration)
 // Warning: This callback may be called from ISR context if publish is from ISR!
-//          Use ISR-safe APIs (e.g., xTaskNotifyFromISR) in the callback.
+//          Use ISR-safe APIs (e.g., k_sem_give) in the callback.
 typedef void (*msghub_sub_callback_t)(msghub_subscriber_t sub, void *context);
 
 // Register a callback for passive wake-up

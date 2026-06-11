@@ -164,7 +164,7 @@ msghub_err_t msghub_subscriber_poll(msghub_subscriber_t handle, uint32_t timeout
         return msghub_subscriber_check(handle, updated);
     }
 
-    // Use FreeRTOS/RT-Thread for blocking wait
+    // Use Zephyr k_sleep for polling wait
     uint32_t elapsed = 0;
     while (elapsed < timeout_ms) {
         msghub_err_t err = msghub_subscriber_check(handle, updated);
@@ -174,18 +174,7 @@ msghub_err_t msghub_subscriber_poll(msghub_subscriber_t handle, uint32_t timeout
         if (*updated) {
             return MSGHUB_OK;
         }
-        // TODO: Use RTOS-specific wait mechanism instead of polling
-#if defined(ZEPHYR_ENV)
         k_sleep(K_MSEC(1));
-#elif defined(FREERTOS_ENV)
-        vTaskDelay(pdMS_TO_TICKS(1));
-#elif defined(RTTHREAD_ENV)
-        rt_thread_mdelay(1);
-#else
-        // PC/bare-metal: busy wait (not recommended for long timeouts)
-        for (volatile int i = 0; i < 100000; i++)
-            ;
-#endif
         elapsed++;
     }
 

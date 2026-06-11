@@ -144,7 +144,7 @@ msghub_err_t msghub_publish(msghub_publisher_t handle, const void *data)
 
 // Publish data to topic from ISR context
 // Note: Subscriber callbacks will also be called from ISR context!
-//       Callbacks must use ISR-safe APIs (e.g., xTaskNotifyFromISR).
+//       Callbacks must use ISR-safe APIs (e.g., k_sem_give, k_msgq_put).
 msghub_err_t msghub_publish_from_isr(msghub_publisher_t handle, const void *data)
 {
     if (data == NULL) {

@@ -1,5 +1,4 @@
 #include "modules/blink/blink.h"
-#include "drivers/led.h"
 #include "topics/topics.h"
 #include "msghub/msghub.h"
 #include "common_device.h"
@@ -15,6 +14,8 @@ static void blink_thread_fn(void *arg1, void *arg2, void *arg3)
     (void)arg2;
     (void)arg3;
 
+    msghub_publisher_t led_cmd_pub = msghub_create_publisher(MSGHUB_TOPIC(led_command));
+    led_cmd_t led_cmd = {.led_id = CUBEMOT_DEVICE_LED_0, .state = false};
     uint32_t count = s_blink_periods_ms[s_blink_freq_index] / 50;
 
     for (;;) {
@@ -34,7 +35,8 @@ static void blink_thread_fn(void *arg1, void *arg2, void *arg3)
             count--;
         } else {
             count = s_blink_periods_ms[s_blink_freq_index] / 50;
-            cubemot_led_toggle(CUBEMOT_DEVICE_LED_0);
+            led_cmd.state = !led_cmd.state;
+            msghub_publish(led_cmd_pub, &led_cmd);
         }
         k_msleep(50);
     }
@@ -44,6 +46,5 @@ K_THREAD_DEFINE(blink_thread, 512, blink_thread_fn, NULL, NULL, NULL, 2, 0, 0);
 
 void blink_module_init(void)
 {
-    cubemot_led_init();
     s_button_sub = msghub_create_subscriber(MSGHUB_TOPIC(button_event), 0);
 }

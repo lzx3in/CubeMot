@@ -11,11 +11,4 @@ void app_launch(void)
             k_msleep(1000);
         }
     }
-
-    if (app_start() != 0) {
-        g_app_state = APP_STATE_ERROR;
-        for (;;) {
-            k_msleep(1000);
-        }
-    }
 }

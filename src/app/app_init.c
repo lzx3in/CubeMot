@@ -1,9 +1,5 @@
 #include "app.h"
 
-#if !defined(ZEPHYR_ENV)
-#include "cubemot_config.h"
-#endif
-
 #include "modules/blink/blink.h"
 #include "modules/led_controller/led_controller.h"
 #include "modules/button_detector/button_detector.h"
@@ -39,16 +35,6 @@ int app_init(void)
     if (ret != 0) {
         g_app_state = APP_STATE_ERROR;
         return ret;
-    }
-
-    g_app_state = APP_STATE_READY;
-    return 0;
-}
-
-int app_start(void)
-{
-    if (g_app_state != APP_STATE_READY) {
-        return -1;
     }
 
     g_app_state = APP_STATE_RUNNING;

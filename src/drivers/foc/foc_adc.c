@@ -54,7 +54,8 @@ int foc_adc_init(void)
     LL_GPIO_SetPinMode(GPIOC, LL_GPIO_PIN_5, LL_GPIO_MODE_ANALOG);   /* PC5: Vbus */
 
     /* ── ADC Common ────────────────────────────────────── */
-    LL_ADC_SetCommonClock(__LL_ADC_COMMON_INSTANCE(ADC1), LL_ADC_CLOCK_ASYNC_DIV1);
+    /* Use synchronous clock (from AHB) - no async clock config needed */
+    LL_ADC_SetCommonClock(__LL_ADC_COMMON_INSTANCE(ADC1), LL_ADC_CLOCK_SYNC_PCLK_DIV4);
 
     /* ── ADC1: Calibrate ───────────────────────────────── */
     LL_ADC_DisableDeepPowerDown(ADC_INSTANCE1);

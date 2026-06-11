@@ -117,3 +117,14 @@ if(CONFIG_MODULE_SERIAL_CMD_ENABLE)
         comm/serial_cmd/serial_cmd.c
     )
 endif()
+
+if(CONFIG_MODULE_SERVO_CTRL)
+    target_include_directories(app PRIVATE
+        drivers/servo
+        modules/servo_ctrl
+    )
+    target_sources(app PRIVATE
+        drivers/servo/servo.c
+        modules/servo_ctrl/servo_ctrl.c
+    )
+endif()

@@ -18,6 +18,7 @@ target_include_directories(app PRIVATE
     drivers/include
     libs/pid
     libs/crc
+    libs/math
 )
 
 # ── Core sources (always compiled) ───────────────────────

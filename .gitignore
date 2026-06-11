@@ -20,3 +20,4 @@ cubemot_config.h
 *.pyc
 *.pyo
 *.pyd
+test_math

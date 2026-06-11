@@ -1,0 +1,3 @@
+mainmenu "CubeMot Application"
+
+source "Kconfig.zephyr"

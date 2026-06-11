@@ -6,6 +6,9 @@
 #include "modules/commander/commander.h"
 #include "modules/vehicle/vehicle.h"
 #include "comm/serial_cmd.h"
+#include "drivers/foc/foc_pwm.h"
+#include "drivers/foc/foc_adc.h"
+#include "drivers/foc/foc_isr.h"
 #include <stdint.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
@@ -29,6 +32,11 @@ static int init_modules(void)
 #if CONFIG_MODULE_BLINK_ENABLE
     blink_module_init();
 #endif
+
+    /* Initialize FOC hardware (PWM, ADC, ISR) */
+    foc_pwm_init();
+    foc_adc_init();
+    foc_isr_init();  /* ISR initialized but NOT started yet */
 
 #if CONFIG_MODULE_COMMANDER_ENABLE
     commander_init();

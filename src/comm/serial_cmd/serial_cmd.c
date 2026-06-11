@@ -15,6 +15,8 @@
 #include "topics/topics.h"
 #include "common_time.h"
 #include "common_error.h"
+#include "drivers/foc/foc_isr.h"
+#include "drivers/foc/foc_pwm.h"
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/uart.h>
@@ -228,6 +230,44 @@ static void process_command(const parsed_frame_t *frame)
         uint8_t pong_payload = 0x00;
         size_t frame_len = encode_frame(RSP_ID_PONG, &pong_payload, 1);
         uart_send(frame_len);
+        break;
+    }
+    
+    case CMD_ID_TEST: {
+        /* FOC test command: payload = [test_id(u8)] + [param(f32)]
+         * test_id=0: Start FOC ISR with Id=param, Iq=0
+         * test_id=1: Stop FOC ISR
+         * test_id=2: Set Iq=param (torque test)
+         */
+        if (frame->len < 5) {
+            LOG_WRN("CMD_TEST: invalid length %u", frame->len);
+            break;
+        }
+        uint8_t test_id = frame->payload[0];
+        float param;
+        memcpy(&param, &frame->payload[1], 4);
+        
+        switch (test_id) {
+        case 0:  /* Start FOC with Id=param */
+            LOG_INF("TEST: Start FOC Id=%.2fA", (double)param);
+            foc_isr_get_foc()->state.i_d_ref = param;
+            foc_isr_get_foc()->state.i_q_ref = 0.0f;
+            foc_pwm_enable();
+            foc_isr_start();
+            break;
+        case 1:  /* Stop FOC */
+            LOG_INF("TEST: Stop FOC");
+            foc_isr_stop();
+            foc_pwm_disable();
+            break;
+        case 2:  /* Set Iq=param */
+            LOG_INF("TEST: Set Iq=%.2fA", (double)param);
+            foc_isr_get_foc()->state.i_q_ref = param;
+            break;
+        default:
+            LOG_WRN("TEST: unknown test_id %u", test_id);
+            break;
+        }
         break;
     }
     

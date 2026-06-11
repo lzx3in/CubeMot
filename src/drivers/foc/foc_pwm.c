@@ -1,6 +1,10 @@
 /**
  * @file foc_pwm.c
- * @brief FOC PWM driver — STM32G4 TIM1 register-level implementation
+ * @brief FOC PWM driver — STM32G4 TIM1 direct-register implementation
+ *
+ * No dependency on LL_TIM_DeInit / LL_TIM_OC_Init (which require
+ * stm32g4xx_ll_tim.c to be compiled). All timer config done via
+ * direct register writes.
  */
 
 #include "foc_pwm.h"
@@ -21,14 +25,54 @@ static bool g_pwm_enabled = false;
 
 static uint32_t calc_deadtime_ns_to_dtg(uint32_t deadtime_ns)
 {
-    /* TIM1 clock = 170 MHz → Tdtg = 1/170e6 ≈ 5.882 ns
-     * DTG = deadtime / Tdtg
-     */
-    uint32_t tdts_ns = 1000000000UL / FOC_PWM_TIMER_CLK_HZ; // ≈ 5.88 ns
+    uint32_t tdts_ns = 1000000000UL / FOC_PWM_TIMER_CLK_HZ;
     uint32_t dtg = (deadtime_ns + tdts_ns / 2) / tdts_ns;
-
-    if (dtg > 0x7F) { dtg = 0x7F; } /* 8-bit max */
+    if (dtg > 0x7F) { dtg = 0x7F; }
     return dtg & 0x7F;
+}
+
+/* ── Direct-register OC config ─────────────────────── */
+
+/**
+ * @brief  Configure output channel for PWM mode (direct register)
+ *
+ * Replaces LL_TIM_OC_Init() which requires stm32g4xx_ll_tim.c
+ */
+static void tim_oc_config_pwm(TIM_TypeDef *tim, uint32_t channel,
+                               uint32_t compare, uint32_t mode,
+                               bool output_enable, bool comp_enable)
+{
+    /* channel: 0=CH1, 1=CH2, 2=CH3, 3=CH4 */
+    uint32_t ch_shift = channel * 8;
+    uint32_t ch_shift2 = (channel & 1) * 16;  /* for CCER */
+
+    /* CCxR compare value */
+    volatile uint32_t *ccr = &tim->CCR1 + channel;
+    *ccr = compare;
+
+    /* CCMRx: OC mode + preload */
+    if (channel < 2) {
+        /* CH1/CH2 → CCMR1 */
+        uint32_t mask = 0xFF << ch_shift;
+        uint32_t val = tim->CCMR1 & ~mask;
+        /* mode bits [6:4], preload bit [3] */
+        val |= (mode << (ch_shift + 4)) | (1 << (ch_shift + 3));
+        tim->CCMR1 = val;
+    } else {
+        /* CH3/CH4 → CCMR2 */
+        uint32_t mask = 0xFF << ch_shift2;
+        uint32_t val = tim->CCMR2 & ~mask;
+        val |= (mode << (ch_shift2 + 4)) | (1 << (ch_shift2 + 3));
+        tim->CCMR2 = val;
+    }
+
+    /* CCER: output enable + complementary enable + polarity */
+    uint32_t ccer_mask = (0xF << (channel * 4));
+    uint32_t ccer_val = 0;
+    if (output_enable) ccer_val |= (1 << (channel * 4));       /* CCxE */
+    if (comp_enable)   ccer_val |= (1 << (channel * 4 + 1));   /* CCxNE */
+    /* polarity = 0 → active high */
+    tim->CCER = (tim->CCER & ~ccer_mask) | ccer_val;
 }
 
 /* ── Init ───────────────────────────────────────────── */
@@ -40,29 +84,23 @@ int foc_pwm_init(void)
     /* Enable TIM1 clock */
     LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_TIM1);
 
-    /* ── Pin configuration ────────────────────────────
-     * TIM1_CH1:  PA8   (AF6)  UH
-     * TIM1_CH1N: PB13  (AF6)  UL
-     * TIM1_CH2:  PA9   (AF6)  VH
-     * TIM1_CH2N: PB14  (AF6)  VL
-     * TIM1_CH3:  PA10  (AF6)  WH
-     * TIM1_CH3N: PB15  (AF6)  WL
-     * TIM1_BKIN2: PA11 (AF12) Emergency stop
-     */
+    /* Reset TIM1 via APB2 (replaces LL_TIM_DeInit) */
+    LL_APB2_GRP1_ForceReset(LL_APB2_GRP1_PERIPH_TIM1);
+    LL_APB2_GRP1_ReleaseReset(LL_APB2_GRP1_PERIPH_TIM1);
+
+    /* ── Pin configuration ──────────────────────────── */
     LL_AHB2_GRP1_EnableClock(LL_AHB2_GRP1_PERIPH_GPIOA);
     LL_AHB2_GRP1_EnableClock(LL_AHB2_GRP1_PERIPH_GPIOB);
 
-    /* PA8: TIM1_CH1 */
+    /* PA8/PA9/PA10: TIM1_CH1/CH2/CH3 */
     LL_GPIO_SetPinMode(GPIOA, LL_GPIO_PIN_8, LL_GPIO_MODE_ALTERNATE);
     LL_GPIO_SetAFPin_8_15(GPIOA, LL_GPIO_PIN_8, LL_GPIO_AF_6);
     LL_GPIO_SetPinSpeed(GPIOA, LL_GPIO_PIN_8, LL_GPIO_SPEED_FREQ_VERY_HIGH);
 
-    /* PA9: TIM1_CH2 */
     LL_GPIO_SetPinMode(GPIOA, LL_GPIO_PIN_9, LL_GPIO_MODE_ALTERNATE);
     LL_GPIO_SetAFPin_8_15(GPIOA, LL_GPIO_PIN_9, LL_GPIO_AF_6);
     LL_GPIO_SetPinSpeed(GPIOA, LL_GPIO_PIN_9, LL_GPIO_SPEED_FREQ_VERY_HIGH);
 
-    /* PA10: TIM1_CH3 */
     LL_GPIO_SetPinMode(GPIOA, LL_GPIO_PIN_10, LL_GPIO_MODE_ALTERNATE);
     LL_GPIO_SetAFPin_8_15(GPIOA, LL_GPIO_PIN_10, LL_GPIO_AF_6);
     LL_GPIO_SetPinSpeed(GPIOA, LL_GPIO_PIN_10, LL_GPIO_SPEED_FREQ_VERY_HIGH);
@@ -71,88 +109,67 @@ int foc_pwm_init(void)
     LL_GPIO_SetPinMode(GPIOA, LL_GPIO_PIN_11, LL_GPIO_MODE_ALTERNATE);
     LL_GPIO_SetAFPin_8_15(GPIOA, LL_GPIO_PIN_11, LL_GPIO_AF_12);
 
-    /* PB13: TIM1_CH1N */
+    /* PB13/PB14/PB15: TIM1_CH1N/CH2N/CH3N */
     LL_GPIO_SetPinMode(GPIOB, LL_GPIO_PIN_13, LL_GPIO_MODE_ALTERNATE);
     LL_GPIO_SetAFPin_8_15(GPIOB, LL_GPIO_PIN_13, LL_GPIO_AF_6);
     LL_GPIO_SetPinSpeed(GPIOB, LL_GPIO_PIN_13, LL_GPIO_SPEED_FREQ_VERY_HIGH);
 
-    /* PB14: TIM1_CH2N */
     LL_GPIO_SetPinMode(GPIOB, LL_GPIO_PIN_14, LL_GPIO_MODE_ALTERNATE);
     LL_GPIO_SetAFPin_8_15(GPIOB, LL_GPIO_PIN_14, LL_GPIO_AF_6);
     LL_GPIO_SetPinSpeed(GPIOB, LL_GPIO_PIN_14, LL_GPIO_SPEED_FREQ_VERY_HIGH);
 
-    /* PB15: TIM1_CH3N */
     LL_GPIO_SetPinMode(GPIOB, LL_GPIO_PIN_15, LL_GPIO_MODE_ALTERNATE);
     LL_GPIO_SetAFPin_8_15(GPIOB, LL_GPIO_PIN_15, LL_GPIO_AF_6);
     LL_GPIO_SetPinSpeed(GPIOB, LL_GPIO_PIN_15, LL_GPIO_SPEED_FREQ_VERY_HIGH);
 
-    /* ── TIM1 basic config ───────────────────────────── */
-    LL_TIM_DeInit(TIM_MOTOR);
+    /* ── TIM1 base config (direct register) ──────────── */
 
-    /* Prescaler: TIM_CLK = 170MHz / 1 = 170MHz */
-    LL_TIM_SetPrescaler(TIM_MOTOR, 0);
+    /* CR1: center-aligned mode 1, up-counting, clock div=2 */
+    TIM_MOTOR->CR1 = TIM_CR1_CMS_0 |          /* Center-aligned mode 1 */
+                      TIM_CR1_DIR |             /* Up counting (DIR=0 actually, but CMS!=0 means center) */
+                      TIM_CR1_CKD_0;            /* Clock division = DIV2 */
+    /* Actually: DIR=0 for up in center-aligned. Clear DIR bit. */
+    TIM_MOTOR->CR1 = TIM_CR1_CMS_0 | TIM_CR1_CKD_0;
 
-    /* Auto-reload: half-period for center-aligned */
-    LL_TIM_SetAutoReload(TIM_MOTOR, FOC_PWM_HALF_PERIOD);
+    /* Prescaler = 0 (170MHz timer clock) */
+    TIM_MOTOR->PSC = 0;
 
-    /* Center-aligned mode 1, up-counting */
-    LL_TIM_SetCounterMode(TIM_MOTOR, LL_TIM_COUNTERMODE_CENTER_UP);
-
-    /* Clock division = DIV2 (for dead-time fine grain) */
-    LL_TIM_SetClockDivision(TIM_MOTOR, LL_TIM_CLOCKDIVISION_DIV2);
+    /* Auto-reload = half period */
+    TIM_MOTOR->ARR = FOC_PWM_HALF_PERIOD;
 
     /* Repetition counter = 0 */
-    LL_TIM_SetRepetitionCounter(TIM_MOTOR, 0);
+    TIM_MOTOR->RCR = 0;
 
-    /* ── PWM mode configuration ────────────────────────
-     * CH1/CH2/CH3: PWM Mode 1, preload enabled
-     *           Output polarity: Active High
-     * CH4: PWM Mode 2 (for TRGO timing)
-     */
-    LL_TIM_OC_InitTypeDef oc_init = {0};
-    oc_init.OCMode      = LL_TIM_OCMODE_PWM1;
-    oc_init.OCState     = LL_TIM_OCSTATE_ENABLE;
-    oc_init.OCPolarity  = LL_TIM_OCPOLARITY_HIGH;
-    oc_init.OCNState    = LL_TIM_OCSTATE_ENABLE;
-    oc_init.OCNPolarity = LL_TIM_OCPOLARITY_HIGH;
-    oc_init.OCIdleState = LL_TIM_OCIDLESTATE_LOW;
-    oc_init.OCNIdleState = LL_TIM_OCIDLESTATE_LOW;
+    /* ── PWM channels ────────────────────────────────── */
+    /* PWM Mode 1 = 0b110 = 6 */
+    #define OC_MODE_PWM1 6
 
-    /* CH1 */
-    oc_init.CompareValue = FOC_PWM_HALF_PERIOD / 2; /* 50% default */
-    LL_TIM_OC_Init(TIM_MOTOR, LL_TIM_CHANNEL_CH1, &oc_init);
+    uint32_t half = FOC_PWM_HALF_PERIOD / 2;
 
-    /* CH2 */
-    LL_TIM_OC_Init(TIM_MOTOR, LL_TIM_CHANNEL_CH2, &oc_init);
+    /* CH1/CH2/CH3: PWM1, preload, output+complementary enable */
+    tim_oc_config_pwm(TIM_MOTOR, 0, half, OC_MODE_PWM1, true, true);
+    tim_oc_config_pwm(TIM_MOTOR, 1, half, OC_MODE_PWM1, true, true);
+    tim_oc_config_pwm(TIM_MOTOR, 2, half, OC_MODE_PWM1, true, true);
 
-    /* CH3 */
-    LL_TIM_OC_Init(TIM_MOTOR, LL_TIM_CHANNEL_CH3, &oc_init);
-
-    /* CH4: for TRGO timing */
-    oc_init.OCMode = LL_TIM_OCMODE_PWM2;
-    oc_init.OCState = LL_TIM_OCSTATE_DISABLE; /* No physical output needed */
-    oc_init.CompareValue = 1;
-    LL_TIM_OC_Init(TIM_MOTOR, LL_TIM_CHANNEL_CH4, &oc_init);
+    /* CH4: PWM2, no output (for TRGO) */
+    /* PWM Mode 2 = 0b111 = 7 */
+    tim_oc_config_pwm(TIM_MOTOR, 3, 1, 7, false, false);
 
     /* ── Dead-time ───────────────────────────────────── */
     uint32_t dtg = calc_deadtime_ns_to_dtg(FOC_PWM_DEADTIME_NS);
     LL_TIM_OC_SetDeadTime(TIM_MOTOR, dtg);
     LOG_INF("Dead-time: %u ns → DTG=%u", FOC_PWM_DEADTIME_NS, dtg);
 
-    /* ── Break & Off-State ─────────────────────────────
-     * BKIN1: Disabled (no break1 input)
-     * BKIN2: Enabled for emergency stop (PA11), Active Low, Filter=3
-     * OSSR: Enabled (off-state run mode)
-     * OSSI: Enabled (off-state idle mode)
-     */
+    /* ── Break & Off-State ───────────────────────────── */
     LL_TIM_EnableAllOutputs(TIM_MOTOR);
     LL_TIM_SetOffStates(TIM_MOTOR, LL_TIM_OSSI_ENABLE, LL_TIM_OSSR_ENABLE);
 
-    /* BKIN2: PA11, Active Low, Filter=FDIV2_N6 (index 3 in workbench = 0x00400000) */
+    /* BKIN2: Active Low, Filter=FDIV2_N6 */
     LL_TIM_EnableBRK2(TIM_MOTOR);
-    LL_TIM_ConfigBRK2(TIM_MOTOR, LL_TIM_BREAK2_POLARITY_LOW, LL_TIM_BREAK2_FILTER_FDIV2_N6, 0);
+    LL_TIM_ConfigBRK2(TIM_MOTOR, LL_TIM_BREAK2_POLARITY_LOW,
+                       LL_TIM_BREAK2_FILTER_FDIV2_N6, 0);
 
-    /* ── Master output: TRGO = OC4REF (ADC trigger) ─── */
+    /* ── Master output: TRGO = OC4REF ────────────────── */
     LL_TIM_SetTriggerOutput(TIM_MOTOR, LL_TIM_TRGO_OC4REF);
     LL_TIM_SetTriggerOutput2(TIM_MOTOR, LL_TIM_TRGO2_RESET);
 
@@ -169,7 +186,6 @@ int foc_pwm_init(void)
     /* ── Start counter ───────────────────────────────── */
     LL_TIM_EnableCounter(TIM_MOTOR);
 
-    /* Outputs are initially disabled (safe state) */
     g_pwm_enabled = false;
 
     LOG_INF("FOC PWM initialized: %u Hz, period=%u",
@@ -181,7 +197,6 @@ int foc_pwm_init(void)
 
 void foc_pwm_set_duty(float duty_a, float duty_b, float duty_c)
 {
-    /* Clamp and convert to compare values */
     if (duty_a < 0.0f) duty_a = 0.0f;
     if (duty_a > 1.0f) duty_a = 1.0f;
     if (duty_b < 0.0f) duty_b = 0.0f;

@@ -41,6 +41,7 @@ extern "C" {
 #define CMD_ID_ESTOP            0x04
 #define CMD_ID_RESET            0x05
 #define CMD_ID_PING             0x06
+#define CMD_ID_TEST             0x10  /* FOC test command */
 
 /* Response IDs (device → host) */
 #define RSP_ID_STATUS           0x80

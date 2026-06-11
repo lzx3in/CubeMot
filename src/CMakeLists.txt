@@ -51,6 +51,7 @@ target_sources(app PRIVATE
     # FOC drivers (always compiled for now)
     drivers/foc/foc_pwm.c
     drivers/foc/foc_adc.c
+    drivers/foc/foc_isr.c
 )
 
 # ── Optional modules (Kconfig-gated) ─────────────────────

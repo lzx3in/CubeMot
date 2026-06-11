@@ -249,7 +249,7 @@ static void process_command(const parsed_frame_t *frame)
         
         switch (test_id) {
         case 0:  /* Start FOC with Id=param */
-            LOG_INF("TEST: Start FOC Id=%.2fA", (double)param);
+            LOG_INF("TEST: Start FOC Id=%dmA", (int)(param * 1000.0f));
             foc_isr_get_foc()->state.i_d_ref = param;
             foc_isr_get_foc()->state.i_q_ref = 0.0f;
             foc_pwm_enable();
@@ -261,7 +261,7 @@ static void process_command(const parsed_frame_t *frame)
             foc_pwm_disable();
             break;
         case 2:  /* Set Iq=param */
-            LOG_INF("TEST: Set Iq=%.2fA", (double)param);
+            LOG_INF("TEST: Set Iq=%dmA", (int)(param * 1000.0f));
             foc_isr_get_foc()->state.i_q_ref = param;
             break;
         default:

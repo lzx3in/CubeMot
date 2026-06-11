@@ -198,9 +198,10 @@ int vehicle_init(const vehicle_config_t *config)
     g_odom_vx = 0.0f;
     g_odom_wz = 0.0f;
     
-    LOG_INF("Vehicle init: %.2fm wheelbase, %.2fm track, %.2fcm wheels",
-            (double)g_config.wheelbase_m, (double)g_config.track_width_m,
-            (double)(g_config.wheel_radius_m * 100.0f));
+    LOG_INF("Vehicle init: %dcm wheelbase, %dcm track, %dcm wheels",
+            (int)(g_config.wheelbase_m * 100.0f),
+            (int)(g_config.track_width_m * 100.0f),
+            (int)(g_config.wheel_radius_m * 100.0f));
     return 0;
 }
 

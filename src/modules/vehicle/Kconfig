@@ -1,0 +1,6 @@
+config MODULE_VEHICLE_ENABLE
+	bool "Vehicle Kinematics Module"
+	default y
+	help
+	  Enables vehicle kinematics (differential drive + odometry).
+	  V2: 2 wheels. V3: Ackermann 4 wheels + 2 servos.

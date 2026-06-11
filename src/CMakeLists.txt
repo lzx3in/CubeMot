@@ -90,3 +90,21 @@ if(CONFIG_MODULE_MOTOR_CTRL_ENABLE)
         modules/motor_ctrl/motor_ctrl.c
     )
 endif()
+
+if(CONFIG_MODULE_COMMANDER_ENABLE)
+    target_include_directories(app PRIVATE
+        modules/commander/include
+    )
+    target_sources(app PRIVATE
+        modules/commander/commander.c
+    )
+endif()
+
+if(CONFIG_MODULE_VEHICLE_ENABLE)
+    target_include_directories(app PRIVATE
+        modules/vehicle/include
+    )
+    target_sources(app PRIVATE
+        modules/vehicle/vehicle.c
+    )
+endif()

@@ -1,0 +1,5 @@
+config MODULE_COMMANDER_ENABLE
+	bool "Commander Module"
+	default y
+	help
+	  Enables the commander module with state machine and command routing.

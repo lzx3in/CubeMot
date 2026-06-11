@@ -16,6 +16,7 @@ target_include_directories(app PRIVATE
     msghub/include
     topics/include
     drivers/include
+    drivers/foc
     libs/pid
     libs/crc
     libs/math
@@ -43,6 +44,9 @@ target_sources(app PRIVATE
     # Hardware drivers
     drivers/led.c
     drivers/button.c
+    # FOC drivers (always compiled for now)
+    drivers/foc/foc_pwm.c
+    drivers/foc/foc_adc.c
 )
 
 # ── Optional modules (Kconfig-gated) ─────────────────────

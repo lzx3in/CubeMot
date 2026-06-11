@@ -1,3 +1,8 @@
 mainmenu "CubeMot Application"
 
 source "Kconfig.zephyr"
+
+# CubeMot application modules (rsource = relative to this Kconfig file)
+rsource "src/modules/blink/Kconfig"
+rsource "src/modules/button_detector/Kconfig"
+rsource "src/modules/led_controller/Kconfig"

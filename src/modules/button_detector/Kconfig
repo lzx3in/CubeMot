@@ -1,0 +1,13 @@
+# Button Detector Module Configuration
+#
+# Detects hardware button presses (SW0 on Nucleo-G431RB) via GPIO interrupt
+# and publishes button_event messages through msghub.
+
+config MODULE_BUTTON_DETECTOR_ENABLE
+	bool "Enable Button Detector Module"
+	depends on GPIO
+	default y
+	help
+	  Enable the button detector module. Registers a GPIO interrupt
+	  callback on SW0 and publishes button_event messages through
+	  msghub's pub/sub system on each press.

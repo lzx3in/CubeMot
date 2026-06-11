@@ -1,0 +1,12 @@
+# Blink Module Configuration
+#
+# Controls the LED blink module that toggles LED0 at configurable frequencies.
+# Frequency cycles: 100ms → 500ms → 1000ms (on user button press).
+
+config MODULE_BLINK_ENABLE
+	bool "Enable Blink Module"
+	default y
+	help
+	  Enable the blink module. Creates a background thread that
+	  toggles LED0 at configurable frequencies. Button presses
+	  cycle through frequency modes.

@@ -1,0 +1,13 @@
+# LED Controller Module Configuration
+#
+# Controls LEDs via msghub commands. Subscribes to led_command topic
+# and publishes led_state on each state change.
+
+config MODULE_LED_CONTROLLER_ENABLE
+	bool "Enable LED Controller Module"
+	depends on GPIO
+	default y
+	help
+	  Enable the LED controller module. Creates a background thread
+	  that subscribes to led_command messages and controls hardware
+	  LEDs accordingly, publishing led_state feedback.

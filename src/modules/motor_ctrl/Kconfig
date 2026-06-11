@@ -1,0 +1,5 @@
+config MODULE_MOTOR_CTRL_ENABLE
+    bool "Motor Control Module"
+    default y
+    help
+      Enables the motor control module with FOC + sensorless observer.

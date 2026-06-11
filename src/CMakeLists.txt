@@ -81,3 +81,12 @@ if(CONFIG_MODULE_LED_CONTROLLER_ENABLE)
         modules/led_controller/led_controller.c
     )
 endif()
+
+if(CONFIG_MODULE_MOTOR_CTRL_ENABLE)
+    target_include_directories(app PRIVATE
+        modules/motor_ctrl/include
+    )
+    target_sources(app PRIVATE
+        modules/motor_ctrl/motor_ctrl.c
+    )
+endif()

@@ -3,6 +3,16 @@
 		led0 = &green_led;
 		sw0 = &user_button;
 	};
+
+	/*
+	 * Redirect Zephyr console to USART1 (PB6/PB7).
+	 * LPUART1 (ST-Link VCP) is exclusively for binary protocol.
+	 * To read debug logs, connect a USB-UART adapter to PB6(TX).
+	 */
+	chosen {
+		zephyr,console = &usart1;
+		zephyr,shell-uart = &usart1;
+	};
 };
 
 &user_button {
@@ -12,4 +22,29 @@
 	 * Override with correct polarity and enable pull-up.
 	 */
 	gpios = <&gpioc 13 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+};
+
+/*
+ * USART1 remap to PB6(TX)/PB7(RX):
+ * Default PC4/PC5 conflicts with ADC2_IN11 (Vbus sensing on PC5).
+ * USART1 is reserved for debug logs; binary protocol uses LPUART1 (ST-Link VCP).
+ */
+&usart1 {
+	pinctrl-0 = <&usart1_tx_pb6 &usart1_rx_pb7>;
+};
+
+/*
+ * Disable SPI2: PB13/PB14/PB15 needed by TIM1_CH1N/CH2N/CH3N
+ * for FOC complementary PWM outputs.
+ */
+&spi2 {
+	status = "disabled";
+};
+
+/*
+ * Disable SPI1: PA7 (MOSI) needed by ADC2_IN4 for Phase W current sensing.
+ * PA5 (SCK) and PA6 (MISO) kept free for future use.
+ */
+&spi1 {
+	status = "disabled";
 };

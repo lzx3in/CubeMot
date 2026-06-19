@@ -13,6 +13,7 @@
 #include <stm32g4xx_ll_bus.h>
 #include <stm32g4xx_ll_rcc.h>
 #include <stm32g4xx_ll_gpio.h>
+#include <stm32g4xx_ll_tim.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(foc_adc, LOG_LEVEL_INF);
@@ -165,13 +166,24 @@ void foc_adc_get_offsets(int16_t *ia_offset, int16_t *ib_offset, int16_t *ic_off
     int32_t sum_ia = 0, sum_ib = 0, sum_ic = 0;
     const int num_samples = 256;
 
+    /*
+     * Injected conversions are triggered by TIM1_TRGO.
+     * Temporarily start TIM1 counter so TRGO events fire.
+     * PWM outputs stay disabled (MOE=0) — motor does not spin.
+     */
+    LL_TIM_EnableCounter(TIM1);
+    k_busy_wait(100);  /* let first trigger settle */
+
     for (int i = 0; i < num_samples; i++) {
+        /* Wait for a fresh conversion (one PWM cycle ~ 33 us) */
+        k_busy_wait(50);
         foc_adc_read_raw(&raw);
         sum_ia += raw.ia;
         sum_ib += raw.ib;
         sum_ic += raw.ic;
-        k_busy_wait(50);
     }
+
+    LL_TIM_DisableCounter(TIM1);
 
     *ia_offset = (int16_t)(sum_ia / num_samples);
     *ib_offset = (int16_t)(sum_ib / num_samples);

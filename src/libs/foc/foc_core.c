@@ -63,6 +63,12 @@ void foc_current_loop(foc_t *foc)
     s->adc_ib = raw.ib;
     s->adc_ic = raw.ic;
 
+    /* Read Vbus (regular conversion, result from previous trigger) */
+    if (foc_adc_vbus_ready()) {
+        s->v_bus = foc_adc_to_vbus((int16_t)LL_ADC_REG_ReadConversionData12(ADC2));
+    }
+    foc_adc_start_vbus();  /* trigger next conversion */
+
     /* 2. Convert to Amperes */
     float ia = foc_adc_to_current(raw.ia, s->adc_ia_offset);
     float ib = foc_adc_to_current(raw.ib, s->adc_ib_offset);

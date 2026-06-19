@@ -117,6 +117,9 @@ void foc_isr_init(void)
     g_isr_running = false;
     g_isr_count = 0;
 
+    /* Prime the first Vbus ADC conversion */
+    foc_adc_start_vbus();
+
     LOG_INF("FOC ISR ready (30kHz, TIM1_UP_IRQn, priority 0)");
     LOG_INF("  ADC offsets: Ia=%d Ib=%d Ic=%d", ia_off, ib_off, ic_off);
 }

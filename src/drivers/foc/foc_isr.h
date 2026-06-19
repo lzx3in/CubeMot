@@ -57,3 +57,9 @@ uint32_t foc_isr_get_count(void);
  * @return true if ISR is active
  */
 bool foc_isr_is_running(void);
+
+/**
+ * @brief  Set bus voltage manually
+ * @param  vbus  Bus voltage in Volts
+ */
+void foc_isr_set_vbus(float vbus);

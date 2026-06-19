@@ -4,16 +4,13 @@ add_subdirectory(${CMAKE_SOURCE_DIR}/src/libs ${CMAKE_BINARY_DIR}/src/libs)
 add_subdirectory(${CMAKE_SOURCE_DIR}/src/msghub ${CMAKE_BINARY_DIR}/src/msghub)
 add_subdirectory(${CMAKE_SOURCE_DIR}/src/topics ${CMAKE_BINARY_DIR}/src/topics)
 
-target_include_directories(msghub PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/mocks/freertos
-)
-
-target_include_directories(common PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/mocks/freertos
-)
-
 add_subdirectory(deps)
 add_subdirectory(test_common)
-add_subdirectory(mocks/freertos)
+add_subdirectory(mocks/zephyr)
+
+# Apply Zephyr mock headers globally for all source libraries in test builds
+target_link_libraries(common PUBLIC zephyr_mocks)
+target_link_libraries(msghub PUBLIC zephyr_mocks)
+
 add_subdirectory(lib)
 add_subdirectory(msghub)

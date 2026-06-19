@@ -9,7 +9,6 @@
 //   - MsgHubSubscriberTest: Auto-manages publisher + subscriber lifecycle
 
 #include <gtest/gtest.h>
-#include <pthread.h>
 #include <thread>
 #include <atomic>
 #include <vector>
@@ -25,9 +24,7 @@ typedef struct {
 
 MSGHUB_TOPIC_DEFINE(msghub_test, msghub_test_t, 10);
 
-// Global critical section mutex for PC unit testing
-pthread_mutex_t g_msghub_crit_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
-pthread_mutex_t g_msghub_mgr_mutex = PTHREAD_MUTEX_INITIALIZER;
+// g_msghub_mgr_mutex is defined in msghub_state.c and initialized by msghub_init()
 }
 
 // =============================================================================

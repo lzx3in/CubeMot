@@ -1,6 +1,28 @@
 #include "crc.h"
 
 /* ============================================================================
+ * CRC8 (Polynomial 0x07) Implementation
+ * ============================================================================ */
+
+#define CRC8_POLYNOMIAL 0x07u
+
+uint8_t crc8_calculate(const uint8_t *data, size_t len)
+{
+    if (data == NULL) {
+        return 0;
+    }
+
+    uint8_t crc = 0x00;
+    for (size_t i = 0; i < len; i++) {
+        crc ^= data[i];
+        for (int j = 0; j < 8; j++) {
+            crc = (crc & 0x80) ? ((uint8_t)(crc << 1) ^ CRC8_POLYNOMIAL) : (uint8_t)(crc << 1);
+        }
+    }
+    return crc;
+}
+
+/* ============================================================================
  * CRC16-CCITT Implementation (Direct Calculation)
  * ============================================================================
  * Polynomial: x^16 + x^12 + x^5 + 1

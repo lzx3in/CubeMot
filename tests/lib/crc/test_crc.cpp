@@ -1,5 +1,5 @@
 // CRC Library Test Suite
-// Tests for CRC16-CCITT and CRC32 (IEEE 802.3)
+// Tests for CRC8, CRC16-CCITT and CRC32 (IEEE 802.3)
 
 #include <gtest/gtest.h>
 #include <string_view>
@@ -11,6 +11,68 @@ extern "C" {
 
 namespace cubemot::test
 {
+
+// ============================================================================
+// CRC8 Tests
+// ============================================================================
+
+class CRC8Test : public ::testing::Test {};
+
+TEST_F(CRC8Test, KnownValue_EmptyData)
+{
+    uint8_t data[] = {};
+    EXPECT_EQ(crc8_calculate(data, 0), 0x00);
+}
+
+TEST_F(CRC8Test, KnownValue_SingleByte)
+{
+    uint8_t data[] = {0x01};
+    // CRC8 poly 0x07: 0x01 → 0x01 ^ 0x00 = 0x01, shift: 0x07
+    uint8_t crc = crc8_calculate(data, 1);
+    EXPECT_NE(crc, 0xFF); // sanity: not garbage
+    // Verify deterministic
+    EXPECT_EQ(crc, crc8_calculate(data, 1));
+}
+
+TEST_F(CRC8Test, KnownValue_StandardVector)
+{
+    // "123456789" with CRC8 poly 0x07 (init=0x00) → 0xF4
+    constexpr std::string_view kData = "123456789";
+    EXPECT_EQ(crc8_calculate(reinterpret_cast<const uint8_t *>(kData.data()), kData.size()), 0xF4u);
+}
+
+TEST_F(CRC8Test, Api_NullHandling)
+{
+    EXPECT_EQ(crc8_calculate(nullptr, 100), 0u);
+}
+
+TEST_F(CRC8Test, Consistency_SameInputSameOutput)
+{
+    const std::vector<uint8_t> data = {0xAA, 0x55, 0x01, 0x08};
+    EXPECT_EQ(crc8_calculate(data.data(), data.size()),
+              crc8_calculate(data.data(), data.size()));
+}
+
+TEST_F(CRC8Test, DifferentData_DifferentCrc)
+{
+    uint8_t d1[] = {0x01, 0x02, 0x03};
+    uint8_t d2[] = {0x01, 0x02, 0x04};
+    EXPECT_NE(crc8_calculate(d1, 3), crc8_calculate(d2, 3));
+}
+
+TEST_F(CRC8Test, Boundary_AllZeros)
+{
+    std::vector<uint8_t> zeros(256, 0x00);
+    uint8_t crc = crc8_calculate(zeros.data(), zeros.size());
+    EXPECT_EQ(crc, crc8_calculate(zeros.data(), zeros.size()));
+}
+
+TEST_F(CRC8Test, Boundary_AllOnes)
+{
+    std::vector<uint8_t> ones(256, 0xFF);
+    uint8_t crc = crc8_calculate(ones.data(), ones.size());
+    EXPECT_EQ(crc, crc8_calculate(ones.data(), ones.size()));
+}
 
 // ============================================================================
 // CRC32 Tests

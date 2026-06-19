@@ -10,6 +10,8 @@
  */
 
 #include "comm/serial_cmd.h"
+#include "serial_protocol.h"
+#include "crc.h"
 #include "topics/topics.h"
 #include "common_time.h"
 #include "common_error.h"
@@ -30,19 +32,7 @@ LOG_MODULE_REGISTER(serial_cmd, LOG_LEVEL_INF);
 #define RX_THREAD_PRIORITY    K_PRIO_COOP(8)
 #define TX_THREAD_PRIORITY    K_PRIO_COOP(8)
 
-/* ── CRC8 (polynomial 0x07) ─────────────────────────── */
-
-static uint8_t crc8(const uint8_t *data, size_t len)
-{
-    uint8_t crc = 0x00;
-    for (size_t i = 0; i < len; i++) {
-        crc ^= data[i];
-        for (int j = 0; j < 8; j++) {
-            crc = (crc & 0x80) ? ((uint8_t)(crc << 1) ^ 0x07u) : (uint8_t)(crc << 1);
-        }
-    }
-    return crc;
-}
+/* ── CRC8 is now provided by lib_crc (crc8_calculate) ── */
 
 /* ── State ───────────────────────────────────────────── */
 
@@ -57,7 +47,7 @@ static size_t rx_head = 0;
 static size_t rx_tail = 0;
 
 /* TX buffer */
-static uint8_t tx_buf[SERIAL_MAX_FRAME];
+static uint8_t tx_buf[SP_MAX_FRAME];
 
 /* msghub subscribers/publishers */
 static msghub_subscriber_t g_cmd_vel_sub;
@@ -125,7 +115,7 @@ static int parse_frame_from_ring(parsed_frame_t *frame)
 
     if (avail < 4) return -1;
 
-    if (ring_peek(0) != SERIAL_FRAME_HEAD_0 || ring_peek(1) != SERIAL_FRAME_HEAD_1) {
+    if (ring_peek(0) != SP_FRAME_HEAD_0 || ring_peek(1) != SP_FRAME_HEAD_1) {
         ring_discard(1);
         return -1;
     }
@@ -133,7 +123,7 @@ static int parse_frame_from_ring(parsed_frame_t *frame)
     frame->cmd_id = ring_peek(2);
     frame->len = ring_peek(3);
 
-    if (frame->len > SERIAL_MAX_PAYLOAD) {
+    if (frame->len > SP_MAX_PAYLOAD) {
         ring_discard(2);
         return -1;
     }
@@ -145,11 +135,11 @@ static int parse_frame_from_ring(parsed_frame_t *frame)
         frame->payload[i] = ring_peek(4 + i);
     }
 
-    uint8_t crc_buf[2 + SERIAL_MAX_PAYLOAD];
+    uint8_t crc_buf[2 + SP_MAX_PAYLOAD];
     crc_buf[0] = frame->cmd_id;
     crc_buf[1] = frame->len;
     memcpy(&crc_buf[2], frame->payload, frame->len);
-    uint8_t expected_crc = crc8(crc_buf, 2 + frame->len);
+    uint8_t expected_crc = crc8_calculate(crc_buf, 2 + frame->len);
     uint8_t actual_crc = ring_peek(4 + frame->len);
 
     ring_discard(frame_len);
@@ -164,18 +154,7 @@ static int parse_frame_from_ring(parsed_frame_t *frame)
 
 static size_t encode_frame(uint8_t cmd_id, const uint8_t *payload, uint8_t len)
 {
-    tx_buf[0] = SERIAL_FRAME_HEAD_0;
-    tx_buf[1] = SERIAL_FRAME_HEAD_1;
-    tx_buf[2] = cmd_id;
-    tx_buf[3] = len;
-
-    if (len > 0 && payload != NULL) {
-        memcpy(&tx_buf[4], payload, len);
-    }
-
-    tx_buf[4 + len] = crc8(&tx_buf[2], 2 + len);
-
-    return 4 + len + 1;
+    return sp_encode_frame(tx_buf, cmd_id, payload, len);
 }
 
 static void send_response(uint8_t cmd_id, const uint8_t *payload, uint8_t len)

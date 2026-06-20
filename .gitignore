@@ -1,6 +1,6 @@
 # Build directories (CMake working directory)
-build/
-build_*/
+/build/
+/build_*/
 
 # clangd cache
 .cache/

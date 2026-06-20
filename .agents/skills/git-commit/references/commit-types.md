@@ -1,6 +1,6 @@
-# CubeMot 提交类型
+# 提交类型
 
-基于 Conventional Commits 规范，针对嵌入式固件项目（STM32 + FreeRTOS / Zephyr RTOS）定制。
+基于 Conventional Commits 规范。各仓库的 scope 定义见各自的 commit-config.md。
 
 ## 类型目录
 
@@ -172,37 +172,3 @@ Zephyr 入口的模块 header 路径导致重复定义。
 
 Reverts a1b2c3d
 ```
-
-## CubeMot 项目 scope 参考
-
-### 硬件抽象层
-- `chips` — 芯片级抽象（`chips/stm32g4`）
-- `boards` — 板级支持（`boards/nucleo_g431rb`）
-- `boards/nucleo_g431rb` — 具体板级配置
-
-### 驱动与通信
-- `drivers/led`、`drivers/button` — 外设驱动
-- `msghub` — 发布-订阅消息总线
-- `topics` — 消息主题定义
-
-### 模块
-- `modules/blink`、`modules/led_controller`、`modules/button_detector`
-- `modules/motor`（计划中）
-
-### 库
-- `libs/pid`、`libs/crc`
-
-### 平台
-- `app` — 应用入口与状态机
-- `common` — 公共类型、错误码、时间戳
-- `freertos` — FreeRTOS 相关
-- `zephyr` — Zephyr RTOS 相关
-
-### 基础设施
-- `build` — CMake/构建系统
-- `ci` — GitHub Actions / CI
-- `tests` — 单元测试
-- `tools` — 脚本工具
-TYPEEEOF
-echo "commit-types.md adapted"
-__code=$?; pgrep -g 0 >/tmp/shell_pgrep_475bf8ebdd19.tmp 2>&1; (exit $__code)

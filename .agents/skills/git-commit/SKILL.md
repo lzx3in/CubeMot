@@ -1,18 +1,30 @@
 ---
 name: git-commit
 description: >
-  分析 git 变更，对相关文件分组，生成 Conventional Commits 格式的提交信息并自动执行提交。
+  分析 git 变更，自动识别变更所属仓库，加载该仓库的 commit-config.md 配置，
+  按配置分组并生成 Conventional Commits 格式的提交信息，自动执行提交。
   当用户要求提交代码、创建 git commit、暂存文件或提到 "/commit" 时使用。
-  确保 pre-commit hook 已安装，并强制执行原子提交规范。
+  无配置的仓库不干预提交。
 ---
 
 # Git Commit
 
 ## 概述
 
-按 Conventional Commits 规范创建标准化、语义化的 git 提交。分析实际 diff，将相关变更分组，生成提交信息，并自动执行。
+为工作区内多个 Git 仓库创建标准化、语义化的提交。自动检测变更所属仓库，加载该仓库的 `.agents/skills/git-commit/commit-config.md` 配置，按 Conventional Commits 规范分组并生成提交信息。无配置的仓库不干预。
 
 ## 工作流程
+
+### 0. 识别仓库与加载配置
+
+对当前有未提交变更的每个 git 仓库：
+
+1. **确定仓库**：在变更目录中执行 `git rev-parse --show-toplevel` 获取仓库根目录
+2. **查找配置**：检查 `<repo-root>/.agents/skills/git-commit/commit-config.md` 是否存在
+3. **无配置则跳过**：若仓库没有 commit-config.md，该仓库的变更不使用本 skill——以默认 git commit 行为处理
+4. **有配置则加载**：读取配置文件中的 scope 映射、分组规则和特殊约束，后续步骤按此配置执行
+
+跨仓库场景：若多个仓库同时有变更，按仓库分别处理，每个仓库独立走完整流程。
 
 ### 1. 收集状态
 
@@ -26,29 +38,18 @@ git diff                   # 无暂存内容时
 
 ### 2. 分组变更
 
-将变更拆分为**逻辑分组**，每个分组独立构成一个提交。CubeMot 项目按以下层级分组：
+按 commit-config.md 中的**分组规则**和 **scope 映射**将变更拆分为逻辑分组。
 
-| 层级 | 路径 | scope 示例 |
-|------|------|-----------|
-| 应用层 | `src/app/` | `app` |
-| 模块层 | `src/modules/` + `zephyr/src/modules/` | `modules/blink`, `modules/led_controller` |
-| 消息总线 | `src/msghub/` | `msghub` |
-| 驱动层 | `src/drivers/` + `zephyr/src/` | `drivers/led`, `drivers/button` |
-| 板级 | `src/boards/` | `boards/nucleo_g431rb` |
-| 芯片层 | `src/chips/` | `chips/stm32g4` |
-| 库 | `src/libs/` | `libs/pid`, `libs/crc` |
-| 公共 | `src/common/` | `common` |
-| Zephyr 构建 | `zephyr/` | `zephyr` |
-| 构建系统 | `cmake/`, `CMakeLists.txt` | `build` |
-| 测试 | `tests/` | `tests` |
-| 工具 | `tools/` | `tools` |
+确定每个变更文件的 scope：
+1. 按文件路径匹配 commit-config.md 中的 scope 映射表（最长前缀优先）
+2. 未匹配时使用兜底规则
 
-规则：
-- **分离** FreeRTOS 与 Zephyr 变更
-- **分离**格式化变更与行为变更
-- **分离**重构与新功能
-- **分离**文档与代码变更
+分组原则（通用 + 仓库配置中列出的额外规则）：
+- 每个分组独立构成一个提交
 - 每个分组应可独立审查、独立回滚
+- 分离格式化变更与行为变更
+- 分离重构与新功能
+- 分离文档与代码变更
 
 ### 3. 生成提交信息
 
@@ -67,15 +68,19 @@ git diff                   # 无暂存内容时
 
 ```
 提交内容：
-  1. refactor(chips/stm32g4): 移除 CMakeLists 中未使用的编译定义
-     文件：src/chips/stm32g4/CMakeLists.txt
-  2. feat(modules): 添加基于 msghub 的电机控制模块
-     文件：src/modules/motor/motor.c, src/topics/topics.c
+  [cubemot]
+  1. refactor(drivers/foc): 移除未使用的编译定义
+     文件：src/drivers/foc/CMakeLists.txt
+  2. feat(modules/motor_ctrl): 添加基于 msghub 的电机控制模块
+     文件：src/modules/motor_ctrl/motor_ctrl.c, src/topics/topics.c
+  [workspace]
+  3. chore(docker/habitat): 更新开发容器基础镜像
+     文件：docker/habitat/Dockerfile
 ```
 
 ### 5. 执行
 
-无需询问确认，按顺序执行每次提交：
+无需询问确认，在每个仓库的根目录下按顺序执行每次提交：
 
 ```bash
 git add <文件...>
@@ -117,6 +122,7 @@ chmod +x .git/hooks/pre-commit
 - **绝不**跳过 hooks（`--no-verify`），除非用户明确要求
 - **绝不** force push 到 `main` / `master`
 - **绝不**提交密钥（`.env`、凭证、私钥）
+- **绝不**在无 commit-config.md 的仓库中使用本 skill 的规范（回退到默认 git 行为）
 - 若提交因 hook 失败，修复问题后创建**新**提交（不要 amend）
 
 ## 提交规范
@@ -166,7 +172,8 @@ chmod +x .git/hooks/pre-commit
 - [ ] diff 中无密钥信息
 - [ ] 无格式化变更与行为变更混在一起
 - [ ] 相关测试/文档已包含或在计划中作为单独提交
-- [ ] FreeRTOS 与 Zephyr 变更未混在同一提交中
+- [ ] 符合 commit-config.md 中的分组规则
+- [ ] 符合 commit-config.md 中的特殊约束
 - [ ] Pre-commit hook 已安装且可用
 
 ## 警告信号
@@ -174,7 +181,7 @@ chmod +x .git/hooks/pre-commit
 - 大量未提交的变更不断累积
 - 提交信息如"fix"、"update"、"wip"、"更新代码"
 - 格式化与行为变更混在一起
-- FreeRTOS 与 Zephyr 迁移混在同一提交
+- 违反 commit-config.md 分组规则的混合提交
 - `.gitignore` 未覆盖构建产物（`build/`、`target/`）
 - 向共享分支 force push
 

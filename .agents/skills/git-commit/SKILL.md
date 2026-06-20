@@ -177,3 +177,19 @@ chmod +x .git/hooks/pre-commit
 - FreeRTOS 与 Zephyr 迁移混在同一提交
 - `.gitignore` 未覆盖构建产物（`build/`、`target/`）
 - 向共享分支 force push
+
+## 与其他 Skill 协作
+
+提交前建议先验证变更：
+
+> 运行 `/build` 确认编译通过，运行 `/test` 确认测试通过，然后 `/commit`。
+
+提交类型与开发 Skill 的对应：
+
+| 开发动作 | 验证 | 提交类型 |
+|----------|------|----------|
+| 新增功能 | `/build` + `/test` | `feat(<scope>): ...` |
+| Bug 修复 | `/build` + `/test` | `fix(<scope>): ...` |
+| 新增测试 | `/test` | `test(<scope>): ...` |
+| 构建系统 | `/build` | `build(<scope>): ...` |
+| 重构 | `/build` + `/test` | `refactor(<scope>): ...` |

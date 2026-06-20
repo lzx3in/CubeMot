@@ -25,6 +25,7 @@ static foc_t g_motor_foc;
 static observer_t g_motor_observer;
 static volatile bool g_isr_running = false;
 static volatile uint32_t g_isr_count = 0;
+static volatile bool g_observer_override = true;  /* ISR updates theta from observer */
 
 /* ── Public accessors ────────────────────────────────── */
 
@@ -73,9 +74,11 @@ static void foc_tim1_isr(void *arg)
                   g_motor_foc.state.i_alpha,
                   g_motor_foc.state.i_beta);
 
-    /* Update FOC angle from observer */
-    g_motor_foc.state.theta_elec = g_motor_observer.theta_elec;
-    g_motor_foc.state.omega_elec = g_motor_observer.omega_elec;
+    /* Update FOC angle from observer (unless motor_ctrl overrides theta) */
+    if (g_observer_override) {
+        g_motor_foc.state.theta_elec = g_motor_observer.theta_elec;
+        g_motor_foc.state.omega_elec = g_motor_observer.omega_elec;
+    }
 
     g_isr_count++;
 }
@@ -134,7 +137,9 @@ void foc_isr_start(void)
     }
     g_isr_running = true;
     g_isr_count = 0;
-    LOG_INF("FOC ISR started");
+    /* Start TIM1 counter to generate TRGO for ADC trigger */
+    LL_TIM_EnableCounter(TIM1);
+    LOG_INF("FOC ISR started (TIM1 counting)");
 }
 
 void foc_isr_stop(void)
@@ -144,10 +149,22 @@ void foc_isr_stop(void)
     }
     g_isr_running = false;
     foc_pwm_set_duty(0.0f, 0.0f, 0.0f);
+    /* Stop TIM1 counter */
+    LL_TIM_DisableCounter(TIM1);
     LOG_INF("FOC ISR stopped");
 }
 
 void foc_isr_set_vbus(float vbus)
 {
     g_motor_foc.state.v_bus = vbus;
+}
+
+void foc_isr_set_observer_override(bool override)
+{
+    g_observer_override = override;
+}
+
+bool foc_isr_get_observer_override(void)
+{
+    return g_observer_override;
 }

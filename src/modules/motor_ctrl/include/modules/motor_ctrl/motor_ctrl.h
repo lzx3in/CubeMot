@@ -19,6 +19,8 @@ extern "C" {
 #include <stdint.h>
 #include <stdbool.h>
 #include "foc_types.h"
+#include "foc_core.h"
+#include "observer.h"
 
 /* ── Configuration ───────────────────────────────────── */
 
@@ -38,18 +40,19 @@ typedef enum {
 /* ── API ─────────────────────────────────────────────── */
 
 /**
- * @brief  Initialize motor control module
+ * @brief  Initialize motor control instance with shared FOC/observer
  *
- * Must be called before any other motor_ctrl functions.
- * Initializes FOC core, observer, speed PID, and subscribes
- * to motor_cmd topic.
+ * The foc_t and observer_t are owned by foc_isr (30kHz ISR context).
+ * motor_ctrl uses them for speed loop and state publishing.
  *
  * @param  motor_id     Motor index (0-based)
  * @param  config       Motor parameters (Flash-resident)
- * @param  pole_pairs   Number of pole pairs
+ * @param  foc          Shared FOC object (from foc_isr)
+ * @param  obs          Shared observer object (from foc_isr)
  * @return 0 on success
  */
-int motor_ctrl_init(uint8_t motor_id, const foc_motor_config_t *config);
+int motor_ctrl_init(uint8_t motor_id, const foc_motor_config_t *config,
+                    foc_t *foc, observer_t *obs);
 
 /**
  * @brief  Enter the motor control thread

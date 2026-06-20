@@ -15,6 +15,7 @@
 #include "observer.h"
 #include "foc_pwm.h"
 #include "foc_adc.h"
+#include "foc_isr.h"
 #include "pid.h"
 #include "topics/topics.h"
 #include "common_time.h"
@@ -43,8 +44,8 @@ LOG_MODULE_REGISTER(motor_ctrl, LOG_LEVEL_INF);
 typedef struct {
     bool initialized;
     uint8_t motor_id;
-    foc_t foc;
-    observer_t obs;
+    foc_t *foc;             /* Shared with foc_isr (30kHz ISR context) */
+    observer_t *obs;        /* Shared with foc_isr */
     PID_t speed_pid;
     motor_run_state_t state;
 
@@ -77,7 +78,8 @@ static void speed_pid_init(PID_t *pid)
 
 /* ── Init ─────────────────────────────────────────────── */
 
-int motor_ctrl_init(uint8_t motor_id, const foc_motor_config_t *config)
+int motor_ctrl_init(uint8_t motor_id, const foc_motor_config_t *config,
+                    foc_t *foc, observer_t *obs)
 {
     if (motor_id >= MAX_MOTORS) {
         LOG_ERR("motor_id %u >= MAX_MOTORS %u", motor_id, MAX_MOTORS);
@@ -92,18 +94,9 @@ int motor_ctrl_init(uint8_t motor_id, const foc_motor_config_t *config)
 
     m->motor_id = motor_id;
 
-    /* Initialize FOC core */
-    foc_init(&m->foc, config);
-
-    /* Initialize observer (from workbench gains) */
-    float dt = 1.0f / 30000.0f;
-    float gain1 = -22528.0f / 16384.0f;
-    float gain2 = 31586.0f / 4096.0f;
-    float pll_kp = 195.0f / 16384.0f;
-    float pll_ki = 5.0f / 65535.0f;
-
-    observer_init(&m->obs, config->rs, config->ls, dt,
-                  gain1, gain2, pll_kp, pll_ki);
+    /* Use shared FOC and observer from ISR */
+    m->foc = foc;
+    m->obs = obs;
 
     /* Initialize speed PID */
     speed_pid_init(&m->speed_pid);
@@ -115,7 +108,7 @@ int motor_ctrl_init(uint8_t motor_id, const foc_motor_config_t *config)
     m->initialized = true;
     g_motor_count++;
 
-    LOG_INF("Motor %u initialized (%u total)", motor_id, g_motor_count);
+    LOG_INF("Motor %u initialized (%u total, shared FOC)", motor_id, g_motor_count);
     return 0;
 }
 
@@ -128,9 +121,9 @@ static void start_phase1(motor_instance_t *m)
     m->phase_duration_ms = PHASE1_DURATION_MS;
     m->consecutive_ok = 0;
 
-    m->foc.state.theta_elec = 0.0f;
-    m->foc.state.i_d_ref = PHASE1_ALIGN_I;
-    m->foc.state.i_q_ref = 0.0f;
+    m->foc->state.theta_elec = 0.0f;
+    m->foc->state.i_d_ref = PHASE1_ALIGN_I;
+    m->foc->state.i_q_ref = 0.0f;
 }
 
 static void start_phase2(motor_instance_t *m)
@@ -139,8 +132,8 @@ static void start_phase2(motor_instance_t *m)
     m->phase_elapsed_ms = 0;
     m->phase_duration_ms = PHASE2_DURATION_MS;
 
-    observer_reset_convergence(&m->obs);
-    m->obs.theta_elec = 0.0f;
+    observer_reset_convergence(m->obs);
+    m->obs->theta_elec = 0.0f;
 }
 
 static void transition_to_closed_loop(motor_instance_t *m)
@@ -156,9 +149,11 @@ static void process_command(motor_instance_t *m, const motor_cmd_t *cmd)
     switch (cmd->cmd) {
     case MOTOR_CMD_START:
         if (m->state == MOTOR_STATE_IDLE) {
-            m->foc.state.i_q_ref = 0.0f;
-            m->foc.state.i_d_ref = 0.0f;
+            m->foc->state.i_q_ref = 0.0f;
+            m->foc->state.i_d_ref = 0.0f;
             m->target_speed_rpm = cmd->target_speed_rpm;
+            foc_isr_set_observer_override(false);  /* motor_ctrl controls theta */
+            foc_isr_start();
             foc_pwm_enable();
             start_phase1(m);
             LOG_INF("Motor %u START: target=%d RPM",
@@ -167,18 +162,22 @@ static void process_command(motor_instance_t *m, const motor_cmd_t *cmd)
         break;
     case MOTOR_CMD_STOP:
         if (m->state != MOTOR_STATE_IDLE) {
+            foc_isr_set_observer_override(true);  /* ISR resumes theta control */
+            foc_isr_stop();
             foc_pwm_disable();
-            m->foc.state.i_q_ref = 0.0f;
-            m->foc.state.i_d_ref = 0.0f;
+            m->foc->state.i_q_ref = 0.0f;
+            m->foc->state.i_d_ref = 0.0f;
             pid_reset_integral(&m->speed_pid);
             m->state = MOTOR_STATE_IDLE;
             LOG_INF("Motor %u STOP", m->motor_id);
         }
         break;
     case MOTOR_CMD_EMERGENCY:
+        foc_isr_set_observer_override(true);
+        foc_isr_stop();
         foc_pwm_disable();
-        m->foc.state.i_q_ref = 0.0f;
-        m->foc.state.i_d_ref = 0.0f;
+        m->foc->state.i_q_ref = 0.0f;
+        m->foc->state.i_d_ref = 0.0f;
         m->state = MOTOR_STATE_IDLE;
         LOG_ERR("Motor %u emergency stop!", m->motor_id);
         break;
@@ -194,6 +193,7 @@ static void run_speed_loop(motor_instance_t *m)
         break;
 
     case MOTOR_STATE_ALIGN:
+        foc_isr_set_observer_override(false);  /* motor_ctrl owns theta */
         m->phase_elapsed_ms += 1;
         if (m->phase_elapsed_ms >= m->phase_duration_ms) {
             start_phase2(m);
@@ -201,32 +201,33 @@ static void run_speed_loop(motor_instance_t *m)
         break;
 
     case MOTOR_STATE_START: {
+        foc_isr_set_observer_override(false);  /* motor_ctrl owns theta */
         m->phase_elapsed_ms += 1;
 
         float progress = (float)m->phase_elapsed_ms / (float)m->phase_duration_ms;
         if (progress > 1.0f) progress = 1.0f;
         float ramp_speed = progress * PHASE2_FINAL_SPEED;
 
-        float omega_ref = foc_rpm_to_rads(ramp_speed, m->foc.config->pole_pairs);
-        m->foc.state.theta_elec += omega_ref * (1.0f / SPEED_LOOP_HZ);
-        while (m->foc.state.theta_elec >= 6.283185307f)
-            m->foc.state.theta_elec -= 6.283185307f;
+        float omega_ref = foc_rpm_to_rads(ramp_speed, m->foc->config->pole_pairs);
+        m->foc->state.theta_elec += omega_ref * (1.0f / SPEED_LOOP_HZ);
+        while (m->foc->state.theta_elec >= 6.283185307f)
+            m->foc->state.theta_elec -= 6.283185307f;
 
-        m->foc.state.i_d_ref = 0.0f;
-        m->foc.state.i_q_ref = PHASE2_I;
+        m->foc->state.i_d_ref = 0.0f;
+        m->foc->state.i_q_ref = PHASE2_I;
 
-        observer_step(&m->obs,
-                      m->foc.state.v_alpha, m->foc.state.v_beta,
-                      m->foc.state.i_alpha, m->foc.state.i_beta);
+        observer_step(m->obs,
+                      m->foc->state.v_alpha, m->foc->state.v_beta,
+                      m->foc->state.i_alpha, m->foc->state.i_beta);
 
         float est_speed = foc_rads_to_rpm(
-            __builtin_fabsf(m->obs.omega_elec), m->foc.config->pole_pairs);
+            __builtin_fabsf(m->obs->omega_elec), m->foc->config->pole_pairs);
 
         if (est_speed > OBS_MIN_SPEED_RPM) {
             m->consecutive_ok++;
             if (m->consecutive_ok >= NB_CONSECUTIVE_OK) {
                 transition_to_closed_loop(m);
-                m->foc.state.theta_elec = m->obs.theta_elec;
+                m->foc->state.theta_elec = m->obs->theta_elec;
             }
         } else {
             m->consecutive_ok = 0;
@@ -235,16 +236,17 @@ static void run_speed_loop(motor_instance_t *m)
     }
 
     case MOTOR_STATE_RUN: {
+        foc_isr_set_observer_override(true);  /* ISR owns theta from observer */
         float speed_meas = foc_rads_to_rpm(
-            __builtin_fabsf(m->obs.omega_elec), m->foc.config->pole_pairs);
+            __builtin_fabsf(m->obs->omega_elec), m->foc->config->pole_pairs);
 
         float iq_ref = pid_calculate(&m->speed_pid,
                                      m->target_speed_rpm, speed_meas, 0.0f,
                                      1.0f / SPEED_LOOP_HZ);
 
-        m->foc.state.i_d_ref = 0.0f;
-        m->foc.state.i_q_ref = iq_ref;
-        m->foc.state.theta_elec = m->obs.theta_elec;
+        m->foc->state.i_d_ref = 0.0f;
+        m->foc->state.i_q_ref = iq_ref;
+        m->foc->state.theta_elec = m->obs->theta_elec;
         break;
     }
 
@@ -261,10 +263,10 @@ static void publish_state(motor_instance_t *m)
         .motor_id = m->motor_id,
         .state = (uint8_t)m->state,
         .speed_rpm = foc_rads_to_rpm(
-            __builtin_fabsf(m->obs.omega_elec), m->foc.config->pole_pairs),
-        .i_d = m->foc.state.i_d,
-        .i_q = m->foc.state.i_q,
-        .v_bus = m->foc.state.v_bus,
+            __builtin_fabsf(m->obs->omega_elec), m->foc->config->pole_pairs),
+        .i_d = m->foc->state.i_d,
+        .i_q = m->foc->state.i_q,
+        .v_bus = m->foc->state.v_bus,
         .faults = 0,
         .timestamp = common_get_timestamp_ms(),
     };
@@ -277,23 +279,10 @@ void motor_ctrl_thread(void)
 {
     k_sleep(K_MSEC(100));
 
-    /* Initialize hardware once */
+    /* Create subscriber (shared by all motors).
+     * Hardware (PWM, ADC, ISR) is already initialized by app_init.
+     * ADC offsets are set in motor_ctrl_init() via foc_isr. */
     if (!g_hw_initialized) {
-        foc_pwm_init();
-        foc_adc_init();
-
-        int16_t ia_off, ib_off, ic_off;
-        foc_adc_get_offsets(&ia_off, &ib_off, &ic_off);
-
-        for (uint8_t i = 0; i < MAX_MOTORS; i++) {
-            if (g_motors[i].initialized) {
-                g_motors[i].foc.state.adc_ia_offset = ia_off;
-                g_motors[i].foc.state.adc_ib_offset = ib_off;
-                g_motors[i].foc.state.adc_ic_offset = ic_off;
-            }
-        }
-
-        /* Create subscriber (shared by all motors) */
         g_cmd_sub = msghub_create_subscriber(MSGHUB_TOPIC(motor_cmd), 0);
         g_hw_initialized = true;
     }

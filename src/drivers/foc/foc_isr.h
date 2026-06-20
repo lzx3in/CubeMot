@@ -63,3 +63,20 @@ bool foc_isr_is_running(void);
  * @param  vbus  Bus voltage in Volts
  */
 void foc_isr_set_vbus(float vbus);
+
+/**
+ * @brief  Enable/disable observer theta override
+ *
+ * When disabled (false), the ISR does NOT write observer's theta_elec
+ * into the FOC state. Used by motor_ctrl during startup (ALIGN/START)
+ * when motor_ctrl controls theta_elec directly.
+ *
+ * @param  override  true = ISR updates theta from observer (default)
+ */
+void foc_isr_set_observer_override(bool override);
+
+/**
+ * @brief  Check if observer theta override is active
+ * @return true if ISR is NOT updating theta from observer
+ */
+bool foc_isr_get_observer_override(void);

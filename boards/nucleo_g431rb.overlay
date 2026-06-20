@@ -48,3 +48,17 @@
 &spi1 {
 	status = "disabled";
 };
+
+/*
+ * ADC1/ADC2 kept DISABLED — Zephyr ADC driver must NOT initialize them.
+ * Our foc_adc_init() handles all ADC configuration directly via LL registers.
+ * The ADC12 bus clock is enabled manually in foc_adc_init() via
+ * LL_AHB2_GRP1_EnableClock(LL_AHB2_GRP1_PERIPH_ADC12).
+ */
+&adc1 {
+	status = "disabled";
+};
+
+&adc2 {
+	status = "disabled";
+};

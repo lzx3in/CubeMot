@@ -113,9 +113,11 @@ endif()
 if(CONFIG_MODULE_SERIAL_CMD_ENABLE)
     target_include_directories(app PRIVATE
         comm/serial_cmd/include
+        libs/serial_protocol
     )
     target_sources(app PRIVATE
         comm/serial_cmd/serial_cmd.c
+        libs/serial_protocol/serial_protocol.c
     )
 endif()
 

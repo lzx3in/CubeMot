@@ -13,9 +13,13 @@
  *   0x03  CMD_DISARM     → {} (0 bytes)
  *   0x04  CMD_ESTOP      → {} (0 bytes)
  *   0x05  CMD_RESET      → {} (0 bytes)
+ *   0x06  CMD_PING       → {} (0 bytes)
+ *   0x07  CMD_MOTOR_START→ {motor_id(u8), speed_rpm(f32)} (5 bytes)
+ *   0x08  CMD_MOTOR_STOP → {motor_id(u8)} (1 byte)
+ *   0x10  CMD_TEST       → FOC test command
  *   0x80  RSP_STATUS     → {state(u8), fault(u8)}  (2 bytes)
  *   0x81  RSP_TELEMETRY  → {x(f32), y(f32), yaw(f32), vx(f32), wz(f32)} (20 bytes)
- *   0x82  RSP_MOTOR      → {motor_id(u8), state(u8), speed(i16), vbus(u16)} (6 bytes)
+ *   0x82  RSP_MOTOR      → {motor_id(u8), state(u8), speed(i16), vbus(u16), id(f32), iq(f32)} (14 bytes)
  *
  * This module bridges UART ↔ msghub topics.
  * Future: ESP32 AT firmware can translate these frames to MQTT.
@@ -41,6 +45,8 @@ extern "C" {
 #define CMD_ID_ESTOP            0x04
 #define CMD_ID_RESET            0x05
 #define CMD_ID_PING             0x06
+#define CMD_ID_MOTOR_START      0x07  /* Start motor startup sequence */
+#define CMD_ID_MOTOR_STOP       0x08  /* Stop motor */
 #define CMD_ID_TEST             0x10  /* FOC test command */
 
 /* Response IDs (device → host) */
@@ -48,6 +54,7 @@ extern "C" {
 #define RSP_ID_TELEMETRY        0x81
 #define RSP_ID_MOTOR            0x82
 #define RSP_ID_PONG             0x86
+#define RSP_ID_DIAG             0x87  /* FOC debug diagnostics */
 
 /* Thread priorities */
 #define SERIAL_RX_THREAD_PRIORITY  8

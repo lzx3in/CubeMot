@@ -1,10 +1,20 @@
 #include "app.h"
 
+#if CONFIG_MODULE_BLINK_ENABLE
 #include "modules/blink/blink.h"
+#endif
+#if CONFIG_MODULE_LED_CONTROLLER_ENABLE
 #include "modules/led_controller/led_controller.h"
+#endif
+#if CONFIG_MODULE_BUTTON_DETECTOR_ENABLE
 #include "modules/button_detector/button_detector.h"
+#endif
 #include "modules/commander/commander.h"
 #include "modules/vehicle/vehicle.h"
+#if CONFIG_MODULE_MOTOR_CTRL_ENABLE
+#include "modules/motor_ctrl/motor_ctrl.h"
+#include "common/motor_params.h"
+#endif
 #include "comm/serial_cmd.h"
 #include "drivers/foc/foc_pwm.h"
 #include "drivers/foc/foc_adc.h"
@@ -37,6 +47,11 @@ static int init_modules(void)
     foc_pwm_init();
     foc_adc_init();
     foc_isr_init();  /* ISR initialized but NOT started yet */
+
+    /* Initialize motor control instances (V1: 1 motor, shared FOC with ISR) */
+#if CONFIG_MODULE_MOTOR_CTRL_ENABLE
+    motor_ctrl_init(0, &g_motor_params, foc_isr_get_foc(), foc_isr_get_observer());
+#endif
 
 #if CONFIG_MODULE_COMMANDER_ENABLE
     commander_init();
@@ -76,6 +91,12 @@ static struct k_thread serial_rx_thread_data;
 static struct k_thread serial_tx_thread_data;
 #endif
 
+#if CONFIG_MODULE_MOTOR_CTRL_ENABLE
+#define MOTOR_CTRL_STACK_SIZE 2048
+K_THREAD_STACK_DEFINE(motor_ctrl_stack, MOTOR_CTRL_STACK_SIZE);
+static struct k_thread motor_ctrl_thread_data;
+#endif
+
 static void start_threads(void)
 {
 #if CONFIG_MODULE_COMMANDER_ENABLE
@@ -85,6 +106,15 @@ static void start_threads(void)
                     NULL, NULL, NULL,
                     K_PRIO_COOP(7), 0, K_NO_WAIT);
     k_thread_name_set(&commander_thread_data, "commander");
+#endif
+
+#if CONFIG_MODULE_MOTOR_CTRL_ENABLE
+    k_thread_create(&motor_ctrl_thread_data, motor_ctrl_stack,
+                    MOTOR_CTRL_STACK_SIZE,
+                    (k_thread_entry_t)motor_ctrl_thread,
+                    NULL, NULL, NULL,
+                    K_PRIO_COOP(5), 0, K_NO_WAIT);
+    k_thread_name_set(&motor_ctrl_thread_data, "motor_ctrl");
 #endif
 
 #if CONFIG_MODULE_VEHICLE_ENABLE

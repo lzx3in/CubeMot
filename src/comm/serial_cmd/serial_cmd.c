@@ -57,6 +57,7 @@ static msghub_subscriber_t g_commander_status_sub;
 
 static msghub_publisher_t g_cmd_vel_pub;
 static msghub_publisher_t g_commander_cmd_pub;
+static msghub_publisher_t g_motor_cmd_pub;
 
 /* ── Ring buffer helpers ─────────────────────────────── */
 
@@ -209,6 +210,34 @@ static void process_command(const parsed_frame_t *frame)
         break;
     }
 
+    case CMD_ID_MOTOR_START: {
+        if (frame->len < 5) {
+            LOG_WRN("CMD_MOTOR_START: invalid length %u", frame->len);
+            break;
+        }
+        motor_cmd_t cmd = {0};
+        cmd.motor_id = frame->payload[0];
+        cmd.cmd = MOTOR_CMD_START;
+        memcpy(&cmd.target_speed_rpm, &frame->payload[1], 4);
+        msghub_publish(g_motor_cmd_pub, &cmd);
+        LOG_INF("MOTOR START: id=%u speed=%.0f RPM",
+                cmd.motor_id, (double)cmd.target_speed_rpm);
+        break;
+    }
+
+    case CMD_ID_MOTOR_STOP: {
+        if (frame->len < 1) {
+            LOG_WRN("CMD_MOTOR_STOP: invalid length %u", frame->len);
+            break;
+        }
+        motor_cmd_t cmd = {0};
+        cmd.motor_id = frame->payload[0];
+        cmd.cmd = MOTOR_CMD_STOP;
+        msghub_publish(g_motor_cmd_pub, &cmd);
+        LOG_INF("MOTOR STOP: id=%u", cmd.motor_id);
+        break;
+    }
+
     case CMD_ID_PING: {
         uint8_t pong_payload = 0x00;
         send_response(RSP_ID_PONG, &pong_payload, 1);
@@ -241,6 +270,55 @@ static void process_command(const parsed_frame_t *frame)
             LOG_INF("TEST: Set Iq=%dmA", (int)(param * 1000.0f));
             foc_isr_get_foc()->state.i_q_ref = param;
             break;
+        case 3: {
+            /* ADC register-level diagnostic */
+            extern void foc_adc_sw_trigger_test(void);
+            extern void foc_adc_get_sw_diag(int16_t *ia, int16_t *ib, int16_t *ic,
+                                            int16_t *vbus_raw, float *vbus_v, bool *valid);
+
+            /* Read COMMON_CCR for CKMODE */
+            uint32_t common_ccr = ADC12_COMMON->CCR;
+
+            /* Read ADC state BEFORE SW trigger */
+            uint32_t adc1_isr_before = ADC1->ISR;
+            uint32_t adc1_jsqr = ADC1->JSQR;
+            int16_t jdr1_before = (int16_t)LL_ADC_INJ_ReadConversionData12(ADC1, LL_ADC_INJ_RANK_1);
+            int16_t jdr2_before = (int16_t)LL_ADC_INJ_ReadConversionData12(ADC1, LL_ADC_INJ_RANK_2);
+            int16_t adc2_jdr1_before = (int16_t)LL_ADC_INJ_ReadConversionData12(ADC2, LL_ADC_INJ_RANK_1);
+
+            /* Run SW trigger test */
+            foc_adc_sw_trigger_test();
+
+            int16_t sw_ia, sw_ib, sw_ic, sw_vbus_raw;
+            float sw_vbus_v;
+            bool sw_valid;
+            foc_adc_get_sw_diag(&sw_ia, &sw_ib, &sw_ic,
+                                &sw_vbus_raw, &sw_vbus_v, &sw_valid);
+
+            /* Read ADC state AFTER SW trigger */
+            uint32_t adc1_isr_after = ADC1->ISR;
+            uint16_t adc2_isr_low = (uint16_t)(ADC2->ISR & 0xFFFF);
+            int16_t adc2_jdr2_after = (int16_t)LL_ADC_INJ_ReadConversionData12(ADC2, LL_ADC_INJ_RANK_2);
+
+            /* Pack RSP_DIAG (32 bytes) — ADC diagnostic v2 */
+            uint8_t dpayload[32];
+            memcpy(&dpayload[0],  &adc1_isr_before, 4);
+            memcpy(&dpayload[4],  &adc1_jsqr, 2);
+            memcpy(&dpayload[6],  &jdr1_before, 2);
+            memcpy(&dpayload[8],  &jdr2_before, 2);
+            memcpy(&dpayload[10], &adc2_jdr1_before, 2);
+            memcpy(&dpayload[12], &sw_ia, 2);
+            memcpy(&dpayload[14], &sw_ib, 2);
+            memcpy(&dpayload[16], &sw_ic, 2);
+            memcpy(&dpayload[18], &sw_vbus_raw, 2);
+            memcpy(&dpayload[20], &adc1_isr_after, 4);
+            memcpy(&dpayload[24], &adc2_isr_low, 2);
+            dpayload[26] = sw_valid ? 1 : 0;
+            dpayload[27] = (uint8_t)((common_ccr >> 16) & 0xFF);
+            memcpy(&dpayload[28], &adc2_jdr2_after, 2);
+            send_response(RSP_ID_DIAG, dpayload, 32);
+            break;
+        }
         default:
             LOG_WRN("TEST: unknown test_id %u", test_id);
             break;
@@ -282,6 +360,7 @@ void serial_cmd_tx_thread(void)
 
     uint32_t status_counter = 0;
     uint32_t telemetry_counter = 0;
+    uint32_t diag_counter = 0;
 
     while (1) {
         /* STATUS @ 10Hz */
@@ -327,15 +406,36 @@ void serial_cmd_tx_thread(void)
             motor_state_t mstate;
             msghub_receive(g_motor_state_sub, &mstate);
 
-            uint8_t payload[6];
+            uint8_t payload[14];
             payload[0] = mstate.motor_id;
             payload[1] = mstate.state;
             int16_t speed = (int16_t)mstate.speed_rpm;
             memcpy(&payload[2], &speed, 2);
             uint16_t vbus = (uint16_t)(mstate.v_bus * 100.0f);
             memcpy(&payload[4], &vbus, 2);
+            memcpy(&payload[6], &mstate.i_d, 4);
+            memcpy(&payload[10], &mstate.i_q, 4);
 
-            send_response(RSP_ID_MOTOR, payload, 6);
+            send_response(RSP_ID_MOTOR, payload, 14);
+        }
+
+        /* DIAG: FOC debug (raw ADC + duty) @ 5Hz */
+        if (++diag_counter >= 20) {
+            diag_counter = 0;
+            foc_t *foc = foc_isr_get_foc();
+            uint8_t dpayload[20];
+            int16_t adc_ia = foc->state.adc_ia;
+            int16_t adc_ib = foc->state.adc_ib;
+            int16_t adc_ic = foc->state.adc_ic;
+            int16_t off_ia = foc->state.adc_ia_offset;
+            memcpy(&dpayload[0], &adc_ia, 2);
+            memcpy(&dpayload[2], &adc_ib, 2);
+            memcpy(&dpayload[4], &adc_ic, 2);
+            memcpy(&dpayload[6], &off_ia, 2);
+            memcpy(&dpayload[8], &foc->state.duty_a, 4);
+            memcpy(&dpayload[12], &foc->state.i_d_ref, 4);
+            memcpy(&dpayload[16], &foc->state.i_q_ref, 4);
+            send_response(RSP_ID_DIAG, dpayload, 20);
         }
 
         k_msleep(10);
@@ -367,6 +467,7 @@ int serial_cmd_init(void)
 
     g_cmd_vel_pub = msghub_create_publisher(MSGHUB_TOPIC(cmd_vel));
     g_commander_cmd_pub = msghub_create_publisher(MSGHUB_TOPIC(commander_cmd));
+    g_motor_cmd_pub = msghub_create_publisher(MSGHUB_TOPIC(motor_cmd));
 
     LOG_INF("Serial command init: LPUART1 @ 115200 baud (IRQ RX)");
     return 0;

@@ -14,6 +14,7 @@
  */
 
 #include "modules/vehicle/vehicle.h"
+#include "modules/commander/commander.h"
 #include "topics/topics.h"
 #include "common_time.h"
 #include "common_error.h"
@@ -133,6 +134,11 @@ static void update_odometry(float dt, float v_left, float v_right)
 
 static void process_cmd_vel(const cmd_vel_t *vel)
 {
+    // Only process commands when Commander is in ACTIVE state
+    if (commander_get_state() != CMD_STATE_ACTIVE) {
+        return;
+    }
+    
     // Clamp inputs
     float linear = clampf(vel->linear_x,
                           -g_config.max_speed_ms,
@@ -207,20 +213,24 @@ int vehicle_init(const vehicle_config_t *config)
 
 /* ── Main thread ─────────────────────────────────────── */
 
-void vehicle_thread(void)
+void vehicle_thread(void *arg1, void *arg2, void *arg3)
 {
-    k_sleep(K_MSEC(100));  // Wait for other modules
+    ARG_UNUSED(arg1);
+    ARG_UNUSED(arg2);
+    ARG_UNUSED(arg3);
+
+    /* Startup delay: allow msghub topics and downstream modules to initialize */
+    k_sleep(K_MSEC(100));
     LOG_INF("Vehicle thread started");
     
     uint32_t pub_counter = 0;
     
     while (1) {
         /* ── Check cmd_vel ───────────────────────────── */
+        cmd_vel_t vel;
         bool updated = false;
-        msghub_subscriber_check(g_cmd_vel_sub, &updated);
+        msghub_subscriber_update(g_cmd_vel_sub, &vel, &updated);
         if (updated) {
-            cmd_vel_t vel;
-            msghub_receive(g_cmd_vel_sub, &vel);
             process_cmd_vel(&vel);
         }
         

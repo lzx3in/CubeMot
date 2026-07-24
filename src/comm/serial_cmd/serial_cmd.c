@@ -107,7 +107,7 @@ static void uart_irq_callback(const struct device *dev, void *user_data)
 typedef struct {
     uint8_t cmd_id;
     uint8_t len;
-    uint8_t payload[SERIAL_MAX_PAYLOAD];
+    uint8_t payload[SP_MAX_PAYLOAD];
 } parsed_frame_t;
 
 static int parse_frame_from_ring(parsed_frame_t *frame)
@@ -334,8 +334,13 @@ static void process_command(const parsed_frame_t *frame)
 
 /* ── RX thread ───────────────────────────────────────── */
 
-void serial_cmd_rx_thread(void)
+void serial_cmd_rx_thread(void *arg1, void *arg2, void *arg3)
 {
+    ARG_UNUSED(arg1);
+    ARG_UNUSED(arg2);
+    ARG_UNUSED(arg3);
+
+    /* Startup delay: wait for UART hardware and msghub topics to be ready */
     k_sleep(K_MSEC(300));
     LOG_INF("Serial RX thread started (IRQ-driven)");
 
@@ -353,8 +358,13 @@ void serial_cmd_rx_thread(void)
 
 /* ── TX thread ───────────────────────────────────────── */
 
-void serial_cmd_tx_thread(void)
+void serial_cmd_tx_thread(void *arg1, void *arg2, void *arg3)
 {
+    ARG_UNUSED(arg1);
+    ARG_UNUSED(arg2);
+    ARG_UNUSED(arg3);
+
+    /* Startup delay: wait for UART hardware and msghub topics to be ready */
     k_sleep(K_MSEC(300));
     LOG_INF("Serial TX thread started");
 
@@ -367,12 +377,10 @@ void serial_cmd_tx_thread(void)
         if (++status_counter >= 10) {
             status_counter = 0;
 
+            commander_status_t status;
             bool updated = false;
-            msghub_subscriber_check(g_commander_status_sub, &updated);
+            msghub_subscriber_update(g_commander_status_sub, &status, &updated);
             if (updated) {
-                commander_status_t status;
-                msghub_receive(g_commander_status_sub, &status);
-
                 uint8_t payload[2] = { (uint8_t)status.state, (uint8_t)status.fault_code };
                 send_response(RSP_ID_STATUS, payload, 2);
             }
@@ -382,12 +390,10 @@ void serial_cmd_tx_thread(void)
         if (++telemetry_counter >= 5) {
             telemetry_counter = 0;
 
+            vehicle_state_t state;
             bool updated = false;
-            msghub_subscriber_check(g_vehicle_state_sub, &updated);
+            msghub_subscriber_update(g_vehicle_state_sub, &state, &updated);
             if (updated) {
-                vehicle_state_t state;
-                msghub_receive(g_vehicle_state_sub, &state);
-
                 uint8_t payload[20];
                 memcpy(&payload[0], &state.x, 4);
                 memcpy(&payload[4], &state.y, 4);
@@ -400,12 +406,10 @@ void serial_cmd_tx_thread(void)
         }
 
         /* MOTOR state (on change) */
+        motor_state_t mstate;
         bool updated = false;
-        msghub_subscriber_check(g_motor_state_sub, &updated);
+        msghub_subscriber_update(g_motor_state_sub, &mstate, &updated);
         if (updated) {
-            motor_state_t mstate;
-            msghub_receive(g_motor_state_sub, &mstate);
-
             uint8_t payload[14];
             payload[0] = mstate.motor_id;
             payload[1] = mstate.state;

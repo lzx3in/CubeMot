@@ -87,44 +87,19 @@ static void send_motor_cmd(uint8_t motor_id, motor_cmd_type_t type, float speed_
 
 /* ── cmd_vel processing ──────────────────────────────── */
 
+/**
+ * @brief  Process incoming cmd_vel command
+ *
+ * Commander's role is state gating and timeout tracking only.
+ * Actual kinematics are handled by the Vehicle module.
+ * Vehicle checks commander_get_state() before processing.
+ */
 static void process_cmd_vel(const cmd_vel_t *vel)
 {
+    (void)vel;  // Content handled by Vehicle module
+    
+    // Track last command time for timeout detection
     g_last_cmd_time_ms = common_get_timestamp_ms();
-    
-    if (g_state != CMD_STATE_ACTIVE) {
-        return;  // Only active in ACTIVE state
-    }
-    
-    // V2: Simple 2-wheel drive (left/right motors)
-    // Ackermann mixing will be in vehicle module later
-    
-    float linear = vel->linear_x;   // m/s
-    float angular = vel->angular_z; // rad/s
-    
-    // Convert to wheel speeds (simple differential drive for now)
-    // TODO: Replace with Ackermann mixer in vehicle module
-    
-    const float WHEEL_BASE_M = 0.3f;      // 30cm wheelbase
-    const float WHEEL_RADIUS_M = 0.05f;   // 5cm wheel radius
-    const float MAX_SPEED_RPM = 1000.0f;
-    
-    // Differential drive kinematics
-    float v_left = linear - angular * WHEEL_BASE_M / 2.0f;
-    float v_right = linear + angular * WHEEL_BASE_M / 2.0f;
-    
-    // Convert m/s to RPM
-    float rpm_left = (v_left / (2.0f * 3.14159f * WHEEL_RADIUS_M)) * 60.0f;
-    float rpm_right = (v_right / (2.0f * 3.14159f * WHEEL_RADIUS_M)) * 60.0f;
-    
-    // Clamp
-    if (rpm_left > MAX_SPEED_RPM) rpm_left = MAX_SPEED_RPM;
-    if (rpm_left < -MAX_SPEED_RPM) rpm_left = -MAX_SPEED_RPM;
-    if (rpm_right > MAX_SPEED_RPM) rpm_right = MAX_SPEED_RPM;
-    if (rpm_right < -MAX_SPEED_RPM) rpm_right = -MAX_SPEED_RPM;
-    
-    // Send to motors (V2: 2 motors, V3: 4 motors)
-    send_motor_cmd(0, MOTOR_CMD_START, rpm_left);
-    send_motor_cmd(1, MOTOR_CMD_START, rpm_right);
 }
 
 /* ── Commander command processing ────────────────────── */
@@ -185,9 +160,14 @@ int commander_init(void)
 
 /* ── Main thread ─────────────────────────────────────── */
 
-void commander_thread(void)
+void commander_thread(void *arg1, void *arg2, void *arg3)
 {
-    k_sleep(K_MSEC(100));  // Wait for other modules
+    ARG_UNUSED(arg1);
+    ARG_UNUSED(arg2);
+    ARG_UNUSED(arg3);
+
+    /* Startup delay: allow msghub topics and downstream modules to initialize */
+    k_sleep(K_MSEC(100));
     
     transition_to(CMD_STATE_STANDBY);
     LOG_INF("Commander thread started");
@@ -196,20 +176,18 @@ void commander_thread(void)
     
     while (1) {
         /* ── Check cmd_vel ───────────────────────────── */
+        cmd_vel_t vel;
         bool updated = false;
-        msghub_subscriber_check(g_cmd_vel_sub, &updated);
+        msghub_subscriber_update(g_cmd_vel_sub, &vel, &updated);
         if (updated) {
-            cmd_vel_t vel;
-            msghub_receive(g_cmd_vel_sub, &vel);
             process_cmd_vel(&vel);
         }
         
         /* ── Check commander commands ────────────────── */
+        commander_cmd_t cmd;
         updated = false;
-        msghub_subscriber_check(g_cmd_sub, &updated);
+        msghub_subscriber_update(g_cmd_sub, &cmd, &updated);
         if (updated) {
-            commander_cmd_t cmd;
-            msghub_receive(g_cmd_sub, &cmd);
             process_commander_cmd(&cmd);
         }
         

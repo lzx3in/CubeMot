@@ -31,36 +31,36 @@ typedef enum {
 #define MSGHUB_TOPIC_INVALID NULL
 
 // ============================================================================
-// Topic 定义结构（只读，常量）
+// Topic definition structure (read-only, constant)
 // ============================================================================
 
 struct msghub_topic {
-    const char *name;    // Topic 名称
-    uint16_t msg_size;   // 消息大小（字节）
-    uint16_t queue_size; // 队列深度（预留，当前未使用）
-    uint8_t id;          // Topic ID（0 = 自动分配）
+    const char *name;    // Topic name
+    uint16_t msg_size;   // Message size (bytes)
+    uint16_t queue_size; // Queue depth (reserved, currently unused)
+    uint8_t id;          // Topic ID (0 = auto-assign)
 };
 
 // ============================================================================
 // Topic API
 // ============================================================================
 
-// 在头文件中声明一个 Topic
+// Declare a Topic in header file
 #define MSGHUB_TOPIC_DECLARE(_name) extern const struct msghub_topic __msghub_##_name
 
-// 在源文件中定义一个 Topic
+// Define a Topic in source file
 #define MSGHUB_TOPIC_DEFINE(_name, _msg_type, _queue_size)                                                             \
     const struct msghub_topic __msghub_##_name = {                                                                     \
         .name = #_name, .msg_size = sizeof(_msg_type), .queue_size = (_queue_size), .id = 0}
 
-// 获取 Topic 句柄
+// Get Topic handle
 #define MSGHUB_TOPIC(_name) (&__msghub_##_name)
 
 // ============================================================================
-// 类型安全的 Publisher/Subscriber 宏
+// Type-safe Publisher/Subscriber macros
 // ============================================================================
 
-// 在头文件中：声明类型安全的 API
+// In header file: declare type-safe API
 #define MSGHUB_PUBSUB_DECLARE(_name, _msg_type)                                                                        \
     typedef msghub_publisher_t _name##_pub_t;                                                                          \
     typedef msghub_subscriber_t _name##_sub_t;                                                                         \
@@ -73,7 +73,7 @@ struct msghub_topic {
     msghub_err_t _name##_receive(_name##_sub_t sub, _msg_type *data);                                                  \
     msghub_err_t _name##_try_receive(_name##_sub_t sub, _msg_type *data, bool *updated)
 
-// 在源文件中：实现类型安全的 API
+// In source file: implement type-safe API
 #define MSGHUB_PUBSUB_DEFINE(_name, _msg_type)                                                                         \
     _name##_pub_t _name##_create_publisher(void)                                                                       \
     {                                                                                                                  \
@@ -123,7 +123,7 @@ msghub_err_t msghub_publish(msghub_publisher_t pub, const void *data);
 // ISR-safe publish (call from interrupt context only)
 msghub_err_t msghub_publish_from_isr(msghub_publisher_t pub, const void *data);
 
-// 多实例支持
+// Multi-instance support
 msghub_publisher_t msghub_create_publisher_multi(msghub_topic_t topic, int *instance);
 
 // ============================================================================
@@ -168,7 +168,7 @@ msghub_err_t msghub_subscriber_set_callback(msghub_subscriber_t sub, msghub_sub_
 msghub_err_t msghub_subscriber_clear_callback(msghub_subscriber_t sub);
 
 // ============================================================================
-// 高级功能
+// Advanced features
 // ============================================================================
 
 #define MSGHUB_TIMEOUT_INFINITE 0xFFFFFFFF
@@ -178,14 +178,14 @@ msghub_err_t msghub_subscriber_poll(msghub_subscriber_t sub, uint32_t timeout_ms
 msghub_err_t msghub_subscriber_update(msghub_subscriber_t sub, void *data, bool *updated);
 
 // ============================================================================
-// Topic 查询功能
+// Topic query functions
 // ============================================================================
 
 bool msghub_topic_exists(msghub_topic_t topic, uint8_t instance);
 int msghub_topic_publisher_count(msghub_topic_t topic);
 
 // ============================================================================
-// 验证功能
+// Validation functions
 // ============================================================================
 
 bool msghub_publisher_valid(msghub_publisher_t pub);

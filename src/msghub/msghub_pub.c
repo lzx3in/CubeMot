@@ -175,28 +175,7 @@ msghub_err_t msghub_publish_from_isr(msghub_publisher_t handle, const void *data
 
     // Trigger callbacks for all subscribers from ISR context
     // Callbacks must use ISR-safe APIs!
-    for (int i = 0; i < MSGHUB_MAX_SUBSCRIBERS; i++) {
-        msghub_sub_slot_t *sub_slot = &g_sub_slots[i];
-
-        // Check if this subscriber is valid and subscribed to this topic
-        if (sub_slot->magic == MSGHUB_SUBSCRIBER_MAGIC && sub_slot->topic_idx == slot->topic_idx &&
-            sub_slot->instance == slot->instance && sub_slot->callback != NULL) {
-
-            // Update subscriber's generation before calling callback
-            sub_slot->last_generation = new_generation;
-
-            // Save callback info
-            msghub_sub_callback_t cb = sub_slot->callback;
-            void *ctx = sub_slot->callback_context;
-
-            // Encode subscriber handle
-            msghub_subscriber_t sub_handle;
-            msghub_core_encode_sub_handle(&sub_handle, (uint8_t)i);
-
-            // Call callback from ISR context - must use ISR-safe APIs!
-            cb(sub_handle, ctx);
-        }
-    }
+    msghub_trigger_callbacks(slot->topic_idx, slot->instance, new_generation);
 
     return MSGHUB_OK;
 }

@@ -7,10 +7,11 @@
  * Provides smooth angle interpolation (100Hz update rate).
  */
 
-#include "servo_ctrl.h"
+#include "modules/servo_ctrl/servo_ctrl.h"
 #include <zephyr/drivers/pwm.h>
 #include "topics/topics.h"
 #include "msghub/msghub.h"
+#include "common_time.h"
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <math.h>
@@ -126,7 +127,7 @@ void servo_ctrl_thread(void *arg1, void *arg2, void *arg3)
                 servo_state_t state = {
                     .servo_id = i,
                     .angle_deg = g_current_angles[i],
-                    .timestamp = k_uptime_get_32(),
+                    .timestamp = common_get_timestamp_ms(),
                 };
                 msghub_publish(g_servo_state_pub, &state);
             }

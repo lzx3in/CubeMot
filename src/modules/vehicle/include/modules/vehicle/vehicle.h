@@ -49,8 +49,12 @@ int vehicle_init(const vehicle_config_t *config);
  *   2. Compute wheel commands (Ackermann mixer)
  *   3. Integrate odometry
  *   4. Publish vehicle_state + motor_cmd + servo_cmd
+ *
+ * @param  arg1  Unused
+ * @param  arg2  Unused
+ * @param  arg3  Unused
  */
-void vehicle_thread(void);
+void vehicle_thread(void *arg1, void *arg2, void *arg3);
 
 /**
  * @brief  Reset odometry to (0, 0, 0)

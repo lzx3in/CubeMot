@@ -31,12 +31,7 @@ extern "C" {
 
 #include <stdint.h>
 
-/* ── Protocol constants ──────────────────────────────── */
-
-#define SERIAL_FRAME_HEAD_0     0xAA
-#define SERIAL_FRAME_HEAD_1     0x55
-#define SERIAL_MAX_PAYLOAD      32
-#define SERIAL_MAX_FRAME        (2 + 1 + 1 + SERIAL_MAX_PAYLOAD + 1)
+/* Protocol constants are defined in serial_protocol.h (SP_*) */
 
 /* Command IDs (host → device) */
 #define CMD_ID_VEL              0x01
@@ -77,16 +72,24 @@ int serial_cmd_init(void);
  *
  * Never returns. Reads UART, parses frames,
  * publishes to msghub topics.
+ *
+ * @param  arg1  Unused
+ * @param  arg2  Unused
+ * @param  arg3  Unused
  */
-void serial_cmd_rx_thread(void);
+void serial_cmd_rx_thread(void *arg1, void *arg2, void *arg3);
 
 /**
  * @brief  Serial command TX thread
  *
  * Never returns. Subscribes to msghub topics,
  * encodes frames, writes to UART.
+ *
+ * @param  arg1  Unused
+ * @param  arg2  Unused
+ * @param  arg3  Unused
  */
-void serial_cmd_tx_thread(void);
+void serial_cmd_tx_thread(void *arg1, void *arg2, void *arg3);
 
 #ifdef __cplusplus
 }

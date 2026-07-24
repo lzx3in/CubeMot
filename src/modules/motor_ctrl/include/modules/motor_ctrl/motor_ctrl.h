@@ -59,8 +59,12 @@ int motor_ctrl_init(uint8_t motor_id, const foc_motor_config_t *config,
  *
  * Never returns. Runs the 1kHz speed loop + startup sequence.
  * Called from a Zephyr thread context.
+ *
+ * @param  arg1  Unused
+ * @param  arg2  Unused
+ * @param  arg3  Unused
  */
-void motor_ctrl_thread(void);
+void motor_ctrl_thread(void *arg1, void *arg2, void *arg3);
 
 #ifdef __cplusplus
 }

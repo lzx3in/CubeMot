@@ -58,8 +58,12 @@ int commander_init(void);
  *   2. Update state machine
  *   3. Route cmd_vel to vehicle/motor
  *   4. Publish commander_status
+ *
+ * @param  arg1  Unused
+ * @param  arg2  Unused
+ * @param  arg3  Unused
  */
-void commander_thread(void);
+void commander_thread(void *arg1, void *arg2, void *arg3);
 
 /**
  * @brief  Get current commander state

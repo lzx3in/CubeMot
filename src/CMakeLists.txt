@@ -15,7 +15,6 @@ target_include_directories(app PRIVATE
     common/include
     msghub/include
     topics/include
-    drivers/include
     drivers/foc
     libs/pid
     libs/crc
@@ -120,7 +119,7 @@ endif()
 
 if(CONFIG_MODULE_SERVO_CTRL)
     target_include_directories(app PRIVATE
-        modules/servo_ctrl
+        modules/servo_ctrl/include
     )
     target_sources(app PRIVATE
         modules/servo_ctrl/servo_ctrl.c

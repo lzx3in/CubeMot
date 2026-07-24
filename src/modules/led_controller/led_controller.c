@@ -1,10 +1,13 @@
 #include "modules/led_controller/led_controller.h"
-#include "drivers/led.h"
+#include <zephyr/drivers/led.h>
 #include "topics/topics.h"
 #include "common_device.h"
 #include "common_time.h"
 #include "msghub/msghub.h"
 #include <zephyr/kernel.h>
+
+/* Board DTS: leds { compatible = "gpio-leds"; ... } */
+static const struct device *const led_dev = DEVICE_DT_GET(DT_NODELABEL(leds));
 
 K_SEM_DEFINE(g_led_cmd_sem, 0, 1);
 
@@ -48,9 +51,9 @@ static void led_ctrl_thread_fn(void *arg1, void *arg2, void *arg3)
 
             if (cubemot_device_led_is_valid((cubemot_device_led)cmd.led_id)) {
                 if (cmd.state) {
-                    cubemot_led_on(cmd.led_id);
+                    led_on(led_dev, cmd.led_id);
                 } else {
-                    cubemot_led_off(cmd.led_id);
+                    led_off(led_dev, cmd.led_id);
                 }
                 g_led.current_state[cmd.led_id] = cmd.state;
                 publish_led_state((cubemot_device_led)cmd.led_id, cmd.state);

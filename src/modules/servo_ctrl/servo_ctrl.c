@@ -8,7 +8,7 @@
  */
 
 #include "servo_ctrl.h"
-#include "servo.h"
+#include <zephyr/drivers/pwm.h>
 #include "topics/topics.h"
 #include "msghub/msghub.h"
 #include <zephyr/kernel.h>
@@ -24,6 +24,19 @@ LOG_MODULE_REGISTER(servo_ctrl, LOG_LEVEL_INF);
 #define SERVO_CTRL_UPDATE_HZ 100
 #define SERVO_STATE_PUBLISH_HZ 10
 
+#define MAX_SERVOS 2
+#define SERVO_PULSE_MIN_US 500
+#define SERVO_PULSE_MAX_US 2500
+#define SERVO_PULSE_CENTER_US 1500
+#define SERVO_ANGLE_MAX 90.0f
+
+/* ── PWM device (from devicetree) ────────────────────── */
+
+static const struct pwm_dt_spec servo_pwm[MAX_SERVOS] = {
+    PWM_DT_SPEC_GET_BY_NAME(DT_NODELABEL(servo), steer_front),
+    PWM_DT_SPEC_GET_BY_NAME(DT_NODELABEL(servo), steer_rear),
+};
+
 /* ── State ───────────────────────────────────────────── */
 
 static msghub_subscriber_t g_servo_cmd_sub;
@@ -31,6 +44,35 @@ static msghub_publisher_t g_servo_state_pub;
 
 static float g_target_angles[MAX_SERVOS] = {0.0f, 0.0f};
 static float g_current_angles[MAX_SERVOS] = {0.0f, 0.0f};
+
+/* ── Servo helpers ───────────────────────────────────── */
+
+static int servo_set_pulse_us(uint8_t id, uint16_t pulse_us)
+{
+    if (id >= MAX_SERVOS) {
+        return -EINVAL;
+    }
+    if (pulse_us < SERVO_PULSE_MIN_US) pulse_us = SERVO_PULSE_MIN_US;
+    if (pulse_us > SERVO_PULSE_MAX_US) pulse_us = SERVO_PULSE_MAX_US;
+
+    return pwm_set_dt(&servo_pwm[id], PWM_MSEC(20), PWM_USEC(pulse_us));
+}
+
+static int servo_set_angle(uint8_t id, float angle_deg)
+{
+    if (id >= MAX_SERVOS) {
+        return -EINVAL;
+    }
+    if (angle_deg < -SERVO_ANGLE_MAX) angle_deg = -SERVO_ANGLE_MAX;
+    if (angle_deg > SERVO_ANGLE_MAX) angle_deg = SERVO_ANGLE_MAX;
+
+    /* -90° → 500μs, 0° → 1500μs, +90° → 2500μs */
+    float pulse_us = SERVO_PULSE_CENTER_US +
+                     (angle_deg / SERVO_ANGLE_MAX) *
+                     (SERVO_PULSE_MAX_US - SERVO_PULSE_CENTER_US);
+
+    return servo_set_pulse_us(id, (uint16_t)pulse_us);
+}
 
 /* ── Thread ──────────────────────────────────────────── */
 
@@ -100,11 +142,14 @@ int servo_ctrl_init(void)
 {
     LOG_INF("Initializing servo control module");
 
-    // Initialize servo driver
-    int ret = servo_init();
-    if (ret != 0) {
-        LOG_ERR("Failed to initialize servo driver: %d", ret);
-        return ret;
+    /* Verify PWM devices are ready */
+    for (int i = 0; i < MAX_SERVOS; i++) {
+        if (!pwm_is_ready_dt(&servo_pwm[i])) {
+            LOG_ERR("Servo %d PWM device not ready", i);
+            return -ENODEV;
+        }
+        /* Center position */
+        servo_set_pulse_us(i, SERVO_PULSE_CENTER_US);
     }
 
     // Create msghub subscriber and publisher

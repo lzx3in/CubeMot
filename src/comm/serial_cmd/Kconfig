@@ -4,3 +4,21 @@ config MODULE_SERIAL_CMD_ENABLE
 	help
 	  Enables UART serial command protocol bridge (UART ↔ msghub).
 	  USART2 @ 115200 baud, binary frame protocol.
+
+if MODULE_SERIAL_CMD_ENABLE
+
+config SERIAL_RX_STACK_SIZE
+	int "Serial RX thread stack size (bytes)"
+	default 2048
+	range 1024 8192
+	help
+	  Stack size for the serial RX thread.
+
+config SERIAL_TX_STACK_SIZE
+	int "Serial TX thread stack size (bytes)"
+	default 2048
+	range 1024 8192
+	help
+	  Stack size for the serial TX thread.
+
+endif # MODULE_SERIAL_CMD_ENABLE

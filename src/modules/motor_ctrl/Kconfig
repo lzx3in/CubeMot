@@ -3,3 +3,14 @@ config MODULE_MOTOR_CTRL_ENABLE
     default y
     help
       Enables the motor control module with FOC + sensorless observer.
+
+if MODULE_MOTOR_CTRL_ENABLE
+
+config MOTOR_CTRL_STACK_SIZE
+    int "Motor control thread stack size (bytes)"
+    default 2048
+    range 1024 8192
+    help
+      Stack size for the motor control thread.
+
+endif # MODULE_MOTOR_CTRL_ENABLE

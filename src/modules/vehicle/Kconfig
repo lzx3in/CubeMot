@@ -4,3 +4,14 @@ config MODULE_VEHICLE_ENABLE
 	help
 	  Enables vehicle kinematics (differential drive + odometry).
 	  V2: 2 wheels. V3: Ackermann 4 wheels + 2 servos.
+
+if MODULE_VEHICLE_ENABLE
+
+config VEHICLE_STACK_SIZE
+	int "Vehicle thread stack size (bytes)"
+	default 2048
+	range 1024 8192
+	help
+	  Stack size for the vehicle kinematics thread.
+
+endif # MODULE_VEHICLE_ENABLE

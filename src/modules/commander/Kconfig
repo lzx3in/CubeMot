@@ -3,3 +3,14 @@ config MODULE_COMMANDER_ENABLE
 	default y
 	help
 	  Enables the commander module with state machine and command routing.
+
+if MODULE_COMMANDER_ENABLE
+
+config COMMANDER_STACK_SIZE
+	int "Commander thread stack size (bytes)"
+	default 2048
+	range 1024 8192
+	help
+	  Stack size for the commander thread.
+
+endif # MODULE_COMMANDER_ENABLE

@@ -10,16 +10,33 @@ extern "C" {
 // Configuration parameters
 // ============================================================================
 
+// Use Kconfig values when building with Zephyr, otherwise use defaults
+#ifdef ZEPHYR_ENV
+#include <zephyr/autoconf.h>
+#endif
+
 #ifndef MSGHUB_MAX_TOPICS
+#ifdef CONFIG_MSGHUB_MAX_TOPICS
+#define MSGHUB_MAX_TOPICS CONFIG_MSGHUB_MAX_TOPICS
+#else
 #define MSGHUB_MAX_TOPICS 8
+#endif
 #endif
 
 #ifndef MSGHUB_MAX_INSTANCES
+#ifdef CONFIG_MSGHUB_MAX_INSTANCES
+#define MSGHUB_MAX_INSTANCES CONFIG_MSGHUB_MAX_INSTANCES
+#else
 #define MSGHUB_MAX_INSTANCES 4
+#endif
 #endif
 
 #ifndef MSGHUB_MAX_SUBSCRIBERS
+#ifdef CONFIG_MSGHUB_MAX_SUBSCRIBERS
+#define MSGHUB_MAX_SUBSCRIBERS CONFIG_MSGHUB_MAX_SUBSCRIBERS
+#else
 #define MSGHUB_MAX_SUBSCRIBERS 16
+#endif
 #endif
 
 // ============================================================================

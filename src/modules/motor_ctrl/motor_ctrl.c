@@ -30,14 +30,26 @@ LOG_MODULE_REGISTER(motor_ctrl, LOG_LEVEL_INF);
 #define SPEED_LOOP_HZ       1000
 #define SPEED_LOOP_PERIOD   K_MSEC(1)
 
-#define PHASE1_DURATION_MS  1000
-#define PHASE1_ALIGN_I      0.8f
-#define PHASE2_DURATION_MS  1164
-#define PHASE2_FINAL_SPEED  582.0f   // RPM
-#define PHASE2_I            0.8f
+/* Startup sequence parameters (grouped for easy tuning) */
+typedef struct {
+    uint32_t phase1_duration_ms;   /* Alignment phase duration */
+    float    phase1_align_current; /* Alignment current [A] */
+    uint32_t phase2_duration_ms;   /* Forced ramp duration */
+    float    phase2_final_speed;   /* Final speed for ramp [RPM] */
+    float    phase2_current;       /* Ramp current [A] */
+    float    obs_min_speed_rpm;    /* Min speed for observer convergence */
+    uint32_t consecutive_ok;       /* Consecutive OK count for switchover */
+} startup_config_t;
 
-#define OBS_MIN_SPEED_RPM   524.0f
-#define NB_CONSECUTIVE_OK   2
+static const startup_config_t g_startup_config = {
+    .phase1_duration_ms  = 1000,
+    .phase1_align_current = 0.8f,
+    .phase2_duration_ms  = 1164,
+    .phase2_final_speed  = 582.0f,
+    .phase2_current      = 0.8f,
+    .obs_min_speed_rpm   = 524.0f,
+    .consecutive_ok      = 2,
+};
 
 /* ── Motor instance structure ────────────────────────── */
 
@@ -118,11 +130,11 @@ static void start_phase1(motor_instance_t *m)
 {
     m->state = MOTOR_STATE_ALIGN;
     m->phase_elapsed_ms = 0;
-    m->phase_duration_ms = PHASE1_DURATION_MS;
+    m->phase_duration_ms = g_startup_config.phase1_duration_ms;
     m->consecutive_ok = 0;
 
     m->foc->state.theta_elec = 0.0f;
-    m->foc->state.i_d_ref = PHASE1_ALIGN_I;
+    m->foc->state.i_d_ref = g_startup_config.phase1_align_current;
     m->foc->state.i_q_ref = 0.0f;
 }
 
@@ -130,7 +142,7 @@ static void start_phase2(motor_instance_t *m)
 {
     m->state = MOTOR_STATE_START;
     m->phase_elapsed_ms = 0;
-    m->phase_duration_ms = PHASE2_DURATION_MS;
+    m->phase_duration_ms = g_startup_config.phase2_duration_ms;
 
     observer_reset_convergence(m->obs);
     m->obs->theta_elec = 0.0f;
@@ -206,7 +218,7 @@ static void run_speed_loop(motor_instance_t *m)
 
         float progress = (float)m->phase_elapsed_ms / (float)m->phase_duration_ms;
         if (progress > 1.0f) progress = 1.0f;
-        float ramp_speed = progress * PHASE2_FINAL_SPEED;
+        float ramp_speed = progress * g_startup_config.phase2_final_speed;
 
         float omega_ref = foc_rpm_to_rads(ramp_speed, m->foc->config->pole_pairs);
         m->foc->state.theta_elec += omega_ref * (1.0f / SPEED_LOOP_HZ);
@@ -214,7 +226,7 @@ static void run_speed_loop(motor_instance_t *m)
             m->foc->state.theta_elec -= 6.283185307f;
 
         m->foc->state.i_d_ref = 0.0f;
-        m->foc->state.i_q_ref = PHASE2_I;
+        m->foc->state.i_q_ref = g_startup_config.phase2_current;
 
         observer_step(m->obs,
                       m->foc->state.v_alpha, m->foc->state.v_beta,
@@ -223,9 +235,9 @@ static void run_speed_loop(motor_instance_t *m)
         float est_speed = foc_rads_to_rpm(
             __builtin_fabsf(m->obs->omega_elec), m->foc->config->pole_pairs);
 
-        if (est_speed > OBS_MIN_SPEED_RPM) {
+        if (est_speed > g_startup_config.obs_min_speed_rpm) {
             m->consecutive_ok++;
-            if (m->consecutive_ok >= NB_CONSECUTIVE_OK) {
+            if (m->consecutive_ok >= g_startup_config.consecutive_ok) {
                 transition_to_closed_loop(m);
                 m->foc->state.theta_elec = m->obs->theta_elec;
             }
@@ -275,8 +287,13 @@ static void publish_state(motor_instance_t *m)
 
 /* ── Main thread (runs all motors) ───────────────────── */
 
-void motor_ctrl_thread(void)
+void motor_ctrl_thread(void *arg1, void *arg2, void *arg3)
 {
+    ARG_UNUSED(arg1);
+    ARG_UNUSED(arg2);
+    ARG_UNUSED(arg3);
+
+    /* Startup delay: allow FOC hardware (PWM, ADC, ISR) to stabilize */
     k_sleep(K_MSEC(100));
 
     /* Create subscriber (shared by all motors).

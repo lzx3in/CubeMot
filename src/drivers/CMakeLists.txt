@@ -1,5 +1,2 @@
-add_library(cubemot_drivers button.c)
-
-target_include_directories(cubemot_drivers PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
+# Custom drivers removed — LED and button now use Zephyr built-in drivers.
+# FOC and servo drivers are compiled directly in src/CMakeLists.txt.

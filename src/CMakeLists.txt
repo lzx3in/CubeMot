@@ -45,8 +45,6 @@ target_sources(app PRIVATE
     # FOC library
     libs/foc/foc_core.c
     libs/foc/observer.c
-    # Hardware drivers
-    drivers/button.c
     # FOC drivers (always compiled for now)
     drivers/foc/foc_pwm.c
     drivers/foc/foc_adc.c

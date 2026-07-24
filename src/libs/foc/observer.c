@@ -13,6 +13,7 @@
 
 #include "observer.h"
 #include "transform.h"
+#include <string.h>
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(observer, LOG_LEVEL_INF);
 

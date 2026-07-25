@@ -1,7 +1,7 @@
 # CubeMot 实施计划
 
 > 四轮驱动 + 转向舵机小车 | Zephyr RTOS | STM32G431RB
-> 最后更新: 2026-06-12 01:30 GMT+8
+> 最后更新: 2026-07-25 16:00 GMT+8
 
 ---
 
@@ -9,7 +9,7 @@
 
 | 阶段 | 内容 | 状态 |
 |------|------|------|
-| **V1** | 1 电机 FOC + 无感启动 + msghub 集成 | ✅ 代码完成，⏸ 待硬件验证（无示波器，跳过 PWM 波形验证） |
+| **V1** | 1 电机 FOC + 无感启动 + msghub 集成 | ✅ 代码完成，⏸ 待硬件验证（串口遥测 + 信号分析仪） |
 | **V2** | 2 电机 + 1 舵机 + Commander + Serial 遥控 | ✅ 代码完成，⏸ 待硬件（当前仅 1 电机，无舵机） |
 | **V3** | 4 电机 + 2 舵机 + 完整四轮 | 🚫 搁置 |
 | **V4** | IMU + 里程计 + 自主导航 | 🚫 搁置 |
@@ -36,16 +36,46 @@
 
 ### 待硬件验证 ⏸
 
-> 需要 NUCLEO-G431RB + X-NUCLEO-IHM16M1 + 电机 + 电源
-> 无示波器，跳过 V.1 PWM 波形验证
+> 需要 NUCLEO-G431RB + X-NUCLEO-IHM16M1 + 电机 + 24V 电源
+> 验证手段：串口遥测（主）+ 信号分析仪（辅）
+> 协议栈：`scripts/cubemot_protocol.py`，USART1 @ 115200 baud (PB6/PB7)
 
 | # | 验证项 | 方法 | 预期结果 |
 |---|--------|------|--------|
-| ~~V.1~~ | ~~TIM1 PWM 输出~~ | ~~示波器~~ | 🚫 跳过（无示波器） |
-| V.2 | ADC 零电流偏移 | 电机未通电，读 `foc_adc_get_offsets` | 稳定偏移值 |
-| V.3 | 电流环开环 | Id=0.8A, Iq=0, θ 强制旋转 | 相电流正弦波形 |
-| V.4 | 启动序列 | 发送 MOTOR_CMD_START | Phase1 对齐 → Phase2 斜坡 → 切换闭环 |
-| V.5 | 速度闭环 | 给定 500 RPM 目标 | 稳态速度误差 <5% |
+| V.1 | TIM1 PWM 输出 | 信号分析仪接 PA8，验证 30kHz 载波 | 中心对齐 PWM，频率 30kHz |
+| V.2 | ADC 零电流偏移 | 电机未通电，观察 DIAG 遥测 (RSP_DIAG) | Ia/Ib/Ic 在 ~2048±20 LSB |
+| V.3 | 电流环开环 | CMD_TEST(0, Id=0.8A)，观察 DIAG 遥测 | 三相 ADC 正弦分布，电机锁定 |
+| V.4 | 启动序列 | CMD_MOTOR_START(500RPM)，观察 RSP_MOTOR | IDLE→ALIGN→START→RUN |
+| V.5 | 速度闭环 | 同 V.4，稳态后读 speed_rpm | 500±25 RPM（误差 <5%） |
+
+#### 验证操作速查
+
+```python
+import serial, struct, sys
+sys.path.insert(0, 'scripts')
+from cubemot_protocol import *
+ser = serial.Serial('/dev/ttyACM0', 115200, timeout=1)
+
+# V.2: 观察 ADC 偏移（收集 DIAG 帧）
+frames = collect_frames(ser, 2.0)
+
+# V.3: 开环 Id=0.8A
+ser.write(build_frame(CMD_TEST, bytes([0]) + struct.pack('<f', 0.8)))
+
+# V.4/V.5: 启动 500 RPM
+ser.write(build_frame(CMD_MOTOR_START, bytes([0]) + struct.pack('<f', 500.0)))
+
+# 停止
+ser.write(build_frame(CMD_MOTOR_STOP, bytes([0])))
+```
+
+#### 信号分析仪测量点（可选）
+
+| 测量点 | 引脚 | 预期 |
+|--------|------|------|
+| PWM 载波 | PA8 (UH) | 30kHz 中心对齐 |
+| 相电流 | PA1 (Ia sense) | 正弦波，58.3Hz @ 500RPM |
+| 母线电压 | PC5 (分压后) | ≈1.5V DC（对应 24V） |
 
 ---
 
@@ -70,7 +100,7 @@ INIT → STANDBY → ARMED → ACTIVE
 | 任务 | 文件 | 状态 |
 |------|------|------|
 | 二进制帧协议 [0xAA 0x55] [CMD] [LEN] [DATA] [CRC8] | `comm/serial_cmd/serial_cmd.c` | ✅ |
-| USART1 @ 115200 baud (PC4/PC5) | 同上 | ✅ |
+| USART1 @ 115200 baud (PB6/PB7) | 同上 | ✅ |
 | 命令：CMD_VEL/ARM/DISARM/ESTOP/PING | 同上 | ✅ |
 | 响应：RSP_STATUS(10Hz)/RSP_TELEMETRY(20Hz)/RSP_MOTOR | 同上 | ✅ |
 
@@ -118,19 +148,16 @@ INIT → STANDBY → ARMED → ACTIVE
 ### 构建环境
 
 ```bash
-cd /home/lzx/Code/CubeMot/cubemot-workspace
-source .venv/bin/activate
-export ZEPHYR_TOOLCHAIN_VARIANT=gnuarmemb
-export GNUARMEMB_TOOLCHAIN_PATH=/usr
-cd CubeMot
-west build -b nucleo_g431rb
+# 在 habitat 容器内执行
+docker exec -u lzx -w /home/lzx/Code/CubeMot/cubemot-workspace opsdc-cubemot-habitat \
+  bash -c "export PATH=\$HOME/.local/bin:\$PATH && west build -b nucleo_g431rb cubemot-esc --pristine"
 ```
 
 ### 运行单元测试
 
 ```bash
-cd CubeMot
-gcc -o test_math test_math.c -Isrc/libs/math -lm -Wall -O2 && ./test_math
+# 宿主机直接执行（tests/ 目录，CMake + GTest）
+cd cubemot-esc && cmake -B build_test -S tests && cmake --build build_test && ctest --test-dir build_test
 ```
 
 ### 硬件连接

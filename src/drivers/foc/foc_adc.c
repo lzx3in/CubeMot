@@ -159,25 +159,19 @@ int foc_adc_init(void)
 
 void foc_adc_read_raw(foc_adc_raw_t *out)
 {
-    /* Software-trigger injected conversions on ADC1+ADC2 */
-    LL_ADC_INJ_StartConversion(ADC_INSTANCE1);
-    LL_ADC_INJ_StartConversion(ADC_INSTANCE2);
-
-    /* Wait for completion (JEOC flag). At 170MHz, 2 ranks × 6.5 cycles ≈ 1µs */
-    volatile int timeout = 500;
-    while (!LL_ADC_IsActiveFlag_JEOC(ADC_INSTANCE1) && --timeout) { }
-    timeout = 500;
-    while (!LL_ADC_IsActiveFlag_JEOC(ADC_INSTANCE2) && --timeout) { }
-
-    /* Read injected data (left-aligned: shift >>4 for 12-bit) */
+    /* Pipeline mode: read PREVIOUS conversion result, then trigger NEXT.
+     * At 30kHz ISR rate (33µs period), the previous conversion (≈1µs)
+     * has long completed. This avoids JEOC polling in ISR context. */
     out->ia = (int16_t)(LL_ADC_INJ_ReadConversionData12(ADC_INSTANCE1, ADC_INJ_RANK2) >> 4);
     out->ib = (int16_t)(LL_ADC_INJ_ReadConversionData12(ADC_INSTANCE1, ADC_INJ_RANK1) >> 4);
     out->ic = (int16_t)(LL_ADC_INJ_ReadConversionData12(ADC_INSTANCE2, ADC_INJ_RANK1) >> 4);
     out->vbus = 0;
 
-    /* Clear JEOC flags for next trigger */
+    /* Clear JEOC and trigger next conversion for next ISR call */
     LL_ADC_ClearFlag_JEOC(ADC_INSTANCE1);
     LL_ADC_ClearFlag_JEOC(ADC_INSTANCE2);
+    LL_ADC_INJ_StartConversion(ADC_INSTANCE1);
+    LL_ADC_INJ_StartConversion(ADC_INSTANCE2);
 }
 
 void foc_adc_start_vbus(void)

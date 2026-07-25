@@ -44,11 +44,11 @@ typedef struct {
 static const startup_config_t g_startup_config = {
     .phase1_duration_ms  = 1000,
     .phase1_align_current = 0.8f,
-    .phase2_duration_ms  = 1164,
+    .phase2_duration_ms  = 2000,   /* longer ramp for observer convergence */
     .phase2_final_speed  = 582.0f,
     .phase2_current      = 0.8f,
-    .obs_min_speed_rpm   = 524.0f,
-    .consecutive_ok      = 2,
+    .obs_min_speed_rpm   = 200.0f, /* relaxed: was 524 */
+    .consecutive_ok      = 10,     /* tolerate ADC glitches: was 2 */
 };
 
 /* ── Motor instance structure ────────────────────────── */
@@ -243,6 +243,13 @@ static void run_speed_loop(motor_instance_t *m)
             }
         } else {
             m->consecutive_ok = 0;
+        }
+
+        /* Force switchover after Phase2 completes (don't wait forever) */
+        if (m->phase_elapsed_ms >= m->phase_duration_ms &&
+            m->state != MOTOR_STATE_RUN) {
+            transition_to_closed_loop(m);
+            m->foc->state.theta_elec = m->obs->theta_elec;
         }
         break;
     }

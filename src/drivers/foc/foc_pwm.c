@@ -109,18 +109,21 @@ int foc_pwm_init(void)
     LL_GPIO_SetPinMode(GPIOA, LL_GPIO_PIN_11, LL_GPIO_MODE_ALTERNATE);
     LL_GPIO_SetAFPin_8_15(GPIOA, LL_GPIO_PIN_11, LL_GPIO_AF_12);
 
-    /* PB13/PB14/PB15: TIM1_CH1N/CH2N/CH3N */
-    LL_GPIO_SetPinMode(GPIOB, LL_GPIO_PIN_13, LL_GPIO_MODE_ALTERNATE);
-    LL_GPIO_SetAFPin_8_15(GPIOB, LL_GPIO_PIN_13, LL_GPIO_AF_6);
+    /* PB13/PB14/PB15: STSPIN830 low-side enable (ES_GPIO mode, NOT TIM1 CHxN) */
+    LL_GPIO_SetPinMode(GPIOB, LL_GPIO_PIN_13, LL_GPIO_MODE_OUTPUT);
+    LL_GPIO_SetPinOutputType(GPIOB, LL_GPIO_PIN_13, LL_GPIO_OUTPUT_PUSHPULL);
     LL_GPIO_SetPinSpeed(GPIOB, LL_GPIO_PIN_13, LL_GPIO_SPEED_FREQ_VERY_HIGH);
+    LL_GPIO_ResetOutputPin(GPIOB, LL_GPIO_PIN_13);
 
-    LL_GPIO_SetPinMode(GPIOB, LL_GPIO_PIN_14, LL_GPIO_MODE_ALTERNATE);
-    LL_GPIO_SetAFPin_8_15(GPIOB, LL_GPIO_PIN_14, LL_GPIO_AF_6);
+    LL_GPIO_SetPinMode(GPIOB, LL_GPIO_PIN_14, LL_GPIO_MODE_OUTPUT);
+    LL_GPIO_SetPinOutputType(GPIOB, LL_GPIO_PIN_14, LL_GPIO_OUTPUT_PUSHPULL);
     LL_GPIO_SetPinSpeed(GPIOB, LL_GPIO_PIN_14, LL_GPIO_SPEED_FREQ_VERY_HIGH);
+    LL_GPIO_ResetOutputPin(GPIOB, LL_GPIO_PIN_14);
 
-    LL_GPIO_SetPinMode(GPIOB, LL_GPIO_PIN_15, LL_GPIO_MODE_ALTERNATE);
-    LL_GPIO_SetAFPin_8_15(GPIOB, LL_GPIO_PIN_15, LL_GPIO_AF_6);
+    LL_GPIO_SetPinMode(GPIOB, LL_GPIO_PIN_15, LL_GPIO_MODE_OUTPUT);
+    LL_GPIO_SetPinOutputType(GPIOB, LL_GPIO_PIN_15, LL_GPIO_OUTPUT_PUSHPULL);
     LL_GPIO_SetPinSpeed(GPIOB, LL_GPIO_PIN_15, LL_GPIO_SPEED_FREQ_VERY_HIGH);
+    LL_GPIO_ResetOutputPin(GPIOB, LL_GPIO_PIN_15);
 
     /* ── TIM1 base config (direct register) ──────────── */
 
@@ -217,6 +220,8 @@ void foc_pwm_set_duty(float duty_a, float duty_b, float duty_c)
 void foc_pwm_enable(void)
 {
     LL_TIM_EnableAllOutputs(TIM_MOTOR);
+    /* ES_GPIO: enable STSPIN830 low-side drivers */
+    LL_GPIO_SetOutputPin(GPIOB, LL_GPIO_PIN_13 | LL_GPIO_PIN_14 | LL_GPIO_PIN_15);
     g_pwm_enabled = true;
     LOG_INF("PWM outputs enabled");
 }
@@ -224,6 +229,8 @@ void foc_pwm_enable(void)
 void foc_pwm_disable(void)
 {
     LL_TIM_DisableAllOutputs(TIM_MOTOR);
+    /* ES_GPIO: disable STSPIN830 low-side drivers */
+    LL_GPIO_ResetOutputPin(GPIOB, LL_GPIO_PIN_13 | LL_GPIO_PIN_14 | LL_GPIO_PIN_15);
     g_pwm_enabled = false;
     LOG_INF("PWM outputs disabled");
 }

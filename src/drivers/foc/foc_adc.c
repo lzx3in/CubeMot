@@ -100,9 +100,9 @@ int foc_adc_init(void)
     LL_ADC_INJ_SetSequencerRanks(ADC_INSTANCE1, ADC_INJ_RANK2, ADC_CH_IA);
     LL_ADC_SetChannelSamplingTime(ADC_INSTANCE1, ADC_CH_IA, LL_ADC_SAMPLINGTIME_6CYCLES_5);
 
-    /* Trigger: TIM1_TRGO, rising edge */
-    LL_ADC_INJ_SetTriggerSource(ADC_INSTANCE1, LL_ADC_INJ_TRIG_EXT_TIM1_TRGO);
-    LL_ADC_INJ_SetTriggerEdge(ADC_INSTANCE1, LL_ADC_INJ_TRIG_EXT_RISING);
+    /* Trigger: software (ISR will trigger each cycle) */
+    LL_ADC_INJ_SetTriggerSource(ADC_INSTANCE1, LL_ADC_INJ_TRIG_SOFTWARE);
+    LL_ADC_INJ_SetTriggerEdge(ADC_INSTANCE1, LL_ADC_INJ_TRIG_SOFTWARE);
 
     /* ── ADC2: Calibrate ───────────────────────────────── */
     LL_ADC_DisableDeepPowerDown(ADC_INSTANCE2);
@@ -126,9 +126,9 @@ int foc_adc_init(void)
     LL_ADC_INJ_SetSequencerRanks(ADC_INSTANCE2, ADC_INJ_RANK2, ADC_CH_IB);
     LL_ADC_SetChannelSamplingTime(ADC_INSTANCE2, ADC_CH_IB, LL_ADC_SAMPLINGTIME_6CYCLES_5);
 
-    /* Trigger: TIM1_TRGO, rising edge */
-    LL_ADC_INJ_SetTriggerSource(ADC_INSTANCE2, LL_ADC_INJ_TRIG_EXT_TIM1_TRGO);
-    LL_ADC_INJ_SetTriggerEdge(ADC_INSTANCE2, LL_ADC_INJ_TRIG_EXT_RISING);
+    /* Trigger: software (ISR will trigger each cycle) */
+    LL_ADC_INJ_SetTriggerSource(ADC_INSTANCE2, LL_ADC_INJ_TRIG_SOFTWARE);
+    LL_ADC_INJ_SetTriggerEdge(ADC_INSTANCE2, LL_ADC_INJ_TRIG_SOFTWARE);
 
     /* ── Regular channel for Vbus (ADC2) ────────────────── */
     LL_ADC_REG_SetSequencerLength(ADC_INSTANCE2, LL_ADC_REG_SEQ_SCAN_DISABLE);
@@ -159,18 +159,25 @@ int foc_adc_init(void)
 
 void foc_adc_read_raw(foc_adc_raw_t *out)
 {
-    /* ADC1 injected data registers (left-aligned: shift >>4 for 12-bit):
-     * Rank 1 → JDR1 (CH14 = Ib)
-     * Rank 2 → JDR2 (CH2  = Ia)
-     */
+    /* Software-trigger injected conversions on ADC1+ADC2 */
+    LL_ADC_INJ_StartConversion(ADC_INSTANCE1);
+    LL_ADC_INJ_StartConversion(ADC_INSTANCE2);
+
+    /* Wait for completion (JEOC flag). At 170MHz, 2 ranks × 6.5 cycles ≈ 1µs */
+    volatile int timeout = 500;
+    while (!LL_ADC_IsActiveFlag_JEOC(ADC_INSTANCE1) && --timeout) { }
+    timeout = 500;
+    while (!LL_ADC_IsActiveFlag_JEOC(ADC_INSTANCE2) && --timeout) { }
+
+    /* Read injected data (left-aligned: shift >>4 for 12-bit) */
     out->ia = (int16_t)(LL_ADC_INJ_ReadConversionData12(ADC_INSTANCE1, ADC_INJ_RANK2) >> 4);
     out->ib = (int16_t)(LL_ADC_INJ_ReadConversionData12(ADC_INSTANCE1, ADC_INJ_RANK1) >> 4);
-
-    /* ADC2 injected data registers:
-     * Rank 1 → JDR1 (CH4  = Ic)
-     */
     out->ic = (int16_t)(LL_ADC_INJ_ReadConversionData12(ADC_INSTANCE2, ADC_INJ_RANK1) >> 4);
     out->vbus = 0;
+
+    /* Clear JEOC flags for next trigger */
+    LL_ADC_ClearFlag_JEOC(ADC_INSTANCE1);
+    LL_ADC_ClearFlag_JEOC(ADC_INSTANCE2);
 }
 
 void foc_adc_start_vbus(void)
@@ -205,15 +212,10 @@ void foc_adc_get_offsets(int16_t *ia_offset, int16_t *ib_offset, int16_t *ic_off
     const int num_samples = 256;
 
     /*
-     * Injected conversions are triggered by TIM1_TRGO.
-     * Temporarily start TIM1 counter so TRGO events fire.
+     * Software-triggered injected conversions (no TIM1 needed).
      * PWM outputs stay disabled (MOE=0) — motor does not spin.
      */
-    /* Ensure JADSTART is set (injected trigger armed) */
-    LL_ADC_INJ_StartConversion(ADC_INSTANCE1);
-    LL_ADC_INJ_StartConversion(ADC_INSTANCE2);
-    LL_TIM_EnableCounter(TIM1);
-    k_busy_wait(100);  /* let first trigger settle */
+    k_busy_wait(100);  /* let ADC settle */
 
     for (int i = 0; i < num_samples; i++) {
         /* Wait for a fresh conversion (one PWM cycle ~ 33 us) */
@@ -223,8 +225,6 @@ void foc_adc_get_offsets(int16_t *ia_offset, int16_t *ib_offset, int16_t *ic_off
         sum_ib += raw.ib;
         sum_ic += raw.ic;
     }
-
-    LL_TIM_DisableCounter(TIM1);
 
     *ia_offset = (int16_t)(sum_ia / num_samples);
     *ib_offset = (int16_t)(sum_ib / num_samples);

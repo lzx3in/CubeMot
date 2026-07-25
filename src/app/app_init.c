@@ -9,13 +9,19 @@
 #if CONFIG_MODULE_BUTTON_DETECTOR_ENABLE
 #include "modules/button_detector/button_detector.h"
 #endif
+#if CONFIG_MODULE_COMMANDER_ENABLE
 #include "modules/commander/commander.h"
+#endif
+#if CONFIG_MODULE_VEHICLE_ENABLE
 #include "modules/vehicle/vehicle.h"
+#endif
 #if CONFIG_MODULE_MOTOR_CTRL_ENABLE
 #include "modules/motor_ctrl/motor_ctrl.h"
 #include "common/motor_params.h"
 #endif
+#if CONFIG_MODULE_SERIAL_CMD_ENABLE
 #include "comm/serial_cmd.h"
+#endif
 #include "drivers/foc/foc_pwm.h"
 #include "drivers/foc/foc_adc.h"
 #include "drivers/foc/foc_isr.h"

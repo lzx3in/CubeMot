@@ -5,8 +5,8 @@
 	};
 
 	/*
-	 * Console/Shell on LPUART1 (ST-Link VCP) for interactive debug.
-	 * USART1 (PB6/PB7) reserved for binary protocol (serial_cmd).
+	 * Console on USART1 (PB6/PB7) — ST-Link V3 VCP bridges USART1.
+	 * Shared with serial_cmd: log output + binary frames coexist on same line.
 	 */
 	chosen {
 		zephyr,console = &lpuart1;
@@ -24,13 +24,10 @@
 };
 
 /*
- * USART1 remap to PB6(TX)/PB7(RX):
- * Default PC4/PC5 conflicts with ADC2_IN11 (Vbus sensing on PC5).
- * USART1 carries binary protocol (serial_cmd); console uses LPUART1 (ST-Link VCP).
+ * USART1 stays on default PC4(TX)/PC5(RX) — ST-Link V3E VCP is wired here.
+ * NOTE: PC5 conflicts with ADC2_IN11 (Vbus). Vbus sensing disabled during
+ * shell-based verification. Restore PB6/PB7 remap when VCU link is added.
  */
-&usart1 {
-	pinctrl-0 = <&usart1_tx_pb6 &usart1_rx_pb7>;
-};
 
 /*
  * Disable SPI2: PB13/PB14/PB15 needed by TIM1_CH1N/CH2N/CH3N

@@ -87,7 +87,7 @@ int foc_adc_init(void)
 
     LL_ADC_SetResolution(ADC_INSTANCE1, LL_ADC_RESOLUTION_12B);
     LL_ADC_SetDataAlignment(ADC_INSTANCE1, LL_ADC_DATA_ALIGN_LEFT);
-    LL_ADC_SetLowPowerMode(ADC_INSTANCE1, LL_ADC_LP_AUTOWAIT);
+    /* No AUTOWAIT: injected conversions must free-run at TIM1 TRGO rate (30kHz) */
 
     /* Injected sequence: 2 conversions */
     LL_ADC_INJ_SetSequencerLength(ADC_INSTANCE1, LL_ADC_INJ_SEQ_SCAN_ENABLE_2RANKS);
@@ -113,7 +113,7 @@ int foc_adc_init(void)
 
     LL_ADC_SetResolution(ADC_INSTANCE2, LL_ADC_RESOLUTION_12B);
     LL_ADC_SetDataAlignment(ADC_INSTANCE2, LL_ADC_DATA_ALIGN_LEFT);
-    LL_ADC_SetLowPowerMode(ADC_INSTANCE2, LL_ADC_LP_AUTOWAIT);
+    /* No AUTOWAIT: injected conversions must free-run at TIM1 TRGO rate (30kHz) */
 
     /* Injected sequence: 2 conversions */
     LL_ADC_INJ_SetSequencerLength(ADC_INSTANCE2, LL_ADC_INJ_SEQ_SCAN_ENABLE_2RANKS);
@@ -159,17 +159,17 @@ int foc_adc_init(void)
 
 void foc_adc_read_raw(foc_adc_raw_t *out)
 {
-    /* ADC1 injected data registers:
+    /* ADC1 injected data registers (left-aligned: shift >>4 for 12-bit):
      * Rank 1 → JDR1 (CH14 = Ib)
      * Rank 2 → JDR2 (CH2  = Ia)
      */
-    out->ia = (int16_t)LL_ADC_INJ_ReadConversionData12(ADC_INSTANCE1, ADC_INJ_RANK2);
-    out->ib = (int16_t)LL_ADC_INJ_ReadConversionData12(ADC_INSTANCE1, ADC_INJ_RANK1);
+    out->ia = (int16_t)(LL_ADC_INJ_ReadConversionData12(ADC_INSTANCE1, ADC_INJ_RANK2) >> 4);
+    out->ib = (int16_t)(LL_ADC_INJ_ReadConversionData12(ADC_INSTANCE1, ADC_INJ_RANK1) >> 4);
 
     /* ADC2 injected data registers:
      * Rank 1 → JDR1 (CH4  = Ic)
      */
-    out->ic = (int16_t)LL_ADC_INJ_ReadConversionData12(ADC_INSTANCE2, ADC_INJ_RANK1);
+    out->ic = (int16_t)(LL_ADC_INJ_ReadConversionData12(ADC_INSTANCE2, ADC_INJ_RANK1) >> 4);
     out->vbus = 0;
 }
 
@@ -194,7 +194,7 @@ float foc_adc_read_vbus_blocking(void)
         k_busy_wait(1);
     }
 
-    int16_t raw = (int16_t)LL_ADC_REG_ReadConversionData12(ADC_INSTANCE2);
+    int16_t raw = (int16_t)(LL_ADC_REG_ReadConversionData12(ADC_INSTANCE2) >> 4);
     return foc_adc_to_vbus(raw);
 }
 
@@ -209,6 +209,9 @@ void foc_adc_get_offsets(int16_t *ia_offset, int16_t *ib_offset, int16_t *ic_off
      * Temporarily start TIM1 counter so TRGO events fire.
      * PWM outputs stay disabled (MOE=0) — motor does not spin.
      */
+    /* Ensure JADSTART is set (injected trigger armed) */
+    LL_ADC_INJ_StartConversion(ADC_INSTANCE1);
+    LL_ADC_INJ_StartConversion(ADC_INSTANCE2);
     LL_TIM_EnableCounter(TIM1);
     k_busy_wait(100);  /* let first trigger settle */
 
@@ -333,7 +336,7 @@ void foc_adc_sw_trigger_test(void)
         timeout--;
         k_busy_wait(10);
     }
-    g_adc_diag.sw_vbus_raw = (int16_t)LL_ADC_REG_ReadConversionData12(ADC_INSTANCE2);
+    g_adc_diag.sw_vbus_raw = (int16_t)(LL_ADC_REG_ReadConversionData12(ADC_INSTANCE2) >> 4);
     g_adc_diag.sw_vbus_v = foc_adc_to_vbus(g_adc_diag.sw_vbus_raw);
 
     /* Clear flags */
@@ -341,11 +344,11 @@ void foc_adc_sw_trigger_test(void)
     LL_ADC_ClearFlag_JEOC(ADC_INSTANCE2);
     LL_ADC_ClearFlag_EOC(ADC_INSTANCE2);
 
-    /* Restore TIM1_TRGO trigger */
-    LL_ADC_INJ_SetTriggerEdge(ADC_INSTANCE1, LL_ADC_INJ_TRIG_EXT_RISING);
+    /* Restore TIM1_TRGO trigger (source first, then edge to avoid JEXTEN=0 intermediate) */
     LL_ADC_INJ_SetTriggerSource(ADC_INSTANCE1, LL_ADC_INJ_TRIG_EXT_TIM1_TRGO);
-    LL_ADC_INJ_SetTriggerEdge(ADC_INSTANCE2, LL_ADC_INJ_TRIG_EXT_RISING);
     LL_ADC_INJ_SetTriggerSource(ADC_INSTANCE2, LL_ADC_INJ_TRIG_EXT_TIM1_TRGO);
+    LL_ADC_INJ_SetTriggerEdge(ADC_INSTANCE1, LL_ADC_INJ_TRIG_EXT_RISING);
+    LL_ADC_INJ_SetTriggerEdge(ADC_INSTANCE2, LL_ADC_INJ_TRIG_EXT_RISING);
 
     /* Re-start injected conversions (waiting for trigger) */
     LL_ADC_INJ_StartConversion(ADC_INSTANCE1);

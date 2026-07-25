@@ -65,7 +65,10 @@ void foc_current_loop(foc_t *foc)
 
     /* Read Vbus (regular conversion, result from previous trigger) */
     if (foc_adc_vbus_ready()) {
-        s->v_bus = foc_adc_to_vbus((int16_t)LL_ADC_REG_ReadConversionData12(ADC2));
+        /* Left-aligned: DR[15:4]=result, ReadConversionData12 returns DR[11:0], shift >>4 */
+        int16_t vbus_raw = (int16_t)(LL_ADC_REG_ReadConversionData12(ADC2) >> 4);
+        s->v_bus = foc_adc_to_vbus(vbus_raw);
+        s->adc_vbus = vbus_raw;
     }
     foc_adc_start_vbus();  /* trigger next conversion */
 

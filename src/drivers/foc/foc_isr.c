@@ -16,6 +16,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <stm32g4xx_ll_tim.h>
+#include <stm32g4xx_ll_adc.h>
 
 LOG_MODULE_REGISTER(foc_isr, LOG_LEVEL_INF);
 
@@ -92,9 +93,8 @@ void foc_isr_init(void)
     /* Initialize FOC with motor parameters */
     foc_init(&g_motor_foc, &g_motor_params);
 
-    /* Read initial bus voltage from ADC2 regular channel */
-    float vbus_init = foc_adc_read_vbus_blocking();
-    g_motor_foc.state.v_bus = vbus_init;
+    /* Set fixed bus voltage (read from ADC2 in current loop at runtime) */
+    g_motor_foc.state.v_bus = 24.0f;
 
     /* Calibrate ADC offsets (motor must be disabled) */
     int16_t ia_off, ib_off, ic_off;
@@ -123,7 +123,7 @@ void foc_isr_init(void)
 
     LOG_INF("FOC ISR ready (30kHz, TIM1_UP_IRQn, priority 0)");
     LOG_INF("  ADC offsets: Ia=%d Ib=%d Ic=%d", ia_off, ib_off, ic_off);
-    LOG_INF("  Vbus=%.2f V", (double)vbus_init);
+    LOG_INF("  Vbus=%.2f V (initial)", (double)g_motor_foc.state.v_bus);
 }
 
 /* ── Start/Stop ──────────────────────────────────────── */
@@ -136,6 +136,9 @@ void foc_isr_start(void)
     }
     g_isr_running = true;
     g_isr_count = 0;
+    /* Re-arm injected ADC trigger (JADSTART) before TIM1 starts */
+    LL_ADC_INJ_StartConversion(ADC1);
+    LL_ADC_INJ_StartConversion(ADC2);
     /* Start TIM1 counter to generate TRGO for ADC trigger */
     LL_TIM_EnableCounter(TIM1);
     LOG_INF("FOC ISR started (TIM1 counting)");

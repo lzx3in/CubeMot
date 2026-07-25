@@ -27,10 +27,15 @@ static const foc_motor_config_t g_motor_params = {
     .iq_max             = 4.0f,
     .id_demag           = 0.0f,
 
-    /* Observer parameters (from Workbench) */
-    .observer_gain1     = -22528.0f / 16384.0f,   /* Normalized G1 = -1.375 */
-    .observer_gain2     = 31586.0f / 4096.0f,     /* Normalized G2 = 7.712 */
-    .pll_kp             = 195.0f / 16384.0f,      /* Normalized KP = 0.0119 */
-    .pll_ki             = 5.0f / 65535.0f,        /* Normalized KI = 7.63e-5 */
-    .observer_min_speed_rpm = 524,
+    /* Observer parameters (floating-point Luenberger, pole placement)
+     * Motor: Rs=5.29, Ls=1.058mH, Rs/Ls=5000
+     * Observer bandwidth: 50Hz → omega_obs=314 rad/s
+     * L1 = 2*omega_obs + Rs/Ls = 5628
+     * L2 = Ls * omega_obs^2 = 104
+     * PLL bandwidth: 5Hz → pll_kp=31, pll_ki=100 */
+    .observer_gain1     = 5628.0f,    /* L1: current correction gain */
+    .observer_gain2     = 104.0f,     /* L2: BEMF integrator gain */
+    .pll_kp             = 31.0f,      /* PLL proportional */
+    .pll_ki             = 100.0f,     /* PLL integral */
+    .observer_min_speed_rpm = 50,
 };

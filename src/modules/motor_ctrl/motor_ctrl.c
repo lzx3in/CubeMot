@@ -144,8 +144,12 @@ static void start_phase2(motor_instance_t *m)
     m->phase_elapsed_ms = 0;
     m->phase_duration_ms = g_startup_config.phase2_duration_ms;
 
-    observer_reset_convergence(m->obs);
-    m->obs->theta_elec = 0.0f;
+    /* Full observer reset: clear all accumulated state from ALIGN phase */
+    observer_force_angle(m->obs, 0.0f);
+    m->obs->i_alpha_hat = 0.0f;
+    m->obs->i_beta_hat = 0.0f;
+    m->obs->e_alpha = 0.0f;
+    m->obs->e_beta = 0.0f;
 }
 
 static void transition_to_closed_loop(motor_instance_t *m)
@@ -228,10 +232,7 @@ static void run_speed_loop(motor_instance_t *m)
         m->foc->state.i_d_ref = 0.0f;
         m->foc->state.i_q_ref = g_startup_config.phase2_current;
 
-        observer_step(m->obs,
-                      m->foc->state.v_alpha, m->foc->state.v_beta,
-                      m->foc->state.i_alpha, m->foc->state.i_beta);
-
+        /* Observer runs in ISR (30kHz). Just read its output here. */
         float est_speed = foc_rads_to_rpm(
             __builtin_fabsf(m->obs->omega_elec), m->foc->config->pole_pairs);
 
@@ -245,11 +246,17 @@ static void run_speed_loop(motor_instance_t *m)
             m->consecutive_ok = 0;
         }
 
-        /* Force switchover after Phase2 completes (don't wait forever) */
+        /* Phase2 timeout: if observer hasn't converged, STOP (safety) */
         if (m->phase_elapsed_ms >= m->phase_duration_ms &&
             m->state != MOTOR_STATE_RUN) {
-            transition_to_closed_loop(m);
-            m->foc->state.theta_elec = m->obs->theta_elec;
+            LOG_WRN("Motor %u: Phase2 timeout, observer not converged → STOP",
+                    m->motor_id);
+            foc_isr_set_observer_override(true);
+            foc_isr_stop();
+            foc_pwm_disable();
+            m->foc->state.i_q_ref = 0.0f;
+            m->foc->state.i_d_ref = 0.0f;
+            m->state = MOTOR_STATE_IDLE;
         }
         break;
     }
@@ -262,6 +269,10 @@ static void run_speed_loop(motor_instance_t *m)
         float iq_ref = pid_calculate(&m->speed_pid,
                                      m->target_speed_rpm, speed_meas, 0.0f,
                                      1.0f / SPEED_LOOP_HZ);
+
+        /* Iq clamp: prevent excessive current (max 2A) */
+        if (iq_ref > 2.0f) iq_ref = 2.0f;
+        if (iq_ref < -2.0f) iq_ref = -2.0f;
 
         m->foc->state.i_d_ref = 0.0f;
         m->foc->state.i_q_ref = iq_ref;

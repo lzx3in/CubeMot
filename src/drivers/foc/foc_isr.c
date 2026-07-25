@@ -68,15 +68,24 @@ static void foc_tim1_isr(void *arg)
      */
     foc_current_loop(&g_motor_foc);
 
-    /* Run sliding mode observer (angle estimation) */
-    observer_step(&g_motor_observer,
-                  g_motor_foc.state.v_alpha,
-                  g_motor_foc.state.v_beta,
-                  g_motor_foc.state.i_alpha,
-                  g_motor_foc.state.i_beta);
+    /* ── Overcurrent protection ──────────────────────────
+     * If |I_alpha| or |I_beta| exceeds 2A, immediately disable PWM.
+     * This prevents motor burnout when observer/speed loop diverges. */
+    {
+        float i_mag = g_motor_foc.state.i_alpha * g_motor_foc.state.i_alpha
+                    + g_motor_foc.state.i_beta * g_motor_foc.state.i_beta;
+        if (i_mag > 4.0f) {  /* 2A squared = 4.0 */
+            foc_pwm_set_duty(0.0f, 0.0f, 0.0f);
+            g_isr_running = false;
+            LL_TIM_DisableCounter(TIM1);
+        }
+    }
 
-    /* Update FOC angle from observer (unless motor_ctrl overrides theta) */
-    if (g_observer_override) {
+    /* Observer runs in motor_ctrl thread (1kHz), not here.
+     * ISR only does current loop + PWM update. */
+
+    /* Update FOC angle from observer only if converged and not overridden */
+    if (g_observer_override && observer_is_converged(&g_motor_observer)) {
         g_motor_foc.state.theta_elec = g_motor_observer.theta_elec;
         g_motor_foc.state.omega_elec = g_motor_observer.omega_elec;
     }

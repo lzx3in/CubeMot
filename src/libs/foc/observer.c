@@ -54,38 +54,50 @@ void observer_step(observer_t *obs,
                    float v_alpha, float v_beta,
                    float i_alpha, float i_beta)
 {
-    /* ── Sliding Mode Observer ────────────────────────────
+    /* ── Luenberger State Observer (floating-point) ────────
      *
      * Motor model: dI/dt = 1/Ls * (V - R*I - E)
      *
-     * Discrete: I_hat[k+1] = I_hat[k] + dt/Ls * (V[k] - R*I_hat[k] - E[k])
+     * Observer:
+     *   dI_hat/dt = 1/Ls * (V - R*I_hat - E_hat) + L1 * (I - I_hat)
+     *   dE_hat/dt = L2 * (I - I_hat)
      *
-     * Correction via sliding mode:
-     *   Z_α = G1 * sign(I_hat_α - I_α)   (jumps between ±G1)
-     *   Z_β = G1 * sign(I_hat_β - I_β)
+     * Discrete (forward Euler):
+     *   I_hat += dt * [1/Ls*(V - R*I_hat - E_hat) + L1*(I - I_hat)]
+     *   E_hat += dt * L2 * (I - I_hat)
      *
-     * Back-EMF estimation via low-pass filtering of Z:
-     *   E_α[k+1] = E_α[k] + G2 * dt * (Z_α - E_α[k])
-     *   E_β[k+1] = E_β[k] + G2 * dt * (Z_β - E_β[k])
+     * Gains L1, L2 from pole placement at -omega_obs:
+     *   L1 = 2*omega_obs + Rs/Ls
+     *   L2 = Ls * omega_obs^2
      */
 
-    /* Current estimation error */
-    float i_alpha_err = obs->i_alpha_hat - i_alpha;
-    float i_beta_err  = obs->i_beta_hat - i_beta;
+    /* Current estimation error (I - I_hat) for correction */
+    float i_alpha_err = i_alpha - obs->i_alpha_hat;
+    float i_beta_err  = i_beta  - obs->i_beta_hat;
 
-    /* Sliding mode correction term Z = G1 * sign(error) */
-    float z_alpha = obs->gain1 * sgn(i_alpha_err);
-    float z_beta  = obs->gain1 * sgn(i_beta_err);
+    /* Current estimate update */
+    obs->i_alpha_hat += obs->dt * (obs->inv_ls
+        * (v_alpha - obs->rs_inv_ls * obs->i_alpha_hat - obs->e_alpha)
+        + obs->gain1 * i_alpha_err);
+    obs->i_beta_hat  += obs->dt * (obs->inv_ls
+        * (v_beta  - obs->rs_inv_ls * obs->i_beta_hat  - obs->e_beta)
+        + obs->gain1 * i_beta_err);
 
-    /* Update current estimate: I_hat += dt * (V - R*I_hat - E_hat)/L */
-    obs->i_alpha_hat += obs->dt * obs->inv_ls
-        * (v_alpha - obs->rs_inv_ls * obs->i_alpha_hat - obs->e_alpha);
-    obs->i_beta_hat  += obs->dt * obs->inv_ls
-        * (v_beta  - obs->rs_inv_ls * obs->i_beta_hat  - obs->e_beta);
+    /* Clamp I_hat to prevent divergence (max 5A) */
+    if (obs->i_alpha_hat > 5.0f) obs->i_alpha_hat = 5.0f;
+    if (obs->i_alpha_hat < -5.0f) obs->i_alpha_hat = -5.0f;
+    if (obs->i_beta_hat > 5.0f) obs->i_beta_hat = 5.0f;
+    if (obs->i_beta_hat < -5.0f) obs->i_beta_hat = -5.0f;
 
-    /* BEMF estimation: E += G2 * dt * (Z - E)   (low-pass filter of Z) */
-    obs->e_alpha += obs->gain2 * obs->dt * (z_alpha - obs->e_alpha);
-    obs->e_beta  += obs->gain2 * obs->dt * (z_beta  - obs->e_beta);
+    /* BEMF estimate update (integrator) */
+    obs->e_alpha += obs->dt * obs->gain2 * i_alpha_err;
+    obs->e_beta  += obs->dt * obs->gain2 * i_beta_err;
+
+    /* Clamp BEMF estimate to prevent integrator windup (max ~24V) */
+    if (obs->e_alpha > 30.0f) obs->e_alpha = 30.0f;
+    if (obs->e_alpha < -30.0f) obs->e_alpha = -30.0f;
+    if (obs->e_beta > 30.0f) obs->e_beta = 30.0f;
+    if (obs->e_beta < -30.0f) obs->e_beta = -30.0f;
 
     /* ── PLL: Extract angle and speed from BEMF ────────────
      *
@@ -127,6 +139,15 @@ void observer_step(observer_t *obs,
         obs->theta_elec -= 2.0f * 3.14159265359f;
     while (obs->theta_elec < 0.0f)
         obs->theta_elec += 2.0f * 3.14159265359f;
+
+    /* NaN/Inf guard: reset observer if any state diverged */
+    if (__builtin_isnan(obs->i_alpha_hat) || __builtin_isnan(obs->e_alpha) ||
+        __builtin_isnan(obs->omega_elec) || __builtin_isinf(obs->e_alpha)) {
+        obs->i_alpha_hat = 0.0f; obs->i_beta_hat = 0.0f;
+        obs->e_alpha = 0.0f; obs->e_beta = 0.0f;
+        obs->omega_elec = 0.0f; obs->pll_integral = 0.0f;
+        obs->theta_elec = 0.0f;
+    }
 
     /* ── Convergence check ────────────────────────────────
      * Consider converged when BEMF amplitude is stable and

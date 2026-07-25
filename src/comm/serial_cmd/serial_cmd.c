@@ -6,7 +6,7 @@
  *
  * RX: interrupt-driven (uart_irq + fifo_read) into ring buffer
  * TX: polling (uart_poll_out)
- * LPUART1 on NUCLEO-G431RB: PA2(TX), PA3(RX) → ST-Link VCP
+ * USART1 on NUCLEO-G431RB: PB6(TX), PB7(RX)
  */
 
 #include "comm/serial_cmd.h"
@@ -450,7 +450,7 @@ void serial_cmd_tx_thread(void *arg1, void *arg2, void *arg3)
 
 int serial_cmd_init(void)
 {
-    uart_dev = DEVICE_DT_GET(DT_NODELABEL(lpuart1));
+    uart_dev = DEVICE_DT_GET(DT_NODELABEL(usart1));
     if (!device_is_ready(uart_dev)) {
         LOG_ERR("UART device not ready");
         return -ENODEV;
@@ -473,6 +473,6 @@ int serial_cmd_init(void)
     g_commander_cmd_pub = msghub_create_publisher(MSGHUB_TOPIC(commander_cmd));
     g_motor_cmd_pub = msghub_create_publisher(MSGHUB_TOPIC(motor_cmd));
 
-    LOG_INF("Serial command init: LPUART1 @ 115200 baud (IRQ RX)");
+    LOG_INF("Serial command init: USART1 @ 115200 baud (IRQ RX)");
     return 0;
 }

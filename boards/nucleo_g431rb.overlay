@@ -5,13 +5,12 @@
 	};
 
 	/*
-	 * Redirect Zephyr console to USART1 (PB6/PB7).
-	 * LPUART1 (ST-Link VCP) is exclusively for binary protocol.
-	 * To read debug logs, connect a USB-UART adapter to PB6(TX).
+	 * Console/Shell on LPUART1 (ST-Link VCP) for interactive debug.
+	 * USART1 (PB6/PB7) reserved for binary protocol (serial_cmd).
 	 */
 	chosen {
-		zephyr,console = &usart1;
-		zephyr,shell-uart = &usart1;
+		zephyr,console = &lpuart1;
+		zephyr,shell-uart = &lpuart1;
 	};
 };
 
@@ -27,7 +26,7 @@
 /*
  * USART1 remap to PB6(TX)/PB7(RX):
  * Default PC4/PC5 conflicts with ADC2_IN11 (Vbus sensing on PC5).
- * USART1 is reserved for debug logs; binary protocol uses LPUART1 (ST-Link VCP).
+ * USART1 carries binary protocol (serial_cmd); console uses LPUART1 (ST-Link VCP).
  */
 &usart1 {
 	pinctrl-0 = <&usart1_tx_pb6 &usart1_rx_pb7>;

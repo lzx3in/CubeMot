@@ -37,36 +37,38 @@
 ### 待硬件验证 ⏸
 
 > 需要 NUCLEO-G431RB + X-NUCLEO-IHM16M1 + 电机 + 24V 电源
-> 验证手段：串口遥测（主）+ 信号分析仪（辅）
-> 协议栈：`scripts/cubemot_protocol.py`，USART1 @ 115200 baud (PB6/PB7)
+> 验证手段：Zephyr Shell（主，USB 一根线）+ 信号分析仪（辅）
+> Shell 接口：LPUART1 → ST-Link VCP → USB，115200 baud
 
-| # | 验证项 | 方法 | 预期结果 |
+| # | 验证项 | Shell 命令 | 预期结果 |
 |---|--------|------|--------|
-| V.1 | TIM1 PWM 输出 | 信号分析仪接 PA8，验证 30kHz 载波 | 中心对齐 PWM，频率 30kHz |
-| V.2 | ADC 零电流偏移 | 电机未通电，观察 DIAG 遥测 (RSP_DIAG) | Ia/Ib/Ic 在 ~2048±20 LSB |
-| V.3 | 电流环开环 | CMD_TEST(0, Id=0.8A)，观察 DIAG 遥测 | 三相 ADC 正弦分布，电机锁定 |
-| V.4 | 启动序列 | CMD_MOTOR_START(500RPM)，观察 RSP_MOTOR | IDLE→ALIGN→START→RUN |
-| V.5 | 速度闭环 | 同 V.4，稳态后读 speed_rpm | 500±25 RPM（误差 <5%） |
+| V.1 | TIM1 PWM 输出 | `foc start 800` + 信号分析仪接 PA8 | 中心对齐 PWM，30kHz |
+| V.2 | ADC 零电流偏移 | `adc offset`（电机未通电） | Ia/Ib/Ic ≈ 2048±20 LSB |
+| V.3 | 电流环开环 | `foc start 800` → `foc status` | Id≈800mA，电机锁定 |
+| V.4 | 启动序列 | `motor start 500` → `motor watch` | IDLE→ALIGN→START→RUN |
+| V.5 | 速度闭环 | 同 V.4，稳态后读 speed | 500±25 RPM（误差 <5%） |
 
-#### 验证操作速查
+#### 验证操作速查（Shell 命令）
 
-```python
-import serial, struct, sys
-sys.path.insert(0, 'scripts')
-from cubemot_protocol import *
-ser = serial.Serial('/dev/ttyACM0', 115200, timeout=1)
+```bash
+# 连接 USB 后打开终端
+minicom -D /dev/ttyACM0 -b 115200   # 或 screen /dev/ttyACM0 115200
 
-# V.2: 观察 ADC 偏移（收集 DIAG 帧）
-frames = collect_frames(ser, 2.0)
+# V.2: ADC 偏移（电机未通电）
+uart:~$ adc offset
 
-# V.3: 开环 Id=0.8A
-ser.write(build_frame(CMD_TEST, bytes([0]) + struct.pack('<f', 0.8)))
+# V.3: 开环电流环
+uart:~$ foc start 800       # Id=800mA
+uart:~$ foc status          # 查看 Id/Iq/Vbus/duty
+uart:~$ foc stop
 
-# V.4/V.5: 启动 500 RPM
-ser.write(build_frame(CMD_MOTOR_START, bytes([0]) + struct.pack('<f', 500.0)))
+# V.4/V.5: 启动序列 + 速度闭环
+uart:~$ motor start 500     # 500 RPM
+uart:~$ motor watch 500 10  # 每 500ms 打印，共 10 次
+uart:~$ motor stop
 
-# 停止
-ser.write(build_frame(CMD_MOTOR_STOP, bytes([0])))
+# 诊断
+uart:~$ adc diag            # ADC 软件触发全诊断
 ```
 
 #### 信号分析仪测量点（可选）

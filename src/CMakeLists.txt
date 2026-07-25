@@ -52,6 +52,13 @@ target_sources(app PRIVATE
 
 # ── Optional modules (Kconfig-gated) ─────────────────────
 
+# Shell commands (development/verification interface)
+if(CONFIG_SHELL)
+    target_sources(app PRIVATE
+        app/shell_cmds.c
+    )
+endif()
+
 if(CONFIG_MODULE_BLINK_ENABLE)
     target_include_directories(app PRIVATE
         modules/blink/include

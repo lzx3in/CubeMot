@@ -1,7 +1,7 @@
 # CubeMot 实施计划
 
 > 四轮驱动 + 转向舵机小车 | Zephyr RTOS | STM32G431RB
-> 最后更新: 2026-07-25 16:00 GMT+8
+> 最后更新: 2026-07-25 23:30 GMT+8
 
 ---
 
@@ -9,7 +9,7 @@
 
 | 阶段 | 内容 | 状态 |
 |------|------|------|
-| **V1** | 1 电机 FOC + 无感启动 + msghub 集成 | ✅ 代码完成，⏸ 待硬件验证（串口遥测 + 信号分析仪） |
+| **V1** | 1 电机 FOC + 无感启动 + msghub 集成 | ✅ V.1~V.4 硬件验证通过，V.5 待观测器调参 |
 | **V2** | 2 电机 + 1 舵机 + Commander + Serial 遥控 | ✅ 代码完成，⏸ 待硬件（当前仅 1 电机，无舵机） |
 | **V3** | 4 电机 + 2 舵机 + 完整四轮 | 🚫 搁置 |
 | **V4** | IMU + 里程计 + 自主导航 | 🚫 搁置 |
@@ -34,19 +34,38 @@
 | 4.2 | 无感启动序列：Align→Forced Ramp→Switchover | 同上 | ✅ 编译通过 |
 | 5.1 | motor_cmd / motor_state msghub topics | `topics/topics.h` | ✅ 编译通过 |
 
-### 待硬件验证 ⏸
+### 硬件验证结果（2026-07-25）
 
-> 需要 NUCLEO-G431RB + X-NUCLEO-IHM16M1 + 电机 + 24V 电源
-> 验证手段：Zephyr Shell（主，USB 一根线）+ 信号分析仪（辅）
-> Shell 接口：LPUART1 → ST-Link VCP → USB，115200 baud
+> 硬件：NUCLEO-G431RB + X-NUCLEO-IHM16M1 + GBM2804H-100T + 12V
+> 验证手段：Zephyr Shell（USB LPUART1 → ST-Link V3 VCP）
+> 电源：12V（非 24V）
 
-| # | 验证项 | Shell 命令 | 预期结果 |
-|---|--------|------|--------|
-| V.1 | TIM1 PWM 输出 | `foc start 800` + 信号分析仪接 PA8 | 中心对齐 PWM，30kHz |
-| V.2 | ADC 零电流偏移 | `adc offset`（电机未通电） | Ia/Ib/Ic ≈ 2048±20 LSB |
-| V.3 | 电流环开环 | `foc start 800` → `foc status` | Id≈800mA，电机锁定 |
-| V.4 | 启动序列 | `motor start 500` → `motor watch` | IDLE→ALIGN→START→RUN |
-| V.5 | 速度闭环 | 同 V.4，稳态后读 speed | 500±25 RPM（误差 <5%） |
+| # | 验证项 | 结果 | 关键数据 |
+|---|--------|------|----------|
+| V.1 | TIM1 PWM 输出 | ✅ | 30kHz, MOE=1, ES_GPIO 下管使能 |
+| V.2 | ADC 零电流偏移 | ✅ | Ia=1939, Ib=1944, Ic=1950 (≈2048±100) |
+| V.3 | 电流环开环 | ✅ | Id=679.8mA (ref=800mA), 电机锁定有力矩 |
+| V.4 | 启动序列 | ✅ | IDLE→ALIGN→START→RUN 完整通过，电机转动 |
+| V.5 | 速度闭环 | ⚠️ | 状态机进入 RUN，观测器未收敛→速度=0 |
+
+#### V.5 阻塞原因
+
+滑模观测器（Luenberger + PLL）在 Phase2 开环阶段未正确收敛，
+导致切换到闭环后 theta 估计错误。属于**参数调优**问题。
+
+待解决：
+- 观测器增益需匹配 GBM2804H-100T 实际 Rs/Ls
+- PLL Kp/Ki 需降低以容忍噪声
+- 可参考 MCSDK Workbench 生成的定点参数转换
+
+#### 本次硬件验证修复的 bug
+
+1. Shell USB 接入：VCP 实际桥接 LPUART1（非 USART1）
+2. ADC 左对齐 >>4 修正
+3. ADC 注入转换改为流水线模式（解决 ISR 中读零）
+4. PB13/14/15 改为 ES_GPIO 模式（STSPIN830 不接受互补 PWM）
+5. 观测器双重调用修复（ISR + motor_ctrl 重复 step）
+6. 三重过流保护（ISR 级 + Iq 限幅 + Phase2 超时停止）
 
 #### 验证操作速查（Shell 命令）
 

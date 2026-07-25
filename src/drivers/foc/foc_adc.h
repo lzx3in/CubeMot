@@ -59,6 +59,16 @@ void foc_adc_start_vbus(void);
 bool foc_adc_vbus_ready(void);
 
 /**
+ * @brief  Blocking read of bus voltage [V] from ADC2 regular channel
+ *
+ * Starts a software-triggered conversion, waits for completion,
+ * and returns the converted voltage. Used at init time before ISR runs.
+ *
+ * @return Bus voltage in Volts
+ */
+float foc_adc_read_vbus_blocking(void);
+
+/**
  * @brief  Calibrate ADC offsets
  *
  * Reads ADC values with all phases disabled (0 current) to

@@ -183,6 +183,21 @@ bool foc_adc_vbus_ready(void)
     return LL_ADC_IsActiveFlag_EOC(ADC_INSTANCE2);
 }
 
+float foc_adc_read_vbus_blocking(void)
+{
+    LL_ADC_ClearFlag_EOC(ADC_INSTANCE2);
+    LL_ADC_REG_StartConversion(ADC_INSTANCE2);
+
+    int timeout = 10000;
+    while (!LL_ADC_IsActiveFlag_EOC(ADC_INSTANCE2) && timeout > 0) {
+        timeout--;
+        k_busy_wait(1);
+    }
+
+    int16_t raw = (int16_t)LL_ADC_REG_ReadConversionData12(ADC_INSTANCE2);
+    return foc_adc_to_vbus(raw);
+}
+
 void foc_adc_get_offsets(int16_t *ia_offset, int16_t *ib_offset, int16_t *ic_offset)
 {
     foc_adc_raw_t raw;

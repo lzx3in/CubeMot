@@ -92,8 +92,9 @@ void foc_isr_init(void)
     /* Initialize FOC with motor parameters */
     foc_init(&g_motor_foc, &g_motor_params);
 
-    /* Set fixed bus voltage (TODO: read from ADC2 regular) */
-    g_motor_foc.state.v_bus = 24.0f;
+    /* Read initial bus voltage from ADC2 regular channel */
+    float vbus_init = foc_adc_read_vbus_blocking();
+    g_motor_foc.state.v_bus = vbus_init;
 
     /* Calibrate ADC offsets (motor must be disabled) */
     int16_t ia_off, ib_off, ic_off;
@@ -120,11 +121,9 @@ void foc_isr_init(void)
     g_isr_running = false;
     g_isr_count = 0;
 
-    /* Prime the first Vbus ADC conversion */
-    foc_adc_start_vbus();
-
     LOG_INF("FOC ISR ready (30kHz, TIM1_UP_IRQn, priority 0)");
     LOG_INF("  ADC offsets: Ia=%d Ib=%d Ic=%d", ia_off, ib_off, ic_off);
+    LOG_INF("  Vbus=%.2f V", (double)vbus_init);
 }
 
 /* ── Start/Stop ──────────────────────────────────────── */

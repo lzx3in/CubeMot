@@ -81,10 +81,8 @@ static struct k_thread vehicle_thread_data;
 #endif
 
 #if CONFIG_MODULE_SERIAL_CMD_ENABLE
-K_THREAD_STACK_DEFINE(serial_rx_stack, CONFIG_SERIAL_RX_STACK_SIZE);
-K_THREAD_STACK_DEFINE(serial_tx_stack, CONFIG_SERIAL_TX_STACK_SIZE);
-static struct k_thread serial_rx_thread_data;
-static struct k_thread serial_tx_thread_data;
+K_THREAD_STACK_DEFINE(serial_cmd_stack, CONFIG_SERIAL_CMD_STACK_SIZE);
+static struct k_thread serial_cmd_thread_data;
 #endif
 
 #if CONFIG_MODULE_MOTOR_CTRL_ENABLE
@@ -122,19 +120,12 @@ static void start_threads(void)
 #endif
 
 #if CONFIG_MODULE_SERIAL_CMD_ENABLE
-    k_thread_create(&serial_rx_thread_data, serial_rx_stack,
-                    CONFIG_SERIAL_RX_STACK_SIZE,
-                    serial_cmd_rx_thread,
+    k_thread_create(&serial_cmd_thread_data, serial_cmd_stack,
+                    CONFIG_SERIAL_CMD_STACK_SIZE,
+                    serial_cmd_thread,
                     NULL, NULL, NULL,
-                    SERIAL_RX_THREAD_PRIORITY, 0, K_NO_WAIT);
-    k_thread_name_set(&serial_rx_thread_data, "serial_rx");
-    
-    k_thread_create(&serial_tx_thread_data, serial_tx_stack,
-                    CONFIG_SERIAL_TX_STACK_SIZE,
-                    serial_cmd_tx_thread,
-                    NULL, NULL, NULL,
-                    SERIAL_TX_THREAD_PRIORITY, 0, K_NO_WAIT);
-    k_thread_name_set(&serial_tx_thread_data, "serial_tx");
+                    SERIAL_CMD_THREAD_PRIORITY, 0, K_NO_WAIT);
+    k_thread_name_set(&serial_cmd_thread_data, "serial_cmd");
 #endif
 }
 

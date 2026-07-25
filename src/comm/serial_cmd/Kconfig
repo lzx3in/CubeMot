@@ -7,18 +7,11 @@ config MODULE_SERIAL_CMD_ENABLE
 
 if MODULE_SERIAL_CMD_ENABLE
 
-config SERIAL_RX_STACK_SIZE
-	int "Serial RX thread stack size (bytes)"
-	default 2048
+config SERIAL_CMD_STACK_SIZE
+	int "Serial command thread stack size (bytes)"
+	default 1536
 	range 1024 8192
 	help
-	  Stack size for the serial RX thread.
-
-config SERIAL_TX_STACK_SIZE
-	int "Serial TX thread stack size (bytes)"
-	default 2048
-	range 1024 8192
-	help
-	  Stack size for the serial TX thread.
+	  Stack size for the unified serial command thread (RX + TX).
 
 endif # MODULE_SERIAL_CMD_ENABLE

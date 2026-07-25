@@ -332,9 +332,9 @@ static void process_command(const parsed_frame_t *frame)
     }
 }
 
-/* ── RX thread ───────────────────────────────────────── */
+/* ── Unified serial thread (RX parse + TX telemetry) ── */
 
-void serial_cmd_rx_thread(void *arg1, void *arg2, void *arg3)
+void serial_cmd_thread(void *arg1, void *arg2, void *arg3)
 {
     ARG_UNUSED(arg1);
     ARG_UNUSED(arg2);
@@ -342,41 +342,26 @@ void serial_cmd_rx_thread(void *arg1, void *arg2, void *arg3)
 
     /* Startup delay: wait for UART hardware and msghub topics to be ready */
     k_sleep(K_MSEC(300));
-    LOG_INF("Serial RX thread started (IRQ-driven)");
-
-    while (1) {
-        /* Wait for ISR callback to signal new data */
-        k_sem_take(&rx_sem, K_MSEC(10));
-
-        /* Parse all available frames */
-        parsed_frame_t frame;
-        while (parse_frame_from_ring(&frame) == 0) {
-            process_command(&frame);
-        }
-    }
-}
-
-/* ── TX thread ───────────────────────────────────────── */
-
-void serial_cmd_tx_thread(void *arg1, void *arg2, void *arg3)
-{
-    ARG_UNUSED(arg1);
-    ARG_UNUSED(arg2);
-    ARG_UNUSED(arg3);
-
-    /* Startup delay: wait for UART hardware and msghub topics to be ready */
-    k_sleep(K_MSEC(300));
-    LOG_INF("Serial TX thread started");
+    LOG_INF("Serial thread started (IRQ RX + periodic TX)");
 
     uint32_t status_counter = 0;
     uint32_t telemetry_counter = 0;
     uint32_t diag_counter = 0;
 
     while (1) {
-        /* STATUS @ 10Hz */
+        /* ── RX: parse frames signaled by ISR ─────────── */
+        k_sem_take(&rx_sem, K_MSEC(10));
+
+        parsed_frame_t frame;
+        while (parse_frame_from_ring(&frame) == 0) {
+            process_command(&frame);
+        }
+
+        /* ── TX: periodic telemetry ───────────────────── */
+
+        /* STATUS @ 10 Hz (every 10th iteration) */
         if (++status_counter >= 10) {
             status_counter = 0;
-
             commander_status_t status;
             bool updated = false;
             msghub_subscriber_update(g_commander_status_sub, &status, &updated);
@@ -386,21 +371,19 @@ void serial_cmd_tx_thread(void *arg1, void *arg2, void *arg3)
             }
         }
 
-        /* TELEMETRY @ 20Hz */
+        /* TELEMETRY @ 20 Hz (every 5th iteration) */
         if (++telemetry_counter >= 5) {
             telemetry_counter = 0;
-
             vehicle_state_t state;
             bool updated = false;
             msghub_subscriber_update(g_vehicle_state_sub, &state, &updated);
             if (updated) {
                 uint8_t payload[20];
-                memcpy(&payload[0], &state.x, 4);
-                memcpy(&payload[4], &state.y, 4);
-                memcpy(&payload[8], &state.yaw, 4);
+                memcpy(&payload[0],  &state.x, 4);
+                memcpy(&payload[4],  &state.y, 4);
+                memcpy(&payload[8],  &state.yaw, 4);
                 memcpy(&payload[12], &state.linear_x, 4);
                 memcpy(&payload[16], &state.angular_z, 4);
-
                 send_response(RSP_ID_TELEMETRY, payload, 20);
             }
         }
@@ -419,11 +402,10 @@ void serial_cmd_tx_thread(void *arg1, void *arg2, void *arg3)
             memcpy(&payload[4], &vbus, 2);
             memcpy(&payload[6], &mstate.i_d, 4);
             memcpy(&payload[10], &mstate.i_q, 4);
-
             send_response(RSP_ID_MOTOR, payload, 14);
         }
 
-        /* DIAG: FOC debug (raw ADC + duty) @ 5Hz */
+        /* DIAG: FOC debug (raw ADC + duty) @ 5 Hz */
         if (++diag_counter >= 20) {
             diag_counter = 0;
             foc_t *foc = foc_isr_get_foc();
@@ -436,13 +418,11 @@ void serial_cmd_tx_thread(void *arg1, void *arg2, void *arg3)
             memcpy(&dpayload[2], &adc_ib, 2);
             memcpy(&dpayload[4], &adc_ic, 2);
             memcpy(&dpayload[6], &off_ia, 2);
-            memcpy(&dpayload[8], &foc->state.duty_a, 4);
+            memcpy(&dpayload[8],  &foc->state.duty_a, 4);
             memcpy(&dpayload[12], &foc->state.i_d_ref, 4);
             memcpy(&dpayload[16], &foc->state.i_q_ref, 4);
             send_response(RSP_ID_DIAG, dpayload, 20);
         }
-
-        k_msleep(10);
     }
 }
 

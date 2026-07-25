@@ -51,45 +51,34 @@ extern "C" {
 #define RSP_ID_PONG             0x86
 #define RSP_ID_DIAG             0x87  /* FOC debug diagnostics */
 
-/* Thread priorities */
-#define SERIAL_RX_THREAD_PRIORITY  8
-#define SERIAL_TX_THREAD_PRIORITY  8
+/* Thread priority */
+#define SERIAL_CMD_THREAD_PRIORITY  K_PRIO_COOP(8)
 
-/* ── API ─────────────────────────────────────────────── */
+/* ── API ────────────────────────────────────────────── */
 
 /**
  * @brief  Initialize serial command module
  *
  * Opens UART, subscribes to msghub topics for TX,
- * creates RX thread.
+ * enables IRQ-driven RX.
  *
  * @return 0 on success
  */
 int serial_cmd_init(void);
 
 /**
- * @brief  Serial command RX thread
+ * @brief  Serial command thread (merged RX + TX)
  *
- * Never returns. Reads UART, parses frames,
- * publishes to msghub topics.
- *
- * @param  arg1  Unused
- * @param  arg2  Unused
- * @param  arg3  Unused
- */
-void serial_cmd_rx_thread(void *arg1, void *arg2, void *arg3);
-
-/**
- * @brief  Serial command TX thread
- *
- * Never returns. Subscribes to msghub topics,
- * encodes frames, writes to UART.
+ * Never returns. Each iteration:
+ *   1. Waits on rx_sem (10 ms timeout) for ISR-signaled RX data
+ *   2. Parses all available frames and dispatches commands
+ *   3. Sends periodic telemetry (status / vehicle / motor / diag)
  *
  * @param  arg1  Unused
  * @param  arg2  Unused
  * @param  arg3  Unused
  */
-void serial_cmd_tx_thread(void *arg1, void *arg2, void *arg3);
+void serial_cmd_thread(void *arg1, void *arg2, void *arg3);
 
 #ifdef __cplusplus
 }

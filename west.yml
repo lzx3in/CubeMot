@@ -30,4 +30,4 @@ manifest:
         - hal
 
   self:
-    path: CubeMot
+    path: cubemot-esc

@@ -27,7 +27,8 @@
       "hidden": true,
       "inherits": "base",
       "cacheVariables": {
-        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/gcc_arm_none_eabi_toolchain.cmake"
+        "BOARD": "nucleo_g431rb",
+        "ZEPHYR_TOOLCHAIN_VARIANT": "gnuarmemb"
       }
     },
     {

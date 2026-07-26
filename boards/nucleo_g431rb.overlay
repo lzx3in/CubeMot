@@ -5,8 +5,8 @@
 	};
 
 	/*
-	 * Console on USART1 (PB6/PB7) — ST-Link V3 VCP bridges USART1.
-	 * Shared with serial_cmd: log output + binary frames coexist on same line.
+	 * Console on LPUART1 (PA2/PA3) — ST-Link V3 VCP bridges LPUART1.
+	 * Shell and log output accessible via /dev/ttyACM0.
 	 */
 	chosen {
 		zephyr,console = &lpuart1;
@@ -24,9 +24,10 @@
 };
 
 /*
- * USART1 stays on default PC4(TX)/PC5(RX) — ST-Link V3E VCP is wired here.
- * NOTE: PC5 conflicts with ADC2_IN11 (Vbus). Vbus sensing disabled during
- * shell-based verification. Restore PB6/PB7 remap when VCU link is added.
+ * USART1 on PC4(TX)/PC5(RX) — NOT bridged by ST-Link V3 VCP.
+ * Available for board-level UART communication (e.g. VCU link).
+ * NOTE: PC5 conflicts with ADC2_IN11 (Vbus). Restore PB6/PB7 remap
+ * when VCU link is added.
  */
 
 /*

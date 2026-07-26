@@ -21,6 +21,7 @@
 #include "common_time.h"
 #include "common_device.h"
 #include "common_error.h"
+#include "common/motor_params.h"
 #include "scope.h"
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
@@ -31,6 +32,10 @@ LOG_MODULE_REGISTER(motor_ctrl, LOG_LEVEL_INF);
 
 #define SPEED_LOOP_HZ       1000
 #define SPEED_LOOP_PERIOD   K_MSEC(1)
+
+/* PLL tracking gains (15Hz BW): switched in at RUN transition */
+#define PLL_TRACK_KP        132.0f
+#define PLL_TRACK_KI        8874.0f
 
 /* Startup sequence parameters (grouped for easy tuning) */
 static startup_config_t g_startup_config = {
@@ -81,7 +86,7 @@ static void speed_pid_init(PID_t *pid)
      * Kp=0.001 → 500 RPM error = 0.5A (gentle proportional)
      * Ki=0.002 → integral converges in ~2s at 250 RPM error
      * integral_limit=1000 (RPM·s), output anti-windup is effective clamp
-     * output_limit=0.4A (observer PLL 5Hz stability margin) */
+     * output_limit=0.4A (current loop + observer safe envelope) */
     pid_set_parameters(pid, 0.001f, 0.002f, 0.0f, 1000.0f, 0.4f);
 }
 
@@ -147,12 +152,21 @@ static void start_phase2(motor_instance_t *m)
     m->obs->i_beta_hat = 0.0f;
     m->obs->e_alpha = 0.0f;
     m->obs->e_beta = 0.0f;
+
+    /* Restore acquisition PLL gains (5Hz) for reliable lock-in */
+    m->obs->pll_kp = g_motor_params.pll_kp;
+    m->obs->pll_ki = g_motor_params.pll_ki;
 }
 
 static void transition_to_closed_loop(motor_instance_t *m)
 {
     m->state = MOTOR_STATE_RUN;
-    LOG_INF("Motor %u: observer converged → closed loop", m->motor_id);
+
+    /* Switch PLL to high-bandwidth tracking gains (15Hz) */
+    m->obs->pll_kp = PLL_TRACK_KP;
+    m->obs->pll_ki = PLL_TRACK_KI;
+
+    LOG_INF("Motor %u: observer converged → closed loop (PLL 15Hz)", m->motor_id);
 }
 
 /* ── Process command for one motor ───────────────────── */

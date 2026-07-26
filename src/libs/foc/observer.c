@@ -68,31 +68,32 @@ void observer_step(observer_t *obs,
      *   E_hat += dt * L2 * (I - I_hat)
      */
 
-    float a = obs->rs_inv_ls + obs->gain1;  /* ~10628 for our motor */
-    float denom = 1.0f + obs->dt * a;       /* ~11.6 at 1kHz, ~1.35 at 30kHz */
+    float a = obs->rs_inv_ls + obs->gain1;
+    float denom = 1.0f + obs->dt * a;
     float inv_denom = 1.0f / denom;
 
-    /* Forcing terms */
+    /* Pre-update current error (innovation signal for BEMF estimation) */
+    float i_alpha_err = i_alpha - obs->i_alpha_hat;
+    float i_beta_err  = i_beta  - obs->i_beta_hat;
+
+    /* Current observer (backward Euler) */
     float b_alpha = obs->inv_ls * (v_alpha - obs->e_alpha) + obs->gain1 * i_alpha;
     float b_beta  = obs->inv_ls * (v_beta  - obs->e_beta)  + obs->gain1 * i_beta;
 
-    /* Backward Euler update for I_hat */
     obs->i_alpha_hat = (obs->i_alpha_hat + obs->dt * b_alpha) * inv_denom;
     obs->i_beta_hat  = (obs->i_beta_hat  + obs->dt * b_beta)  * inv_denom;
 
-    /* Clamp I_hat (max 5A) */
+    /* Clamp I_hat */
     if (obs->i_alpha_hat > 5.0f) obs->i_alpha_hat = 5.0f;
     if (obs->i_alpha_hat < -5.0f) obs->i_alpha_hat = -5.0f;
     if (obs->i_beta_hat > 5.0f) obs->i_beta_hat = 5.0f;
     if (obs->i_beta_hat < -5.0f) obs->i_beta_hat = -5.0f;
 
-    /* Current estimation error (using updated I_hat) */
-    float i_alpha_err = i_alpha - obs->i_alpha_hat;
-    float i_beta_err  = i_beta  - obs->i_beta_hat;
-
-    /* BEMF estimate update (integrator) */
-    obs->e_alpha += obs->dt * obs->gain2 * i_alpha_err;
-    obs->e_beta  += obs->dt * obs->gain2 * i_beta_err;
+    /* BEMF estimate: integrator driven by pre-update current error.
+     * gain2 must be high enough to overcome backward Euler damping.
+     * Effective loop gain = gain2 * dt * L1 * Ls ≈ gain2 * 0.001 * 5.95 */
+    obs->e_alpha += obs->gain2 * i_alpha_err;
+    obs->e_beta  += obs->gain2 * i_beta_err;
 
     /* Clamp BEMF (max 30V) */
     if (obs->e_alpha > 30.0f) obs->e_alpha = 30.0f;
@@ -115,11 +116,18 @@ void observer_step(observer_t *obs,
 
     float cos_t, sin_t;
     fast_sincos(obs->theta_elec, &sin_t, &cos_t);
-    float theta_error = obs->e_alpha * cos_t + obs->e_beta * sin_t;
 
-    /* Clamp theta error to prevent windup */
-    if (theta_error > 100.0f)  theta_error = 100.0f;
-    if (theta_error < -100.0f) theta_error = -100.0f;
+    /* Normalized phase error: project BEMF onto rotor direction,
+     * then divide by |BEMF| to get sin(angle_error) in [-1, 1].
+     * This makes PLL gains independent of BEMF amplitude. */
+    float bemf_proj = obs->e_alpha * cos_t + obs->e_beta * sin_t;
+    float bemf_amp = __builtin_sqrtf(obs->e_alpha * obs->e_alpha
+                                   + obs->e_beta * obs->e_beta);
+    float theta_error = (bemf_amp > 0.1f) ? (bemf_proj / bemf_amp) : 0.0f;
+
+    /* Clamp to [-1, 1] (already normalized, but safety) */
+    if (theta_error > 1.0f)  theta_error = 1.0f;
+    if (theta_error < -1.0f) theta_error = -1.0f;
 
     /* PLL integrator */
     obs->pll_integral += obs->pll_ki * theta_error * obs->dt;
@@ -151,15 +159,14 @@ void observer_step(observer_t *obs,
     }
 
     /* ── Convergence check ────────────────────────────────
-     * Consider converged when BEMF amplitude is stable and
-     * θ_error is small for N consecutive cycles.
+     * Consider converged when BEMF amplitude is sufficient and
+     * normalized θ_error is small for N consecutive cycles.
      */
-    float bemf_amp = __builtin_sqrtf(obs->e_alpha * obs->e_alpha + obs->e_beta * obs->e_beta);
-    float bemf_min = 0.1f; // minimum BEMF for reliable angle
+    float bemf_min = 0.5f; /* minimum BEMF for reliable angle */
 
-    if (bemf_amp > bemf_min && __builtin_fabsf(theta_error) < 500.0f) {
+    if (bemf_amp > bemf_min && __builtin_fabsf(theta_error) < 0.3f) {
         obs->consecutive_ok++;
-        if (obs->consecutive_ok > 50) {
+        if (obs->consecutive_ok > 100) {  /* 100ms at 1kHz */
             obs->converged = true;
         }
     } else {

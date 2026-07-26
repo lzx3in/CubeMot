@@ -237,14 +237,23 @@ static void run_speed_loop(motor_instance_t *m)
                       m->foc->state.v_alpha, m->foc->state.v_beta,
                       m->foc->state.i_alpha, m->foc->state.i_beta);
 
-        float est_speed = foc_rads_to_rpm(
-            __builtin_fabsf(m->obs->omega_elec), m->foc->config->pole_pairs);
+        /* During START: force observer theta to track forced angle.
+         * This keeps BEMF estimation aligned with actual rotor position.
+         * PLL only takes over after switchover to RUN. */
+        m->obs->theta_elec = m->foc->state.theta_elec;
+        m->obs->omega_elec = omega_ref;  /* feed forward speed */
 
-        if (est_speed > g_startup_config.obs_min_speed_rpm) {
+        /* Convergence: check BEMF amplitude (observer's E_hat should grow
+         * as motor speeds up). Threshold ~0.5V means motor is spinning. */
+        float bemf = __builtin_sqrtf(m->obs->e_alpha * m->obs->e_alpha
+                                   + m->obs->e_beta * m->obs->e_beta);
+        if (bemf > 0.5f && ramp_speed > 200.0f) {
             m->consecutive_ok++;
-            if (m->consecutive_ok >= g_startup_config.consecutive_ok) {
+            if (m->consecutive_ok >= 50) {  /* 50ms stable */
+                /* Initialize PLL integral to current forced speed */
+                m->obs->pll_integral = omega_ref;
+                m->obs->omega_elec = omega_ref;
                 transition_to_closed_loop(m);
-                m->foc->state.theta_elec = m->obs->theta_elec;
             }
         } else {
             m->consecutive_ok = 0;

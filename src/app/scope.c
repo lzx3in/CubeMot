@@ -46,7 +46,10 @@ static struct k_thread stream_thread_data;
 static void stream_consumer_thread(void *a, void *b, void *c)
 {
     ARG_UNUSED(a); ARG_UNUSED(b); ARG_UNUSED(c);
-    char line[64];
+    uint8_t seq = 0;
+    /* Binary frame: [0xA5][seq][9×int16 LE] = 20 bytes */
+    uint8_t frame[20];
+    frame[0] = 0xA5;  /* sync byte */
 
     while (1) {
         k_sleep(K_MSEC(1));
@@ -60,12 +63,14 @@ static void stream_consumer_thread(void *a, void *b, void *c)
             scope_sample_t s = g_stream_ring[g_stream_tail];
             g_stream_tail = (g_stream_tail + 1) % SCOPE_STREAM_SLOTS;
 
-            int len = snprintf(line, sizeof(line),
-                               "S%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
-                               s.ch[0], s.ch[1], s.ch[2], s.ch[3],
-                               s.ch[4], s.ch[5], s.ch[6], s.ch[7], s.ch[8]);
-            for (int i = 0; i < len; i++) {
-                uart_poll_out(g_stream_uart, line[i]);
+            frame[1] = seq++;
+            /* Pack 9×int16 little-endian */
+            for (int i = 0; i < SCOPE_CHANNELS; i++) {
+                frame[2 + i * 2]     = (uint8_t)(s.ch[i] & 0xFF);
+                frame[2 + i * 2 + 1] = (uint8_t)((s.ch[i] >> 8) & 0xFF);
+            }
+            for (int i = 0; i < 20; i++) {
+                uart_poll_out(g_stream_uart, frame[i]);
             }
         }
     }
@@ -188,9 +193,8 @@ void scope_stream_start(uint8_t decimation)
     g_stream_tail = 0;
     g_streaming = true;
 
-    /* Emit header */
-    stream_uart_puts("#SCOPE_STREAM\n");
-    stream_uart_puts("th_foc,th_obs,omega,id,iq,iq_ref,rpm,bemf,state\n");
+    /* Emit binary mode header */
+    stream_uart_puts("#SCOPE_BIN\n");
 
     /* Start consumer thread on first use */
     static bool thread_started = false;

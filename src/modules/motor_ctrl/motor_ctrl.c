@@ -77,11 +77,12 @@ static bool g_hw_initialized = false;
 static void speed_pid_init(PID_t *pid)
 {
     pid_init(pid, PID_MODE_DERIVATIV_CALC_NO_SP, 1.0f / SPEED_LOOP_HZ);
-    /* Gimbal motor speed PID:
-     * Kp=0.002 → 50 RPM error = 0.1A output
-     * Ki=0.001 → eliminates 70 RPM error in ~2s
-     * integral_limit=0.2, output_limit=0.3 */
-    pid_set_parameters(pid, 0.002f, 0.001f, 0.0f, 0.2f, 0.3f);
+    /* Speed PID (1kHz loop):
+     * Kp=0.001 → 500 RPM error = 0.5A (gentle proportional)
+     * Ki=0.002 → integral converges in ~2s at 250 RPM error
+     * integral_limit=1000 (RPM·s), output anti-windup is effective clamp
+     * output_limit=0.4A (observer PLL 5Hz stability margin) */
+    pid_set_parameters(pid, 0.001f, 0.002f, 0.0f, 1000.0f, 0.4f);
 }
 
 /* ── Init ─────────────────────────────────────────────── */

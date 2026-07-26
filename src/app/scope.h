@@ -16,6 +16,7 @@ extern "C" {
 
 #define SCOPE_CHANNELS  9
 #define SCOPE_DEPTH     128  /* 128ms @ 1kHz */
+#define SCOPE_STREAM_SLOTS 4 /* SPSC ring for stream mode (4×18B=72B) */
 
 typedef struct {
     int16_t ch[SCOPE_CHANNELS];
@@ -41,6 +42,11 @@ bool scope_is_active(void);
 void scope_record(int8_t motor_state);  /* call from motor_ctrl thread each tick */
 uint16_t scope_get_count(void);
 const scope_sample_t *scope_get_buf(void);
+
+/* ── Stream mode: real-time CSV over UART (unlimited duration) ── */
+void scope_stream_start(uint8_t decimation);
+void scope_stream_stop(void);
+bool scope_is_streaming(void);
 
 #ifdef __cplusplus
 }

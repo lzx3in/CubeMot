@@ -375,8 +375,8 @@ void motor_ctrl_thread(void *arg1, void *arg2, void *arg3)
             }
         }
 
-        /* High-res scope capture @ 1kHz */
-        if (scope_is_active()) {
+        /* High-res scope capture @ 1kHz (ring buffer OR stream) */
+        if (scope_is_active() || scope_is_streaming()) {
             scope_record((int8_t)g_motors[0].state);
         }
 

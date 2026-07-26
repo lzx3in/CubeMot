@@ -600,17 +600,44 @@ static int cmd_scope_status(const struct shell *sh, size_t argc, char **argv)
 {
     ARG_UNUSED(argc);
     ARG_UNUSED(argv);
-    shell_print(sh, "Scope: %s, %u/%u samples",
+    shell_print(sh, "Scope: ring=%s (%u/%u), stream=%s",
                 scope_is_active() ? "ACTIVE" : "idle",
-                scope_get_count(), SCOPE_DEPTH);
+                scope_get_count(), SCOPE_DEPTH,
+                scope_is_streaming() ? "ACTIVE" : "idle");
+    return 0;
+}
+
+static int cmd_scope_stream(const struct shell *sh, size_t argc, char **argv)
+{
+    uint8_t decim = 50;  /* default 20Hz */
+    if (argc > 1) decim = (uint8_t)atoi(argv[1]);
+    if (decim < 1) decim = 1;
+
+    /* Stop ring buffer if active (mutual exclusion) */
+    scope_stop();
+    scope_stream_start(decim);
+    shell_print(sh, "Scope STREAM started (decim=%u, %uHz)",
+                decim, 1000 / decim);
+    return 0;
+}
+
+static int cmd_scope_stream_stop(const struct shell *sh, size_t argc, char **argv)
+{
+    ARG_UNUSED(argc);
+    ARG_UNUSED(argv);
+    scope_stream_stop();
+    shell_print(sh, "Scope STREAM stopped");
     return 0;
 }
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_scope,
-    SHELL_CMD_ARG(start, NULL, "Start capture [decimation] (default=1)",
+    SHELL_CMD_ARG(start, NULL, "Start ring capture [decimation] (default=1)",
                   cmd_scope_start, 1, 1),
-    SHELL_CMD(stop, NULL, "Stop capture", cmd_scope_stop),
-    SHELL_CMD(dump, NULL, "Dump buffer as CSV", cmd_scope_dump),
+    SHELL_CMD(stop, NULL, "Stop ring capture", cmd_scope_stop),
+    SHELL_CMD(dump, NULL, "Dump ring buffer as CSV", cmd_scope_dump),
+    SHELL_CMD_ARG(stream, NULL, "Start real-time CSV stream [decim] (default=50)",
+                  cmd_scope_stream, 1, 1),
+    SHELL_CMD(stream_stop, NULL, "Stop real-time stream", cmd_scope_stream_stop),
     SHELL_CMD(status, NULL, "Show scope status", cmd_scope_status),
     SHELL_SUBCMD_SET_END
 );
@@ -660,7 +687,8 @@ static int cmd_obs_status(const struct shell *sh, size_t argc, char **argv)
     shell_print(sh, "  BEMF a/b:    %.3f / %.3f V",
                 (double)obs->e_alpha, (double)obs->e_beta);
     shell_print(sh, "  BEMF amp:    %.3f V", (double)bemf_amp);
-    shell_print(sh, "  theta_error: %.4f (norm)", (double)theta_error);
+    shell_print(sh, "  theta_error: %.4f (norm, ema=%.4f)",
+                (double)theta_error, (double)obs->theta_error_ema);
     shell_print(sh, "  PLL integral:%.3f", (double)obs->pll_integral);
     shell_print(sh, "  Converged:   %s (consec=%u)",
                 obs->converged ? "YES" : "NO", obs->consecutive_ok);

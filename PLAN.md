@@ -1,7 +1,7 @@
 # CubeMot 实施计划
 
 > 四轮驱动 + 转向舵机小车 | Zephyr RTOS | STM32G431RB
-> 最后更新: 2026-07-25 23:30 GMT+8
+> 最后更新: 2026-07-26 02:00 GMT+8
 
 ---
 
@@ -9,7 +9,7 @@
 
 | 阶段 | 内容 | 状态 |
 |------|------|------|
-| **V1** | 1 电机 FOC + 无感启动 + msghub 集成 | ✅ V.1~V.4 硬件验证通过，V.5 待观测器调参 |
+| **V1** | 1 电机 FOC + 无感启动 + msghub 集成 | ✅ 全部通过（V.1~V.5 硬件验证完成） |
 | **V2** | 2 电机 + 1 舵机 + Commander + Serial 遥控 | ✅ 代码完成，⏸ 待硬件（当前仅 1 电机，无舵机） |
 | **V3** | 4 电机 + 2 舵机 + 完整四轮 | 🚫 搁置 |
 | **V4** | IMU + 里程计 + 自主导航 | 🚫 搁置 |
@@ -46,17 +46,17 @@
 | V.2 | ADC 零电流偏移 | ✅ | Ia=1939, Ib=1944, Ic=1950 (≈2048±100) |
 | V.3 | 电流环开环 | ✅ | Id=679.8mA (ref=800mA), 电机锁定有力矩 |
 | V.4 | 启动序列 | ✅ | IDLE→ALIGN→START→RUN 完整通过，电机转动 |
-| V.5 | 速度闭环 | ⚠️ | 状态机进入 RUN，观测器未收敛→速度=0 |
+| V.5 | 速度闭环 | ✅ | RPM=500±5 (1%), iq_ref=±6mA, 无 limit cycle |
 
-#### V.5 阻塞原因
+#### V.5 调参历程
 
-滑模观测器（Luenberger + PLL）在 Phase2 开环阶段未正确收敛，
-导致切换到闭环后 theta 估计错误。属于**参数调优**问题。
+1. 观测器 BEMF 极性取反（PLL 锁 180° 问题）
+2. 观测器 speed_rpm_filt 电气/机械 RPM 混淆修复
+3. 速度 PID limit cycle 消除（Kp 从 2.0 降到 0.002）
+4. 速度滤波 alpha=0.03（~5Hz BW，抑制 30kHz 混叠）
+5. Ki=0.001 消除稳态误差
 
-待解决：
-- 观测器增益需匹配 GBM2804H-100T 实际 Rs/Ls
-- PLL Kp/Ki 需降低以容忍噪声
-- 可参考 MCSDK Workbench 生成的定点参数转换
+最终 PID: Kp=0.002, Ki=0.001, limits=±0.3A
 
 #### 本次硬件验证修复的 bug
 
@@ -85,6 +85,12 @@ uart:~$ foc stop
 uart:~$ motor start 500     # 500 RPM
 uart:~$ motor watch 500 10  # 每 500ms 打印，共 10 次
 uart:~$ motor stop
+
+# 高分辨率诊断 (1kHz 环形缓冲区)
+uart:~$ scope start [N]     # N=抽取因子 (1=128ms, 4=512ms, 8=1024ms)
+uart:~$ scope stop
+uart:~$ scope dump          # 输出 CSV
+uart:~$ scope status
 
 # 诊断
 uart:~$ adc diag            # ADC 软件触发全诊断
@@ -185,9 +191,9 @@ cd cubemot-esc && cmake -B build_test -S tests && cmake --build build_test && ct
 
 | 信号 | 引脚 | NUCLEO 位置 |
 |------|------|------------|
-| Phase UH / UL | PA8 / PB13 | CN5-1 / CN5-4 |
-| Phase VH / VL | PA9 / PB14 | CN5-2 / CN5-5 |
-| Phase WH / WL | PA10 / PB15 | CN5-3 / CN5-6 |
+| Phase UH / EN_U | PA8 / PB13 (GPIO) | CN5-1 / CN5-4 |
+| Phase VH / EN_V | PA9 / PB14 (GPIO) | CN5-2 / CN5-5 |
+| Phase WH / EN_W | PA10 / PB15 (GPIO) | CN5-3 / CN5-6 |
 | Ia (U相电流) | PA1 | CN8-1 |
 | Ib (V相电流) | PB11 | CN8-3 |
 | Ic (W相电流) | PA7 | CN8-2 |

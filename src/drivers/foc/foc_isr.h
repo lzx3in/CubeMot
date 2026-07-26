@@ -80,3 +80,15 @@ void foc_isr_set_observer_override(bool override);
  * @return true if ISR is NOT updating theta from observer
  */
 bool foc_isr_get_observer_override(void);
+
+/**
+ * @brief  Set overcurrent protection threshold
+ * @param  amps  Threshold in Amperes (e.g. 2.0f)
+ */
+void foc_isr_set_oc_threshold(float amps);
+
+/**
+ * @brief  Get overcurrent protection threshold
+ * @return Threshold in Amperes
+ */
+float foc_isr_get_oc_threshold(void);

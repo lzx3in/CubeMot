@@ -24,6 +24,7 @@
 #include "scope.h"
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+#include <string.h>
 LOG_MODULE_REGISTER(motor_ctrl, LOG_LEVEL_INF);
 
 /* ── Constants (from Workbench) ──────────────────────── */
@@ -32,17 +33,7 @@ LOG_MODULE_REGISTER(motor_ctrl, LOG_LEVEL_INF);
 #define SPEED_LOOP_PERIOD   K_MSEC(1)
 
 /* Startup sequence parameters (grouped for easy tuning) */
-typedef struct {
-    uint32_t phase1_duration_ms;   /* Alignment phase duration */
-    float    phase1_align_current; /* Alignment current [A] */
-    uint32_t phase2_duration_ms;   /* Forced ramp duration */
-    float    phase2_final_speed;   /* Final speed for ramp [RPM] */
-    float    phase2_current;       /* Ramp current [A] */
-    float    obs_min_speed_rpm;    /* Min speed for observer convergence */
-    uint32_t consecutive_ok;       /* Consecutive OK count for switchover */
-} startup_config_t;
-
-static const startup_config_t g_startup_config = {
+static startup_config_t g_startup_config = {
     .phase1_duration_ms  = 1000,
     .phase1_align_current = 0.8f,
     .phase2_duration_ms  = 4000,   /* 4s ramp for observer convergence */
@@ -401,4 +392,47 @@ void motor_ctrl_thread(void *arg1, void *arg2, void *arg3)
 
         k_sleep(SPEED_LOOP_PERIOD);
     }
+}
+
+/* ── Runtime tuning accessors ─────────────────────── */
+
+PID_t *motor_ctrl_get_speed_pid(uint8_t motor_id)
+{
+    if (motor_id >= MAX_MOTORS || !g_motors[motor_id].initialized) {
+        return NULL;
+    }
+    return &g_motors[motor_id].speed_pid;
+}
+
+void motor_ctrl_set_speed_gains(uint8_t motor_id, float kp, float ki)
+{
+    if (motor_id >= MAX_MOTORS || !g_motors[motor_id].initialized) {
+        return;
+    }
+    PID_t *pid = &g_motors[motor_id].speed_pid;
+    pid_set_parameters(pid, kp, ki, pid->kd,
+                       pid->integral_limit, pid->output_limit);
+}
+
+const startup_config_t *motor_ctrl_get_startup_cfg(void)
+{
+    return &g_startup_config;
+}
+
+int motor_ctrl_set_startup_param(const char *key, int value)
+{
+    if (strcmp(key, "align_ms") == 0) {
+        g_startup_config.phase1_duration_ms = (uint32_t)value;
+    } else if (strcmp(key, "align_ma") == 0) {
+        g_startup_config.phase1_align_current = (float)value / 1000.0f;
+    } else if (strcmp(key, "ramp_ms") == 0) {
+        g_startup_config.phase2_duration_ms = (uint32_t)value;
+    } else if (strcmp(key, "ramp_rpm") == 0) {
+        g_startup_config.phase2_final_speed = (float)value;
+    } else if (strcmp(key, "ramp_ma") == 0) {
+        g_startup_config.phase2_current = (float)value / 1000.0f;
+    } else {
+        return -1;
+    }
+    return 0;
 }

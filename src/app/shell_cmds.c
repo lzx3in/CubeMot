@@ -21,6 +21,9 @@
 #include "drivers/foc/foc_pwm.h"
 #include "drivers/foc/foc_adc.h"
 #include "libs/foc/foc_types.h"
+#include "libs/foc/foc_core.h"
+#include "modules/motor_ctrl/motor_ctrl.h"
+#include "common/motor_params.h"
 #include "topics/topics.h"
 #include "common_time.h"
 #include "scope.h"
@@ -122,6 +125,86 @@ static int cmd_foc_status(const struct shell *sh, size_t argc, char **argv)
     return 0;
 }
 
+static int cmd_foc_pid(const struct shell *sh, size_t argc, char **argv)
+{
+    PID_t *pid = foc_get_pid_id();
+
+    if (argc < 3) {
+        shell_print(sh, "Current loop PI: Kp=%.4f  Ki=%.4f",
+                    (double)pid->kp, (double)pid->ki);
+        shell_print(sh, "  (limits: integral=%.1f, output=%.1f)",
+                    (double)pid->integral_limit, (double)pid->output_limit);
+        shell_print(sh, "Usage: foc pid <kp_milli> <ki_milli>  (e.g. 3300 550 = 3.3, 0.55)");
+        return 0;
+    }
+
+    float kp = (float)atoi(argv[1]) / 1000.0f;
+    float ki = (float)atoi(argv[2]) / 1000.0f;
+    foc_set_current_gains(kp, ki);
+
+    shell_print(sh, "Current loop PI set: Kp=%.4f  Ki=%.4f", (double)kp, (double)ki);
+    return 0;
+}
+
+static int cmd_foc_params(const struct shell *sh, size_t argc, char **argv)
+{
+    ARG_UNUSED(argc);
+    ARG_UNUSED(argv);
+
+    const foc_motor_config_t *cfg = &g_motor_params;
+    PID_t *pid_i = foc_get_pid_id();
+    PID_t *spd = motor_ctrl_get_speed_pid(0);
+    observer_t *obs = foc_isr_get_observer();
+    const startup_config_t *scfg = motor_ctrl_get_startup_cfg();
+
+    shell_print(sh, "── Motor Parameters ──");
+    shell_print(sh, "  Rs=%.2f Ohm  Ls=%.3f mH  PP=%u",
+                (double)cfg->rs, (double)(cfg->ls * 1000.0f), cfg->pole_pairs);
+    shell_print(sh, "  Max speed: %.0f RPM  Iq_max: %.1f A",
+                (double)cfg->max_speed_rpm, (double)cfg->iq_max);
+    shell_print(sh, "── Current Loop PI ──");
+    shell_print(sh, "  Kp=%.4f  Ki=%.4f", (double)pid_i->kp, (double)pid_i->ki);
+    shell_print(sh, "── Speed Loop PI ──");
+    if (spd) {
+        shell_print(sh, "  Kp=%.5f  Ki=%.5f  (int_lim=%.2f, out_lim=%.2f)",
+                    (double)spd->kp, (double)spd->ki,
+                    (double)spd->integral_limit, (double)spd->output_limit);
+    } else {
+        shell_print(sh, "  (motor not initialized)");
+    }
+    shell_print(sh, "── Observer PLL ──");
+    shell_print(sh, "  pll_kp=%.1f  pll_ki=%.1f",
+                (double)obs->pll_kp, (double)obs->pll_ki);
+    shell_print(sh, "── Startup Sequence ──");
+    shell_print(sh, "  align: %u ms @ %.0f mA",
+                scfg->phase1_duration_ms, (double)(scfg->phase1_align_current * 1000.0f));
+    shell_print(sh, "  ramp:  %u ms -> %.0f RPM @ %.0f mA",
+                scfg->phase2_duration_ms, (double)scfg->phase2_final_speed,
+                (double)(scfg->phase2_current * 1000.0f));
+    shell_print(sh, "── Protection ──");
+    shell_print(sh, "  Overcurrent: %.1f A", (double)foc_isr_get_oc_threshold());
+    return 0;
+}
+
+static int cmd_foc_limit(const struct shell *sh, size_t argc, char **argv)
+{
+    if (argc < 2) {
+        shell_print(sh, "Overcurrent threshold: %.1f A",
+                    (double)foc_isr_get_oc_threshold());
+        shell_print(sh, "Usage: foc limit <amps_x10>  (e.g. 20 = 2.0A)");
+        return 0;
+    }
+
+    float amps = (float)atoi(argv[1]) / 10.0f;
+    if (amps < 0.1f || amps > 10.0f) {
+        shell_error(sh, "Range: 0.1A ~ 10.0A");
+        return -EINVAL;
+    }
+    foc_isr_set_oc_threshold(amps);
+    shell_print(sh, "Overcurrent threshold set: %.1f A", (double)amps);
+    return 0;
+}
+
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_foc,
     SHELL_CMD_ARG(start, NULL,
         "Start FOC open-loop (Id lock)\n"
@@ -135,6 +218,16 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_foc,
         cmd_foc_iq, 2, 0),
     SHELL_CMD_ARG(status, NULL, "Show FOC state",
         cmd_foc_status, 1, 0),
+    SHELL_CMD_ARG(pid, NULL,
+        "Show/set current loop PI gains\n"
+        "Usage: foc pid [kp_milli] [ki_milli]",
+        cmd_foc_pid, 1, 2),
+    SHELL_CMD_ARG(params, NULL, "Show all motor params and gains",
+        cmd_foc_params, 1, 0),
+    SHELL_CMD_ARG(limit, NULL,
+        "Show/set overcurrent threshold\n"
+        "Usage: foc limit [amps_x10]",
+        cmd_foc_limit, 1, 1),
     SHELL_SUBCMD_SET_END
 );
 
@@ -253,6 +346,62 @@ static int cmd_motor_watch(const struct shell *sh, size_t argc, char **argv)
     return 0;
 }
 
+static int cmd_motor_pid(const struct shell *sh, size_t argc, char **argv)
+{
+    PID_t *pid = motor_ctrl_get_speed_pid(0);
+    if (!pid) {
+        shell_error(sh, "Motor 0 not initialized");
+        return -ENODEV;
+    }
+
+    if (argc < 3) {
+        shell_print(sh, "Speed loop PI: Kp=%.5f  Ki=%.5f",
+                    (double)pid->kp, (double)pid->ki);
+        shell_print(sh, "  (limits: integral=%.2f, output=%.2f)",
+                    (double)pid->integral_limit, (double)pid->output_limit);
+        shell_print(sh, "Usage: motor pid <kp_milli> <ki_milli>  (e.g. 2 1 = 0.002, 0.001)");
+        return 0;
+    }
+
+    float kp = (float)atoi(argv[1]) / 1000.0f;
+    float ki = (float)atoi(argv[2]) / 1000.0f;
+    motor_ctrl_set_speed_gains(0, kp, ki);
+
+    shell_print(sh, "Speed loop PI set: Kp=%.5f  Ki=%.5f", (double)kp, (double)ki);
+    return 0;
+}
+
+static int cmd_motor_cfg(const struct shell *sh, size_t argc, char **argv)
+{
+    const startup_config_t *cfg = motor_ctrl_get_startup_cfg();
+
+    if (argc < 2) {
+        shell_print(sh, "── Startup Config ──");
+        shell_print(sh, "  align_ms  = %u", cfg->phase1_duration_ms);
+        shell_print(sh, "  align_ma  = %.0f", (double)(cfg->phase1_align_current * 1000.0f));
+        shell_print(sh, "  ramp_ms   = %u", cfg->phase2_duration_ms);
+        shell_print(sh, "  ramp_rpm  = %.0f", (double)cfg->phase2_final_speed);
+        shell_print(sh, "  ramp_ma   = %.0f", (double)(cfg->phase2_current * 1000.0f));
+        shell_print(sh, "Usage: motor cfg <key> <value>");
+        return 0;
+    }
+
+    if (argc < 3) {
+        shell_error(sh, "Usage: motor cfg <key> <value>");
+        return -EINVAL;
+    }
+
+    int value = atoi(argv[2]);
+    if (motor_ctrl_set_startup_param(argv[1], value) != 0) {
+        shell_error(sh, "Unknown key '%s'", argv[1]);
+        shell_print(sh, "Valid keys: align_ms, align_ma, ramp_ms, ramp_rpm, ramp_ma");
+        return -EINVAL;
+    }
+
+    shell_print(sh, "%s = %d", argv[1], value);
+    return 0;
+}
+
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_motor,
     SHELL_CMD_ARG(start, NULL,
         "Start motor startup sequence\n"
@@ -266,6 +415,14 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_motor,
         "Watch motor state periodically\n"
         "Usage: motor watch [interval_ms] [count]  (default 500ms x10)",
         cmd_motor_watch, 1, 2),
+    SHELL_CMD_ARG(pid, NULL,
+        "Show/set speed loop PI gains\n"
+        "Usage: motor pid [kp_milli] [ki_milli]",
+        cmd_motor_pid, 1, 2),
+    SHELL_CMD_ARG(cfg, NULL,
+        "Show/set startup parameters\n"
+        "Usage: motor cfg [key] [value]",
+        cmd_motor_cfg, 1, 2),
     SHELL_SUBCMD_SET_END
 );
 
@@ -323,11 +480,38 @@ static int cmd_adc_diag(const struct shell *sh, size_t argc, char **argv)
     return 0;
 }
 
+static int cmd_adc_cal(const struct shell *sh, size_t argc, char **argv)
+{
+    ARG_UNUSED(argc);
+    ARG_UNUSED(argv);
+
+    if (foc_pwm_is_enabled()) {
+        shell_error(sh, "PWM is ENABLED — stop FOC first (foc stop)");
+        return -EBUSY;
+    }
+
+    shell_print(sh, "Recalibrating ADC offsets (motor must be idle)...");
+
+    int16_t ia_off, ib_off, ic_off;
+    foc_adc_get_offsets(&ia_off, &ib_off, &ic_off);
+
+    foc_t *foc = foc_isr_get_foc();
+    foc->state.adc_ia_offset = ia_off;
+    foc->state.adc_ib_offset = ib_off;
+    foc->state.adc_ic_offset = ic_off;
+
+    shell_print(sh, "ADC offsets recalibrated:");
+    shell_print(sh, "  Ia: %d  Ib: %d  Ic: %d", ia_off, ib_off, ic_off);
+    return 0;
+}
+
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_adc,
     SHELL_CMD_ARG(offset, NULL, "Show ADC offsets and live values",
         cmd_adc_offset, 1, 0),
     SHELL_CMD_ARG(diag, NULL, "Run software-trigger ADC diagnostic",
         cmd_adc_diag, 1, 0),
+    SHELL_CMD_ARG(cal, NULL, "Recalibrate ADC offsets (PWM must be off)",
+        cmd_adc_cal, 1, 0),
     SHELL_SUBCMD_SET_END
 );
 
@@ -432,6 +616,71 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_scope,
 );
 
 /* ══════════════════════════════════════════════════════
+ *  obs command group (observer tuning & diagnostics)
+ * ══════════════════════════════════════════════════════ */
+
+static int cmd_obs_pll(const struct shell *sh, size_t argc, char **argv)
+{
+    observer_t *obs = foc_isr_get_observer();
+
+    if (argc < 3) {
+        shell_print(sh, "Observer PLL: Kp=%.1f  Ki=%.1f",
+                    (double)obs->pll_kp, (double)obs->pll_ki);
+        shell_print(sh, "Usage: obs pll <kp> <ki>  (integers)");
+        return 0;
+    }
+
+    obs->pll_kp = (float)atoi(argv[1]);
+    obs->pll_ki = (float)atoi(argv[2]);
+
+    shell_print(sh, "Observer PLL set: Kp=%.1f  Ki=%.1f",
+                (double)obs->pll_kp, (double)obs->pll_ki);
+    return 0;
+}
+
+static int cmd_obs_status(const struct shell *sh, size_t argc, char **argv)
+{
+    ARG_UNUSED(argc);
+    ARG_UNUSED(argv);
+
+    observer_t *obs = foc_isr_get_observer();
+    foc_t *foc = foc_isr_get_foc();
+
+    float cos_t, sin_t;
+    fast_sincos(obs->theta_elec, &sin_t, &cos_t);
+    float bemf_proj = obs->e_alpha * cos_t + obs->e_beta * sin_t;
+    float bemf_amp = __builtin_sqrtf(obs->e_alpha * obs->e_alpha
+                                   + obs->e_beta * obs->e_beta);
+    float theta_error = (bemf_amp > 0.1f) ? -(bemf_proj / bemf_amp) : 0.0f;
+
+    shell_print(sh, "── Observer Status ──");
+    shell_print(sh, "  theta_elec:  %.4f rad", (double)obs->theta_elec);
+    shell_print(sh, "  omega_elec:  %.2f rad/s", (double)obs->omega_elec);
+    shell_print(sh, "  speed_filt:  %.1f RPM", (double)obs->speed_rpm_filt);
+    shell_print(sh, "  BEMF a/b:    %.3f / %.3f V",
+                (double)obs->e_alpha, (double)obs->e_beta);
+    shell_print(sh, "  BEMF amp:    %.3f V", (double)bemf_amp);
+    shell_print(sh, "  theta_error: %.4f (norm)", (double)theta_error);
+    shell_print(sh, "  PLL integral:%.3f", (double)obs->pll_integral);
+    shell_print(sh, "  Converged:   %s (consec=%u)",
+                obs->converged ? "YES" : "NO", obs->consecutive_ok);
+    shell_print(sh, "  FOC theta:   %.4f rad (delta=%.4f)",
+                (double)foc->state.theta_elec,
+                (double)(foc->state.theta_elec - obs->theta_elec));
+    return 0;
+}
+
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_obs,
+    SHELL_CMD_ARG(pll, NULL,
+        "Show/set observer PLL gains\n"
+        "Usage: obs pll [kp] [ki]",
+        cmd_obs_pll, 1, 2),
+    SHELL_CMD_ARG(status, NULL, "Show observer internal state",
+        cmd_obs_status, 1, 0),
+    SHELL_SUBCMD_SET_END
+);
+
+/* ══════════════════════════════════════════════════════
  *  Root command registration
  * ══════════════════════════════════════════════════════ */
 
@@ -439,3 +688,4 @@ SHELL_CMD_REGISTER(foc, &sub_foc, "FOC open-loop control", NULL);
 SHELL_CMD_REGISTER(motor, &sub_motor, "Motor closed-loop control", NULL);
 SHELL_CMD_REGISTER(adc, &sub_adc, "ADC diagnostics", NULL);
 SHELL_CMD_REGISTER(scope, &sub_scope, "High-res scope (1kHz ring buf)", NULL);
+SHELL_CMD_REGISTER(obs, &sub_obs, "Observer tuning & diagnostics", NULL);

@@ -52,6 +52,25 @@ void foc_current_loop(foc_t *foc);
  */
 void foc_apply_duty(foc_t *foc);
 
+/* ── Runtime tuning accessors ─────────────────────── */
+
+/**
+ * @brief  Get D-axis current PID controller
+ */
+PID_t *foc_get_pid_id(void);
+
+/**
+ * @brief  Get Q-axis current PID controller
+ */
+PID_t *foc_get_pid_iq(void);
+
+/**
+ * @brief  Set current loop PI gains (applies to both Id and Iq)
+ * @param  kp  Proportional gain
+ * @param  ki  Integral gain
+ */
+void foc_set_current_gains(float kp, float ki);
+
 #ifdef __cplusplus
 }
 #endif

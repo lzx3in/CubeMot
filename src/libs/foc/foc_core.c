@@ -120,3 +120,23 @@ void foc_apply_duty(foc_t *foc)
     (void)foc;
     /* Duty already written in foc_current_loop */
 }
+
+/* ── Runtime tuning accessors ─────────────────────── */
+
+PID_t *foc_get_pid_id(void)
+{
+    return &g_pid_id;
+}
+
+PID_t *foc_get_pid_iq(void)
+{
+    return &g_pid_iq;
+}
+
+void foc_set_current_gains(float kp, float ki)
+{
+    pid_set_parameters(&g_pid_id, kp, ki, 0.0f,
+                       g_pid_id.integral_limit, g_pid_id.output_limit);
+    pid_set_parameters(&g_pid_iq, kp, ki, 0.0f,
+                       g_pid_iq.integral_limit, g_pid_iq.output_limit);
+}

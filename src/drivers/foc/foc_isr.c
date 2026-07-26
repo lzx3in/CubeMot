@@ -27,6 +27,8 @@ static observer_t g_motor_observer;
 static volatile bool g_isr_running = false;
 static volatile uint32_t g_isr_count = 0;
 static volatile bool g_observer_override = true;  /* ISR updates theta from observer */
+static volatile float g_oc_threshold_sq = 4.0f;   /* Overcurrent threshold squared (default 2A) */
+static volatile float g_oc_threshold_amps = 2.0f;  /* Overcurrent threshold in Amps (for readback) */
 
 /* ── Public accessors ────────────────────────────────── */
 
@@ -74,7 +76,7 @@ static void foc_tim1_isr(void *arg)
     {
         float i_mag = g_motor_foc.state.i_alpha * g_motor_foc.state.i_alpha
                     + g_motor_foc.state.i_beta * g_motor_foc.state.i_beta;
-        if (i_mag > 4.0f) {  /* 2A squared = 4.0 */
+        if (i_mag > g_oc_threshold_sq) {
             foc_pwm_set_duty(0.0f, 0.0f, 0.0f);
             g_isr_running = false;
             LL_TIM_DisableCounter(TIM1);
@@ -187,4 +189,15 @@ void foc_isr_set_observer_override(bool override)
 bool foc_isr_get_observer_override(void)
 {
     return g_observer_override;
+}
+
+void foc_isr_set_oc_threshold(float amps)
+{
+    g_oc_threshold_amps = amps;
+    g_oc_threshold_sq = amps * amps;
+}
+
+float foc_isr_get_oc_threshold(void)
+{
+    return g_oc_threshold_amps;
 }

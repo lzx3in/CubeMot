@@ -149,10 +149,8 @@ void observer_step(observer_t *obs,
         obs->converged = false;
     }
 
-    /* Filtered speed (low-pass) */
-    float alpha = 0.01f;
-    obs->speed_rpm_filt = (1.0f - alpha) * obs->speed_rpm_filt
-                         + alpha * __builtin_fabsf(obs->omega_elec) * 9.54929658551f;
+    /* speed_rpm_filt is managed by motor_ctrl thread (has pole_pairs).
+     * Do NOT update it here — would corrupt with electrical RPM. */
 }
 
 /* ── Helpers ──────────────────────────────────────────── */

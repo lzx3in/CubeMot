@@ -86,8 +86,11 @@ static bool g_hw_initialized = false;
 static void speed_pid_init(PID_t *pid)
 {
     pid_init(pid, PID_MODE_DERIVATIV_CALC_NO_SP, 1.0f / SPEED_LOOP_HZ);
-    /* Reduced gains for noisy observer: Kp=2.0, Ki=0.005, Kd=0, limits ±0.8A */
-    pid_set_parameters(pid, 2.0f, 0.005f, 0.0f, 0.8f, 0.8f);
+    /* Gimbal motor speed PID:
+     * Kp=0.002 → 50 RPM error = 0.1A output
+     * Ki=0.00005 → eliminates steady-state in ~5s
+     * integral_limit=0.15, output_limit=0.3 */
+    pid_set_parameters(pid, 0.002f, 0.00005f, 0.0f, 0.15f, 0.3f);
 }
 
 /* ── Init ─────────────────────────────────────────────── */
@@ -292,11 +295,11 @@ static void run_speed_loop(motor_instance_t *m)
                       m->foc->state.v_alpha, m->foc->state.v_beta,
                       m->foc->state.i_alpha, m->foc->state.i_beta);
 
-        /* Speed estimate (filtered) */
+        /* Speed estimate (filtered, alpha=0.1 → ~16Hz BW @ 1kHz) */
         float speed_raw = foc_rads_to_rpm(
             __builtin_fabsf(m->obs->omega_elec), m->foc->config->pole_pairs);
-        m->obs->speed_rpm_filt = 0.98f * m->obs->speed_rpm_filt
-                               + 0.02f * speed_raw;
+        m->obs->speed_rpm_filt = 0.9f * m->obs->speed_rpm_filt
+                               + 0.1f * speed_raw;
         float speed_meas = m->obs->speed_rpm_filt;
 
         /* Speed PID → Iq reference */

@@ -69,13 +69,13 @@ int foc_adc_init(void)
     /* Verify COMMON_CCR write — diagnose clock configuration */
     uint32_t ccr_readback = __LL_ADC_COMMON_INSTANCE(ADC1)->CCR;
     LOG_INF("COMMON_CCR after SetCommonClock: 0x%08X (CKMODE=%lu)",
-            (unsigned)ccr_readback, (ccr_readback >> 16) & 0x3);
+            (unsigned)ccr_readback, (unsigned long)((ccr_readback >> 16) & 0x3));
     if (((ccr_readback >> 16) & 0x3) == 0) {
         LOG_WRN("CKMODE=0! Retrying COMMON_CCR write...");
         LL_ADC_SetCommonClock(__LL_ADC_COMMON_INSTANCE(ADC1), LL_ADC_CLOCK_SYNC_PCLK_DIV4);
         ccr_readback = __LL_ADC_COMMON_INSTANCE(ADC1)->CCR;
         LOG_INF("COMMON_CCR after retry: 0x%08X (CKMODE=%lu)",
-                (unsigned)ccr_readback, (ccr_readback >> 16) & 0x3);
+                (unsigned)ccr_readback, (unsigned long)((ccr_readback >> 16) & 0x3));
     }
 
     /* ── ADC1: Calibrate ───────────────────────────────── */

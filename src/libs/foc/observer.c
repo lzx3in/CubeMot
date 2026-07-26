@@ -68,8 +68,9 @@ void observer_step(observer_t *obs,
     float e_alpha_raw = v_alpha - obs->rs * i_alpha - obs->ls * di_alpha_meas;
     float e_beta_raw  = v_beta  - obs->rs * i_beta  - obs->ls * di_beta_meas;
 
-    /* First-order LPF: E_hat += alpha * (E_raw - E_hat), alpha = 0.05 */
-    float lpf_alpha = 0.05f;
+    /* First-order LPF: E_hat += alpha * (E_raw - E_hat)
+     * At 1kHz, alpha=0.5 → cutoff ≈ 80Hz (passes 58Hz electrical) */
+    float lpf_alpha = 0.5f;
     obs->e_alpha += lpf_alpha * (e_alpha_raw - obs->e_alpha);
     obs->e_beta  += lpf_alpha * (e_beta_raw  - obs->e_beta);
 
@@ -91,11 +92,13 @@ void observer_step(observer_t *obs,
 
     /* Normalized phase error: project BEMF onto rotor direction,
      * then divide by |BEMF| to get sin(angle_error) in [-1, 1].
-     * This makes PLL gains independent of BEMF amplitude. */
+     * Negated because BEMF is along q-axis (perpendicular to d-axis).
+     * When theta = theta_true, E·[cos,sin] = |E|*sin(theta-theta_true)
+     * but our convention needs the negative for correct PLL polarity. */
     float bemf_proj = obs->e_alpha * cos_t + obs->e_beta * sin_t;
     float bemf_amp = __builtin_sqrtf(obs->e_alpha * obs->e_alpha
                                    + obs->e_beta * obs->e_beta);
-    float theta_error = (bemf_amp > 0.1f) ? (bemf_proj / bemf_amp) : 0.0f;
+    float theta_error = (bemf_amp > 0.1f) ? -(bemf_proj / bemf_amp) : 0.0f;
 
     /* Clamp to [-1, 1] (already normalized, but safety) */
     if (theta_error > 1.0f)  theta_error = 1.0f;

@@ -20,6 +20,7 @@ target_include_directories(app PRIVATE
     libs/crc
     libs/math
     libs/foc
+    app
 )
 
 # ── Core sources (always compiled) ───────────────────────
@@ -56,6 +57,7 @@ target_sources(app PRIVATE
 if(CONFIG_SHELL)
     target_sources(app PRIVATE
         app/shell_cmds.c
+        app/scope.c
     )
 endif()
 

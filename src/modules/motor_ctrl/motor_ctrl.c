@@ -21,6 +21,7 @@
 #include "common_time.h"
 #include "common_device.h"
 #include "common_error.h"
+#include "scope.h"
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(motor_ctrl, LOG_LEVEL_INF);
@@ -85,7 +86,8 @@ static bool g_hw_initialized = false;
 static void speed_pid_init(PID_t *pid)
 {
     pid_init(pid, PID_MODE_DERIVATIV_CALC_NO_SP, 1.0f / SPEED_LOOP_HZ);
-    pid_set_parameters(pid, 10.66f, 0.0343f, 0.0f, 0.8f, 0.8f);
+    /* Reduced gains for noisy observer: Kp=2.0, Ki=0.005, Kd=0, limits ±0.8A */
+    pid_set_parameters(pid, 2.0f, 0.005f, 0.0f, 0.8f, 0.8f);
 }
 
 /* ── Init ─────────────────────────────────────────────── */
@@ -184,6 +186,7 @@ static void process_command(motor_instance_t *m, const motor_cmd_t *cmd)
             m->foc->state.i_q_ref = 0.0f;
             m->foc->state.i_d_ref = 0.0f;
             pid_reset_integral(&m->speed_pid);
+            m->obs->speed_rpm_filt = 0.0f;  /* reset for next start */
             m->state = MOTOR_STATE_IDLE;
             LOG_INF("Motor %u STOP", m->motor_id);
         }
@@ -225,6 +228,8 @@ static void run_speed_loop(motor_instance_t *m)
         float ramp_speed = progress * g_startup_config.phase2_final_speed;
 
         float omega_ref = foc_rpm_to_rads(ramp_speed, m->foc->config->pole_pairs);
+
+        /* Open-loop theta ramp (drives the motor) */
         m->foc->state.theta_elec += omega_ref * (1.0f / SPEED_LOOP_HZ);
         while (m->foc->state.theta_elec >= 6.283185307f)
             m->foc->state.theta_elec -= 6.283185307f;
@@ -232,46 +237,43 @@ static void run_speed_loop(motor_instance_t *m)
         m->foc->state.i_d_ref = 0.0f;
         m->foc->state.i_q_ref = g_startup_config.phase2_current;
 
-        /* Run observer at 1kHz (backward Euler, unconditionally stable) */
+        /* Run observer at 1kHz (voltage model BEMF + PLL) */
         observer_step(m->obs,
                       m->foc->state.v_alpha, m->foc->state.v_beta,
                       m->foc->state.i_alpha, m->foc->state.i_beta);
 
-        /* Only allow BEMF integration when motor is actually spinning.
-         * During early ramp (low speed), current transients corrupt E_hat. */
-        if (ramp_speed < 100.0f) {
+        if (ramp_speed < 200.0f) {
+            /* Phase A: force PLL theta to open-loop (give it direction) */
+            m->obs->theta_elec = m->foc->state.theta_elec;
+            m->obs->pll_integral = omega_ref;
+            m->obs->omega_elec = omega_ref;
             m->obs->e_alpha = 0.0f;
             m->obs->e_beta = 0.0f;
-        }
-
-        /* During START: force observer theta to track forced angle.
-         * This keeps BEMF estimation aligned with actual rotor position.
-         * PLL only takes over after switchover to RUN. */
-        m->obs->theta_elec = m->foc->state.theta_elec;
-        m->obs->omega_elec = omega_ref;  /* feed forward speed */
-
-        /* Convergence: check BEMF amplitude (observer's E_hat should grow
-         * as motor speeds up). Threshold ~0.5V means motor is spinning. */
-        float bemf = __builtin_sqrtf(m->obs->e_alpha * m->obs->e_alpha
-                                   + m->obs->e_beta * m->obs->e_beta);
-        if (bemf > 0.5f && ramp_speed > 200.0f) {
-            m->consecutive_ok++;
-            if (m->consecutive_ok >= 50) {  /* 50ms stable */
-                /* Initialize PLL integral to current forced speed */
-                m->obs->pll_integral = omega_ref;
-                m->obs->omega_elec = omega_ref;
-                transition_to_closed_loop(m);
-            }
-        } else {
             m->consecutive_ok = 0;
+        } else {
+            /* Phase B: release PLL — let it free-run.
+             * Check angle error between PLL and open-loop. */
+            float angle_err = m->obs->theta_elec - m->foc->state.theta_elec;
+            /* Normalize to [-pi, pi] */
+            while (angle_err > 3.14159f) angle_err -= 6.28318f;
+            while (angle_err < -3.14159f) angle_err += 6.28318f;
+
+            if (__builtin_fabsf(angle_err) < 0.5f) {  /* < ~30 degrees */
+                m->consecutive_ok++;
+            } else {
+                m->consecutive_ok = 0;
+            }
+
+            if (m->consecutive_ok >= 100) {  /* 100ms locked */
+                transition_to_closed_loop(m);
+                /* No theta jump needed — PLL already aligned */
+            }
         }
 
-        /* Phase2 timeout: if observer hasn't converged, STOP (safety) */
+        /* Phase2 timeout safety */
         if (m->phase_elapsed_ms >= m->phase_duration_ms &&
             m->state != MOTOR_STATE_RUN) {
-            LOG_WRN("Motor %u: Phase2 timeout, observer not converged → STOP",
-                    m->motor_id);
-            foc_isr_set_observer_override(true);
+            LOG_WRN("Motor %u: Phase2 timeout → STOP", m->motor_id);
             foc_isr_stop();
             foc_pwm_disable();
             m->foc->state.i_q_ref = 0.0f;
@@ -282,31 +284,31 @@ static void run_speed_loop(motor_instance_t *m)
     }
 
     case MOTOR_STATE_RUN: {
-        foc_isr_set_observer_override(true);  /* ISR owns theta from observer */
+        /* True closed-loop FOC: observer theta drives Park transform */
+        foc_isr_set_observer_override(true);  /* ISR uses observer theta */
 
-        /* Run observer at 1kHz (voltage model BEMF + PLL) */
+        /* Run observer at 1kHz */
         observer_step(m->obs,
                       m->foc->state.v_alpha, m->foc->state.v_beta,
                       m->foc->state.i_alpha, m->foc->state.i_beta);
 
-        /* Low-pass filter on speed measurement (alpha=0.1 → ~16Hz BW) */
+        /* Speed estimate (filtered) */
         float speed_raw = foc_rads_to_rpm(
             __builtin_fabsf(m->obs->omega_elec), m->foc->config->pole_pairs);
-        m->obs->speed_rpm_filt = 0.9f * m->obs->speed_rpm_filt
-                               + 0.1f * speed_raw;
+        m->obs->speed_rpm_filt = 0.98f * m->obs->speed_rpm_filt
+                               + 0.02f * speed_raw;
         float speed_meas = m->obs->speed_rpm_filt;
 
+        /* Speed PID → Iq reference */
         float iq_ref = pid_calculate(&m->speed_pid,
                                      m->target_speed_rpm, speed_meas, 0.0f,
                                      1.0f / SPEED_LOOP_HZ);
-
-        /* Iq clamp: prevent excessive current (max 2A) */
         if (iq_ref > 2.0f) iq_ref = 2.0f;
         if (iq_ref < -2.0f) iq_ref = -2.0f;
 
         m->foc->state.i_d_ref = 0.0f;
         m->foc->state.i_q_ref = iq_ref;
-        m->foc->state.theta_elec = m->obs->theta_elec;
+        /* theta_elec is owned by ISR (observer) — don't touch it here */
         break;
     }
 
@@ -334,6 +336,8 @@ static void publish_state(motor_instance_t *m)
 
 /* ── Main thread (runs all motors) ───────────────────── */
 
+volatile bool g_motor_log_enabled = false;
+
 void motor_ctrl_thread(void *arg1, void *arg2, void *arg3)
 {
     ARG_UNUSED(arg1);
@@ -354,6 +358,7 @@ void motor_ctrl_thread(void *arg1, void *arg2, void *arg3)
     LOG_INF("Motor control thread started (%u motors)", g_motor_count);
 
     uint32_t pub_counter = 0;
+    uint32_t log_counter = 0;
 
     while (1) {
         /* Check for commands */
@@ -378,6 +383,11 @@ void motor_ctrl_thread(void *arg1, void *arg2, void *arg3)
             }
         }
 
+        /* High-res scope capture @ 1kHz */
+        if (scope_is_active()) {
+            scope_record((int8_t)g_motors[0].state);
+        }
+
         /* Publish states @ 100Hz */
         if (++pub_counter >= 10) {
             pub_counter = 0;
@@ -385,6 +395,26 @@ void motor_ctrl_thread(void *arg1, void *arg2, void *arg3)
                 if (g_motors[i].initialized) {
                     publish_state(&g_motors[i]);
                 }
+            }
+        }
+
+        /* Real-time CSV log @ 10Hz (every 100ms) */
+        if (g_motor_log_enabled && ++log_counter >= 100) {
+            log_counter = 0;
+            motor_instance_t *m = &g_motors[0];
+            if (m->initialized) {
+                float bemf = __builtin_sqrtf(m->obs->e_alpha * m->obs->e_alpha
+                                           + m->obs->e_beta * m->obs->e_beta);
+                printk("L,%u,%d,%.0f,%.0f,%.0f,%.1f,%.2f,%.1f,%.1f\n",
+                       (unsigned)k_uptime_get_32(),
+                       (int)m->state,
+                       (double)m->obs->speed_rpm_filt,
+                       (double)(m->foc->state.i_d * 1000.0f),
+                       (double)(m->foc->state.i_q * 1000.0f),
+                       (double)(m->obs->omega_elec),
+                       (double)bemf,
+                       (double)(m->foc->state.theta_elec * 57.2958f),
+                       (double)(m->obs->theta_elec * 57.2958f));
             }
         }
 

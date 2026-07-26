@@ -21,6 +21,7 @@
 #include "libs/foc/foc_types.h"
 #include "topics/topics.h"
 #include "common_time.h"
+#include "scope.h"
 
 /* ── msghub handles (lazy init) ─────────────────────── */
 
@@ -250,6 +251,19 @@ static int cmd_motor_watch(const struct shell *sh, size_t argc, char **argv)
     return 0;
 }
 
+static int cmd_motor_log(const struct shell *sh, size_t argc, char **argv)
+{
+    extern volatile bool g_motor_log_enabled;
+    if (argc > 1 && (argv[1][0] == '1' || argv[1][0] == 'o')) {
+        g_motor_log_enabled = true;
+        shell_print(sh, "Motor log ON (CSV @ 10Hz: t,state,RPM,Id,Iq,omega,BEMF,theta_foc,theta_obs)");
+    } else {
+        g_motor_log_enabled = false;
+        shell_print(sh, "Motor log OFF");
+    }
+    return 0;
+}
+
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_motor,
     SHELL_CMD_ARG(start, NULL,
         "Start motor startup sequence\n"
@@ -263,6 +277,10 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_motor,
         "Watch motor state periodically\n"
         "Usage: motor watch [interval_ms] [count]  (default 500ms x10)",
         cmd_motor_watch, 1, 2),
+    SHELL_CMD_ARG(log, NULL,
+        "Toggle real-time CSV log (10Hz)\n"
+        "Usage: motor log [on|off]",
+        cmd_motor_log, 1, 1),
     SHELL_SUBCMD_SET_END
 );
 
@@ -329,9 +347,77 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_adc,
 );
 
 /* ══════════════════════════════════════════════════════
+ *  scope command group (high-res ring buffer diagnostics)
+ * ══════════════════════════════════════════════════════ */
+
+static int cmd_scope_start(const struct shell *sh, size_t argc, char **argv)
+{
+    ARG_UNUSED(argc);
+    ARG_UNUSED(argv);
+    scope_start();
+    shell_print(sh, "Scope STARTED (128 samples @ 1kHz = 128ms window)");
+    return 0;
+}
+
+static int cmd_scope_stop(const struct shell *sh, size_t argc, char **argv)
+{
+    ARG_UNUSED(argc);
+    ARG_UNUSED(argv);
+    scope_stop();
+    shell_print(sh, "Scope STOPPED (%u samples captured)", scope_get_count());
+    return 0;
+}
+
+static int cmd_scope_dump(const struct shell *sh, size_t argc, char **argv)
+{
+    ARG_UNUSED(argc);
+    ARG_UNUSED(argv);
+
+    scope_stop();  /* freeze before reading */
+
+    uint16_t count = scope_get_count();
+    const scope_sample_t *buf = scope_get_buf();
+
+    shell_print(sh, "th_foc,th_obs,omega,id,iq,iq_ref,rpm,bemf,state");
+
+    for (uint16_t i = 0; i < count; i++) {
+        const scope_sample_t *s = &buf[i];
+        shell_print(sh, "%d,%d,%d,%d,%d,%d,%d,%d,%d",
+                    s->ch[SC_THETA_FOC], s->ch[SC_THETA_OBS],
+                    s->ch[SC_OMEGA], s->ch[SC_ID_MA],
+                    s->ch[SC_IQ_MA], s->ch[SC_IQ_REF_MA],
+                    s->ch[SC_RPM], s->ch[SC_BEMF_CV],
+                    s->ch[SC_STATE]);
+        if ((i & 15) == 15) k_msleep(1);  /* yield every 16 lines */
+    }
+
+    shell_print(sh, "# %u samples dumped", count);
+    return 0;
+}
+
+static int cmd_scope_status(const struct shell *sh, size_t argc, char **argv)
+{
+    ARG_UNUSED(argc);
+    ARG_UNUSED(argv);
+    shell_print(sh, "Scope: %s, %u/%u samples",
+                scope_is_active() ? "ACTIVE" : "idle",
+                scope_get_count(), SCOPE_DEPTH);
+    return 0;
+}
+
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_scope,
+    SHELL_CMD(start, NULL, "Start capture (clears buffer)", cmd_scope_start),
+    SHELL_CMD(stop, NULL, "Stop capture", cmd_scope_stop),
+    SHELL_CMD(dump, NULL, "Dump buffer as CSV", cmd_scope_dump),
+    SHELL_CMD(status, NULL, "Show scope status", cmd_scope_status),
+    SHELL_SUBCMD_SET_END
+);
+
+/* ══════════════════════════════════════════════════════
  *  Root command registration
  * ══════════════════════════════════════════════════════ */
 
 SHELL_CMD_REGISTER(foc, &sub_foc, "FOC open-loop control", NULL);
 SHELL_CMD_REGISTER(motor, &sub_motor, "Motor closed-loop control", NULL);
 SHELL_CMD_REGISTER(adc, &sub_adc, "ADC diagnostics", NULL);
+SHELL_CMD_REGISTER(scope, &sub_scope, "High-res scope (1kHz ring buf)", NULL);

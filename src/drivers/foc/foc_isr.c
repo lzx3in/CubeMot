@@ -81,13 +81,22 @@ static void foc_tim1_isr(void *arg)
         }
     }
 
-    /* Observer runs in motor_ctrl thread (1kHz, backward Euler = stable).
-     * ISR only does current loop + overcurrent protection. */
-
-    /* Update FOC angle from observer only if converged and not overridden */
-    if (g_observer_override && observer_is_converged(&g_motor_observer)) {
-        g_motor_foc.state.theta_elec = g_motor_observer.theta_elec;
+    /* Observer runs at 1kHz in motor_ctrl thread.
+     * ISR extrapolates theta using omega for fresh angle at 30kHz. */
+    if (g_observer_override) {
+        /* Extrapolate: theta += omega * dt_since_last_observer_update
+         * At 30kHz ISR, observer updates every 30 ticks. */
+        static uint8_t obs_tick = 0;
+        obs_tick++;
+        float extrapolate_dt = (float)obs_tick / FOC_PWM_FREQ_HZ;
+        float theta_ext = g_motor_observer.theta_elec
+                        + g_motor_observer.omega_elec * extrapolate_dt;
+        /* Wrap */
+        while (theta_ext >= 6.283185307f) theta_ext -= 6.283185307f;
+        while (theta_ext < 0.0f) theta_ext += 6.283185307f;
+        g_motor_foc.state.theta_elec = theta_ext;
         g_motor_foc.state.omega_elec = g_motor_observer.omega_elec;
+        if (obs_tick >= 30) obs_tick = 0;  /* reset every 1ms */
     }
 
     g_isr_count++;
@@ -112,11 +121,11 @@ void foc_isr_init(void)
     g_motor_foc.state.adc_ib_offset = ib_off;
     g_motor_foc.state.adc_ic_offset = ic_off;
 
-    /* Initialize observer — runs at 1kHz in motor_ctrl (backward Euler) */
+    /* Initialize observer — runs at 1kHz in motor_ctrl thread */
     observer_init(&g_motor_observer,
                   g_motor_params.rs,
                   g_motor_params.ls,
-                  1.0f / 1000.0f,   /* dt = 1ms (speed loop rate) */
+                  1.0f / 1000.0f,   /* dt = 1ms */
                   g_motor_params.observer_gain1,
                   g_motor_params.observer_gain2,
                   g_motor_params.pll_kp,

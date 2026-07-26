@@ -97,23 +97,7 @@ if(CONFIG_MODULE_MOTOR_CTRL_ENABLE)
     )
 endif()
 
-if(CONFIG_MODULE_COMMANDER_ENABLE)
-    target_include_directories(app PRIVATE
-        modules/commander/include
-    )
-    target_sources(app PRIVATE
-        modules/commander/commander.c
-    )
-endif()
 
-if(CONFIG_MODULE_VEHICLE_ENABLE)
-    target_include_directories(app PRIVATE
-        modules/vehicle/include
-    )
-    target_sources(app PRIVATE
-        modules/vehicle/vehicle.c
-    )
-endif()
 
 if(CONFIG_MODULE_SERIAL_CMD_ENABLE)
     target_include_directories(app PRIVATE
@@ -126,11 +110,4 @@ if(CONFIG_MODULE_SERIAL_CMD_ENABLE)
     )
 endif()
 
-if(CONFIG_MODULE_SERVO_CTRL)
-    target_include_directories(app PRIVATE
-        modules/servo_ctrl/include
-    )
-    target_sources(app PRIVATE
-        modules/servo_ctrl/servo_ctrl.c
-    )
-endif()
+

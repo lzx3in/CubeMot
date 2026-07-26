@@ -9,12 +9,7 @@
 #if CONFIG_MODULE_BUTTON_DETECTOR_ENABLE
 #include "modules/button_detector/button_detector.h"
 #endif
-#if CONFIG_MODULE_COMMANDER_ENABLE
-#include "modules/commander/commander.h"
-#endif
-#if CONFIG_MODULE_VEHICLE_ENABLE
-#include "modules/vehicle/vehicle.h"
-#endif
+
 #if CONFIG_MODULE_MOTOR_CTRL_ENABLE
 #include "modules/motor_ctrl/motor_ctrl.h"
 #include "common/motor_params.h"
@@ -59,13 +54,7 @@ static int init_modules(void)
     motor_ctrl_init(0, &g_motor_params, foc_isr_get_foc(), foc_isr_get_observer());
 #endif
 
-#if CONFIG_MODULE_COMMANDER_ENABLE
-    commander_init();
-#endif
 
-#if CONFIG_MODULE_VEHICLE_ENABLE
-    vehicle_init(NULL);  // Use default config
-#endif
 
 #if CONFIG_MODULE_SERIAL_CMD_ENABLE
     serial_cmd_init();
@@ -76,15 +65,7 @@ static int init_modules(void)
 
 /* ── Thread stacks ───────────────────────────────────── */
 
-#if CONFIG_MODULE_COMMANDER_ENABLE
-K_THREAD_STACK_DEFINE(commander_stack, CONFIG_COMMANDER_STACK_SIZE);
-static struct k_thread commander_thread_data;
-#endif
 
-#if CONFIG_MODULE_VEHICLE_ENABLE
-K_THREAD_STACK_DEFINE(vehicle_stack, CONFIG_VEHICLE_STACK_SIZE);
-static struct k_thread vehicle_thread_data;
-#endif
 
 #if CONFIG_MODULE_SERIAL_CMD_ENABLE
 K_THREAD_STACK_DEFINE(serial_cmd_stack, CONFIG_SERIAL_CMD_STACK_SIZE);
@@ -98,14 +79,7 @@ static struct k_thread motor_ctrl_thread_data;
 
 static void start_threads(void)
 {
-#if CONFIG_MODULE_COMMANDER_ENABLE
-    k_thread_create(&commander_thread_data, commander_stack,
-                    CONFIG_COMMANDER_STACK_SIZE,
-                    commander_thread,
-                    NULL, NULL, NULL,
-                    K_PRIO_COOP(7), 0, K_NO_WAIT);
-    k_thread_name_set(&commander_thread_data, "commander");
-#endif
+
 
 #if CONFIG_MODULE_MOTOR_CTRL_ENABLE
     k_thread_create(&motor_ctrl_thread_data, motor_ctrl_stack,
@@ -116,14 +90,7 @@ static void start_threads(void)
     k_thread_name_set(&motor_ctrl_thread_data, "motor_ctrl");
 #endif
 
-#if CONFIG_MODULE_VEHICLE_ENABLE
-    k_thread_create(&vehicle_thread_data, vehicle_stack,
-                    CONFIG_VEHICLE_STACK_SIZE,
-                    vehicle_thread,
-                    NULL, NULL, NULL,
-                    K_PRIO_COOP(7), 0, K_NO_WAIT);
-    k_thread_name_set(&vehicle_thread_data, "vehicle");
-#endif
+
 
 #if CONFIG_MODULE_SERIAL_CMD_ENABLE
     k_thread_create(&serial_cmd_thread_data, serial_cmd_stack,

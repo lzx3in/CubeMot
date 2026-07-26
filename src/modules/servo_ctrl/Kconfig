@@ -1,5 +1,0 @@
-config MODULE_SERVO_CTRL
-	bool "Enable servo control module"
-	default y
-	help
-	  Enable PWM servo control for steering

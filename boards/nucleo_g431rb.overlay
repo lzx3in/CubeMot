@@ -60,26 +60,3 @@
 	status = "disabled";
 };
 
-/*
- * Servo PWM: TIM3 CH1(PA6) / CH2(PA7), 50Hz, 1μs resolution.
- * Prescaler 169 → 170MHz/170 = 1MHz tick.
- */
-&timers3 {
-	st,prescaler = <169>;
-	status = "okay";
-
-	pwm3: pwm {
-		pinctrl-0 = <&tim3_ch1_pa6 &tim3_ch2_pa7>;
-		pinctrl-names = "default";
-		status = "okay";
-	};
-};
-
-/ {
-	servo: servo {
-		compatible = "pwm-servo";
-		pwms = <&pwm3 1 20000000 PWM_POLARITY_NORMAL>,
-		       <&pwm3 2 20000000 PWM_POLARITY_NORMAL>;
-		pwm-names = "steer-front", "steer-rear";
-	};
-};

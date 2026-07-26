@@ -340,8 +340,6 @@ static void publish_state(motor_instance_t *m)
 
 /* ── Main thread (runs all motors) ───────────────────── */
 
-volatile bool g_motor_log_enabled = false;
-
 void motor_ctrl_thread(void *arg1, void *arg2, void *arg3)
 {
     ARG_UNUSED(arg1);
@@ -362,7 +360,6 @@ void motor_ctrl_thread(void *arg1, void *arg2, void *arg3)
     LOG_INF("Motor control thread started (%u motors)", g_motor_count);
 
     uint32_t pub_counter = 0;
-    uint32_t log_counter = 0;
 
     while (1) {
         /* Check for commands */
@@ -399,26 +396,6 @@ void motor_ctrl_thread(void *arg1, void *arg2, void *arg3)
                 if (g_motors[i].initialized) {
                     publish_state(&g_motors[i]);
                 }
-            }
-        }
-
-        /* Real-time CSV log @ 10Hz (every 100ms) */
-        if (g_motor_log_enabled && ++log_counter >= 100) {
-            log_counter = 0;
-            motor_instance_t *m = &g_motors[0];
-            if (m->initialized) {
-                float bemf = __builtin_sqrtf(m->obs->e_alpha * m->obs->e_alpha
-                                           + m->obs->e_beta * m->obs->e_beta);
-                printk("L,%u,%d,%.0f,%.0f,%.0f,%.1f,%.2f,%.1f,%.1f\n",
-                       (unsigned)k_uptime_get_32(),
-                       (int)m->state,
-                       (double)m->obs->speed_rpm_filt,
-                       (double)(m->foc->state.i_d * 1000.0f),
-                       (double)(m->foc->state.i_q * 1000.0f),
-                       (double)(m->obs->omega_elec),
-                       (double)bemf,
-                       (double)(m->foc->state.theta_elec * 57.2958f),
-                       (double)(m->obs->theta_elec * 57.2958f));
             }
         }
 

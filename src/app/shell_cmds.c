@@ -251,19 +251,6 @@ static int cmd_motor_watch(const struct shell *sh, size_t argc, char **argv)
     return 0;
 }
 
-static int cmd_motor_log(const struct shell *sh, size_t argc, char **argv)
-{
-    extern volatile bool g_motor_log_enabled;
-    if (argc > 1 && (argv[1][0] == '1' || argv[1][0] == 'o')) {
-        g_motor_log_enabled = true;
-        shell_print(sh, "Motor log ON (CSV @ 10Hz: t,state,RPM,Id,Iq,omega,BEMF,theta_foc,theta_obs)");
-    } else {
-        g_motor_log_enabled = false;
-        shell_print(sh, "Motor log OFF");
-    }
-    return 0;
-}
-
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_motor,
     SHELL_CMD_ARG(start, NULL,
         "Start motor startup sequence\n"
@@ -277,10 +264,6 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_motor,
         "Watch motor state periodically\n"
         "Usage: motor watch [interval_ms] [count]  (default 500ms x10)",
         cmd_motor_watch, 1, 2),
-    SHELL_CMD_ARG(log, NULL,
-        "Toggle real-time CSV log (10Hz)\n"
-        "Usage: motor log [on|off]",
-        cmd_motor_log, 1, 1),
     SHELL_SUBCMD_SET_END
 );
 

@@ -13,7 +13,9 @@
 
 #include <zephyr/shell/shell.h>
 #include <zephyr/kernel.h>
+#include <zephyr/drivers/uart.h>
 #include <stdlib.h>
+#include <stdio.h>  /* snprintf */
 
 #include "drivers/foc/foc_isr.h"
 #include "drivers/foc/foc_pwm.h"
@@ -333,6 +335,16 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_adc,
  *  scope command group (high-res ring buffer diagnostics)
  * ══════════════════════════════════════════════════════ */
 
+/* ── Scope dump: direct UART output (bypass log/shell queue) ── */
+static const struct device *scope_console_uart;
+
+static void scope_uart_puts(const char *s)
+{
+    while (*s) {
+        uart_poll_out(scope_console_uart, *s++);
+    }
+}
+
 static int cmd_scope_start(const struct shell *sh, size_t argc, char **argv)
 {
     uint8_t decim = 1;
@@ -358,28 +370,45 @@ static int cmd_scope_dump(const struct shell *sh, size_t argc, char **argv)
     ARG_UNUSED(argc);
     ARG_UNUSED(argv);
 
+    /* Lazy-init console UART device */
+    if (!scope_console_uart) {
+        scope_console_uart = DEVICE_DT_GET(DT_CHOSEN(zephyr_console));
+        if (!device_is_ready(scope_console_uart)) {
+            shell_error(sh, "Console UART not ready");
+            return -ENODEV;
+        }
+    }
+
     scope_stop();  /* freeze before reading */
 
     uint16_t count = scope_get_count();
     const scope_sample_t *buf = scope_get_buf();
+    char line[64];  /* 9×int16 max "-32768,"×9 + \n = 63 chars */
 
-    /* Use printk directly (faster than shell_print, no prompt overhead) */
-    printk("th_foc,th_obs,omega,id,iq,iq_ref,rpm,bemf,state\n");
-    k_msleep(5);  /* let header flush */
+    /* Header — direct UART, no shell/log */
+    scope_uart_puts("th_foc,th_obs,omega,id,iq,iq_ref,rpm,bemf,state\n");
 
     for (uint16_t i = 0; i < count; i++) {
         const scope_sample_t *s = &buf[i];
-        printk("%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
-               s->ch[SC_THETA_FOC], s->ch[SC_THETA_OBS],
-               s->ch[SC_OMEGA], s->ch[SC_ID_MA],
-               s->ch[SC_IQ_MA], s->ch[SC_IQ_REF_MA],
-               s->ch[SC_RPM], s->ch[SC_BEMF_CV],
-               s->ch[SC_STATE]);
-        if ((i & 7) == 7) k_msleep(2);  /* yield every 8 lines for UART flush */
+        int len = snprintf(line, sizeof(line),
+                           "%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
+                           s->ch[SC_THETA_FOC], s->ch[SC_THETA_OBS],
+                           s->ch[SC_OMEGA], s->ch[SC_ID_MA],
+                           s->ch[SC_IQ_MA], s->ch[SC_IQ_REF_MA],
+                           s->ch[SC_RPM], s->ch[SC_BEMF_CV],
+                           s->ch[SC_STATE]);
+        for (int j = 0; j < len; j++) {
+            uart_poll_out(scope_console_uart, line[j]);
+        }
+        if ((i & 15) == 15) {
+            k_msleep(1);  /* yield every 16 lines */
+        }
     }
 
-    k_msleep(5);
-    printk("# %u samples\n", count);
+    snprintf(line, sizeof(line), "# %u samples\n", count);
+    scope_uart_puts(line);
+
+    shell_print(sh, "Scope dump complete: %u samples", count);
     return 0;
 }
 

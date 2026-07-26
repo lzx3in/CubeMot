@@ -16,6 +16,7 @@
  *   0x06  CMD_PING       → {} (0 bytes)
  *   0x07  CMD_MOTOR_START→ {motor_id(u8), speed_rpm(f32)} (5 bytes)
  *   0x08  CMD_MOTOR_STOP → {motor_id(u8)} (1 byte)
+ *   0x09  CMD_MOTOR_SPEED→ {motor_id(u8), speed_rpm(f32)} (5 bytes)
  *   0x10  CMD_TEST       → FOC test command
  *   0x80  RSP_STATUS     → {state(u8), fault(u8)}  (2 bytes)
  *   0x81  RSP_TELEMETRY  → {x(f32), y(f32), yaw(f32), vx(f32), wz(f32)} (20 bytes)
@@ -42,6 +43,7 @@ extern "C" {
 #define CMD_ID_PING             0x06
 #define CMD_ID_MOTOR_START      0x07  /* Start motor startup sequence */
 #define CMD_ID_MOTOR_STOP       0x08  /* Stop motor */
+#define CMD_ID_MOTOR_SPEED      0x09  /* Set target speed (RUN only) */
 #define CMD_ID_TEST             0x10  /* FOC test command */
 
 /* Response IDs (device → host) */

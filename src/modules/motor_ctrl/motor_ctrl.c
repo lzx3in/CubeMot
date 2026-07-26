@@ -170,6 +170,20 @@ static void process_command(motor_instance_t *m, const motor_cmd_t *cmd)
             start_phase1(m);
             LOG_INF("Motor %u START: target=%d RPM",
                     m->motor_id, (int)cmd->target_speed_rpm);
+        } else {
+            LOG_WRN("Motor %u: START ignored (state=%d, not IDLE)",
+                    m->motor_id, m->state);
+        }
+        break;
+    case MOTOR_CMD_SET_SPEED:
+        if (m->state == MOTOR_STATE_RUN) {
+            float old = m->target_speed_rpm;
+            m->target_speed_rpm = cmd->target_speed_rpm;
+            LOG_INF("Motor %u speed: %.0f → %.0f RPM",
+                    m->motor_id, (double)old, (double)cmd->target_speed_rpm);
+        } else {
+            LOG_WRN("Motor %u: SET_SPEED ignored (state=%d, not RUN)",
+                    m->motor_id, m->state);
         }
         break;
     case MOTOR_CMD_STOP:

@@ -275,6 +275,28 @@ static int cmd_motor_stop(const struct shell *sh, size_t argc, char **argv)
     return 0;
 }
 
+static int cmd_motor_speed(const struct shell *sh, size_t argc, char **argv)
+{
+    if (argc < 2) {
+        shell_error(sh, "Usage: motor speed <rpm>");
+        return -EINVAL;
+    }
+
+    float rpm = (float)atoi(argv[1]);
+
+    ensure_msghub_handles();
+
+    motor_cmd_t cmd = {
+        .motor_id = 0,
+        .cmd = MOTOR_CMD_SET_SPEED,
+        .target_speed_rpm = rpm,
+    };
+    msghub_publish(g_motor_cmd_pub, &cmd);
+
+    shell_print(sh, "Motor SET_SPEED: target=%.0f RPM", (double)rpm);
+    return 0;
+}
+
 static int cmd_motor_status(const struct shell *sh, size_t argc, char **argv)
 {
     ARG_UNUSED(argc);
@@ -409,6 +431,10 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_motor,
         cmd_motor_start, 1, 1),
     SHELL_CMD_ARG(stop, NULL, "Stop motor",
         cmd_motor_stop, 1, 0),
+    SHELL_CMD_ARG(speed, NULL,
+        "Set target speed while running\n"
+        "Usage: motor speed <rpm>",
+        cmd_motor_speed, 2, 0),
     SHELL_CMD_ARG(status, NULL, "Show motor state (single read)",
         cmd_motor_status, 1, 0),
     SHELL_CMD_ARG(watch, NULL,

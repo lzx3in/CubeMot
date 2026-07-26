@@ -43,7 +43,8 @@ MSGHUB_TOPIC_DECLARE(led_command);
 
 typedef enum {
     MOTOR_CMD_STOP = 0,
-    MOTOR_CMD_START,
+    MOTOR_CMD_START,        // IDLE → RUN (state transition)
+    MOTOR_CMD_SET_SPEED,    // Update target speed (RUN only)
     MOTOR_CMD_EMERGENCY
 } motor_cmd_type_t;
 

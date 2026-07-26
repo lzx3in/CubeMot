@@ -238,6 +238,21 @@ static void process_command(const parsed_frame_t *frame)
         break;
     }
 
+    case CMD_ID_MOTOR_SPEED: {
+        if (frame->len < 5) {
+            LOG_WRN("CMD_MOTOR_SPEED: invalid length %u", frame->len);
+            break;
+        }
+        motor_cmd_t cmd = {0};
+        cmd.motor_id = frame->payload[0];
+        cmd.cmd = MOTOR_CMD_SET_SPEED;
+        memcpy(&cmd.target_speed_rpm, &frame->payload[1], 4);
+        msghub_publish(g_motor_cmd_pub, &cmd);
+        LOG_INF("MOTOR SPEED: id=%u target=%.0f RPM",
+                cmd.motor_id, (double)cmd.target_speed_rpm);
+        break;
+    }
+
     case CMD_ID_PING: {
         uint8_t pong_payload = 0x00;
         send_response(RSP_ID_PONG, &pong_payload, 1);

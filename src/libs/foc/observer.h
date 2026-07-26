@@ -57,6 +57,7 @@ typedef struct {
     /* Convergence check */
     bool  converged;
     uint16_t consecutive_ok;
+    float  theta_error_ema; // EMA of |theta_error| for noise-robust convergence
     float  speed_rpm_filt; // Filtered speed estimate
 
     /* Timestamp */

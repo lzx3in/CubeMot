@@ -134,19 +134,23 @@ void observer_step(observer_t *obs,
     }
 
     /* ── Convergence check ────────────────────────────────
-     * Consider converged when BEMF amplitude is sufficient and
-     * normalized θ_error is small for N consecutive cycles.
+     * Use EMA of |theta_error| to reject BEMF noise spikes.
+     * Converged when smoothed error < threshold and BEMF sufficient.
      */
     float bemf_min = 0.5f; /* minimum BEMF for reliable angle */
+    float err_abs = __builtin_fabsf(theta_error);
 
-    if (bemf_amp > bemf_min && __builtin_fabsf(theta_error) < 0.3f) {
+    /* EMA: alpha=0.01 → ~16Hz BW @ 1kHz, rejects switching noise */
+    obs->theta_error_ema += 0.01f * (err_abs - obs->theta_error_ema);
+
+    if (bemf_amp > bemf_min && obs->theta_error_ema < 0.3f) {
         obs->consecutive_ok++;
         if (obs->consecutive_ok > 100) {  /* 100ms at 1kHz */
             obs->converged = true;
         }
     } else {
-        obs->consecutive_ok = 0;
-        obs->converged = false;
+        if (obs->consecutive_ok > 0) obs->consecutive_ok--;
+        if (obs->consecutive_ok == 0) obs->converged = false;
     }
 
     /* speed_rpm_filt is managed by motor_ctrl thread (has pole_pairs).

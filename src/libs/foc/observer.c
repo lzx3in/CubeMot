@@ -56,21 +56,21 @@ void observer_step(observer_t *obs,
                    float v_alpha, float v_beta,
                    float i_alpha, float i_beta)
 {
-    /* ── BEMF estimation: direct voltage model ─────────────
-     * E = V - R*I - L*dI/dt
-     * Then low-pass filter to remove switching noise.
-     * No integrator, no gain tuning needed. */
-    float di_alpha_meas = (i_alpha - obs->i_alpha_prev) / obs->dt;
-    float di_beta_meas  = (i_beta  - obs->i_beta_prev)  / obs->dt;
+    /* ── BEMF estimation: resistive voltage model ─────────
+     * E = V - R*I
+     * Ls*dI/dt omitted: numerical differentiation at 1kHz amplifies
+     * 30kHz switching ripple (190mA pp → 0.2V noise vs 2V signal).
+     * PLL integral compensates the steady-state Ls*dI/dt ≈ 0. */
     obs->i_alpha_prev = i_alpha;
     obs->i_beta_prev  = i_beta;
 
-    float e_alpha_raw = v_alpha - obs->rs * i_alpha - obs->ls * di_alpha_meas;
-    float e_beta_raw  = v_beta  - obs->rs * i_beta  - obs->ls * di_beta_meas;
+    float e_alpha_raw = v_alpha - obs->rs * i_alpha;
+    float e_beta_raw  = v_beta  - obs->rs * i_beta;
 
-    /* First-order LPF: E_hat += alpha * (E_raw - E_hat)
-     * At 1kHz, alpha=0.5 → cutoff ≈ 80Hz (passes 58Hz electrical) */
-    float lpf_alpha = 0.5f;
+    /* First-order LPF: alpha=0.3 → cutoff ≈ 48Hz @ 1kHz, τ=5ms
+     * Balances noise rejection (vs 0.5) with phase lag (vs 0.1).
+     * Adequate for electrical freq ≤82Hz (1000RPM × 7pp). */
+    float lpf_alpha = 0.3f;
     obs->e_alpha += lpf_alpha * (e_alpha_raw - obs->e_alpha);
     obs->e_beta  += lpf_alpha * (e_beta_raw  - obs->e_beta);
 

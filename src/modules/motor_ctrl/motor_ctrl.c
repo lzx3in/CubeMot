@@ -86,8 +86,8 @@ static void speed_pid_init(PID_t *pid)
      * Kp=0.001 → 500 RPM error = 0.5A (gentle proportional)
      * Ki=0.002 → integral converges in ~2s at 250 RPM error
      * integral_limit=1000 (RPM·s), output anti-windup is effective clamp
-     * output_limit=0.4A (current loop + observer safe envelope) */
-    pid_set_parameters(pid, 0.001f, 0.002f, 0.0f, 1000.0f, 0.4f);
+     * output_limit=0.8A (observer dI/dt removed, noise floor lowered) */
+    pid_set_parameters(pid, 0.001f, 0.002f, 0.0f, 1000.0f, 0.8f);
 }
 
 /* ── Init ─────────────────────────────────────────────── */
@@ -310,10 +310,19 @@ static void run_speed_loop(motor_instance_t *m)
         /* True closed-loop FOC: observer theta drives Park transform */
         foc_isr_set_observer_override(true);  /* ISR uses observer theta */
 
-        /* Run observer at 1kHz */
+        /* Pre-filter currents for observer (remove 30kHz aliasing)
+         * ISR writes instantaneous i_alpha/i_beta at 30kHz (with PWM ripple).
+         * Observer at 1kHz would alias ripple into BEMF band.
+         * LPF alpha=0.2 → ~32Hz cutoff, attenuates aliased components. */
+        static float i_alpha_filt = 0.0f;
+        static float i_beta_filt  = 0.0f;
+        i_alpha_filt += 0.2f * (m->foc->state.i_alpha - i_alpha_filt);
+        i_beta_filt  += 0.2f * (m->foc->state.i_beta  - i_beta_filt);
+
+        /* Run observer at 1kHz with filtered currents */
         observer_step(m->obs,
                       m->foc->state.v_alpha, m->foc->state.v_beta,
-                      m->foc->state.i_alpha, m->foc->state.i_beta);
+                      i_alpha_filt, i_beta_filt);
 
         /* Speed estimate (filtered, alpha=0.03 → ~5Hz BW @ 1kHz)
          * Rejects 30kHz switching ripple aliased to 1kHz */
@@ -329,6 +338,16 @@ static void run_speed_loop(motor_instance_t *m)
                                      1.0f / SPEED_LOOP_HZ);
         if (iq_ref > 2.0f) iq_ref = 2.0f;
         if (iq_ref < -2.0f) iq_ref = -2.0f;
+
+        /* Slew rate limit: max 0.05A per 1ms step (50A/s)
+         * Prevents current step that destabilizes observer.
+         * 0→0.8A takes 16ms — fast enough for speed loop, gentle for observer. */
+        float iq_prev = m->foc->state.i_q_ref;
+        float iq_delta = iq_ref - iq_prev;
+        const float slew_max = 0.05f;
+        if (iq_delta > slew_max)  iq_delta = slew_max;
+        if (iq_delta < -slew_max) iq_delta = -slew_max;
+        iq_ref = iq_prev + iq_delta;
 
         m->foc->state.i_d_ref = 0.0f;
         m->foc->state.i_q_ref = iq_ref;

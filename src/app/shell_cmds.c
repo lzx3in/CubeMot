@@ -108,10 +108,14 @@ static int cmd_foc_status(const struct shell *sh, size_t argc, char **argv)
     shell_print(sh, "  Duty A/B/C: %.3f / %.3f / %.3f",
                 (double)s->duty_a, (double)s->duty_b, (double)s->duty_c);
     shell_print(sh, "  Theta:     %.3f rad", (double)s->theta_elec);
-    shell_print(sh, "  Speed:     %.1f RPM", (double)s->speed_rpm);
-    shell_print(sh, "  Observer:  %s (omega=%.1f rad/s)",
-                observer_is_converged(obs) ? "CONVERGED" : "not converged",
+    shell_print(sh, "  Speed(obs): %.1f RPM (omega=%.1f rad/s)",
+                (double)(__builtin_fabsf(obs->omega_elec) * 60.0f / (6.2832f * foc->config->pole_pairs)),
                 (double)obs->omega_elec);
+    shell_print(sh, "  BEMF:      %.2f V", (double)__builtin_sqrtf(
+                obs->e_alpha * obs->e_alpha + obs->e_beta * obs->e_beta));
+    shell_print(sh, "  Observer:  %s (consec=%d)",
+                observer_is_converged(obs) ? "CONVERGED" : "not converged",
+                obs->consecutive_ok);
     return 0;
 }
 

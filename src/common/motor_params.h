@@ -36,7 +36,7 @@ static const foc_motor_config_t g_motor_params = {
      *   pll_kp = 2*zeta*wn = 70
      *   pll_ki = wn^2 = 2500 */
     .observer_gain1     = 5628.0f,    /* L1: current correction gain */
-    .observer_gain2     = 1000.0f,    /* L2: BEMF integrator gain (high for fast convergence) */
+    .observer_gain2     = 0.1f,       /* L2: BEMF integrator (no dt factor) */
     .pll_kp             = 70.0f,      /* PLL proportional */
     .pll_ki             = 2500.0f,    /* PLL integral */
     .observer_min_speed_rpm = 50,

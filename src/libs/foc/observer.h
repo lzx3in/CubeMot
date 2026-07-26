@@ -45,8 +45,14 @@ typedef struct {
     float pll_ki;
 
     /* Motor constants */
+    float rs;             // Stator resistance [Ohm]
+    float ls;             // Stator inductance [H]
     float rs_inv_ls;      // Rs / Ls
     float inv_ls;         // 1 / Ls
+
+    /* Previous measured currents (for dI/dt) */
+    float i_alpha_prev;
+    float i_beta_prev;
 
     /* Convergence check */
     bool  converged;

@@ -35,6 +35,8 @@ void observer_init(observer_t *obs,
 {
     memset(obs, 0, sizeof(*obs));
 
+    obs->rs = rs;
+    obs->ls = ls;
     obs->rs_inv_ls = rs / ls;
     obs->inv_ls    = 1.0f / ls;
     obs->dt        = dt;
@@ -54,52 +56,22 @@ void observer_step(observer_t *obs,
                    float v_alpha, float v_beta,
                    float i_alpha, float i_beta)
 {
-    /* ── Luenberger Observer (Backward Euler discretization) ──
-     *
-     * Continuous: dI_hat/dt = 1/Ls*(V - R*I_hat - E_hat) + L1*(I - I_hat)
-     *
-     * Let a = Rs/Ls + L1 (self-feedback coefficient)
-     * Let b = 1/Ls*(V - E_hat) + L1*I (forcing term)
-     *
-     * Backward Euler: I_hat[k+1] = (I_hat[k] + dt*b) / (1 + dt*a)
-     * Unconditionally stable for any dt > 0 and a > 0.
-     *
-     * E_hat update (pure integrator, no self-feedback):
-     *   E_hat += dt * L2 * (I - I_hat)
-     */
+    /* ── BEMF estimation: direct voltage model ─────────────
+     * E = V - R*I - L*dI/dt
+     * Then low-pass filter to remove switching noise.
+     * No integrator, no gain tuning needed. */
+    float di_alpha_meas = (i_alpha - obs->i_alpha_prev) / obs->dt;
+    float di_beta_meas  = (i_beta  - obs->i_beta_prev)  / obs->dt;
+    obs->i_alpha_prev = i_alpha;
+    obs->i_beta_prev  = i_beta;
 
-    float a = obs->rs_inv_ls + obs->gain1;
-    float denom = 1.0f + obs->dt * a;
-    float inv_denom = 1.0f / denom;
+    float e_alpha_raw = v_alpha - obs->rs * i_alpha - obs->ls * di_alpha_meas;
+    float e_beta_raw  = v_beta  - obs->rs * i_beta  - obs->ls * di_beta_meas;
 
-    /* Pre-update current error (innovation signal for BEMF estimation) */
-    float i_alpha_err = i_alpha - obs->i_alpha_hat;
-    float i_beta_err  = i_beta  - obs->i_beta_hat;
-
-    /* Current observer (backward Euler) */
-    float b_alpha = obs->inv_ls * (v_alpha - obs->e_alpha) + obs->gain1 * i_alpha;
-    float b_beta  = obs->inv_ls * (v_beta  - obs->e_beta)  + obs->gain1 * i_beta;
-
-    obs->i_alpha_hat = (obs->i_alpha_hat + obs->dt * b_alpha) * inv_denom;
-    obs->i_beta_hat  = (obs->i_beta_hat  + obs->dt * b_beta)  * inv_denom;
-
-    /* Clamp I_hat */
-    if (obs->i_alpha_hat > 5.0f) obs->i_alpha_hat = 5.0f;
-    if (obs->i_alpha_hat < -5.0f) obs->i_alpha_hat = -5.0f;
-    if (obs->i_beta_hat > 5.0f) obs->i_beta_hat = 5.0f;
-    if (obs->i_beta_hat < -5.0f) obs->i_beta_hat = -5.0f;
-
-    /* BEMF estimate: integrator driven by pre-update current error.
-     * gain2 must be high enough to overcome backward Euler damping.
-     * Effective loop gain = gain2 * dt * L1 * Ls ≈ gain2 * 0.001 * 5.95 */
-    obs->e_alpha += obs->gain2 * i_alpha_err;
-    obs->e_beta  += obs->gain2 * i_beta_err;
-
-    /* Clamp BEMF (max 30V) */
-    if (obs->e_alpha > 30.0f) obs->e_alpha = 30.0f;
-    if (obs->e_alpha < -30.0f) obs->e_alpha = -30.0f;
-    if (obs->e_beta > 30.0f) obs->e_beta = 30.0f;
-    if (obs->e_beta < -30.0f) obs->e_beta = -30.0f;
+    /* First-order LPF: E_hat += alpha * (E_raw - E_hat), alpha = 0.05 */
+    float lpf_alpha = 0.05f;
+    obs->e_alpha += lpf_alpha * (e_alpha_raw - obs->e_alpha);
+    obs->e_beta  += lpf_alpha * (e_beta_raw  - obs->e_beta);
 
     /* ── PLL: Extract angle and speed from BEMF ────────────
      *

@@ -237,6 +237,13 @@ static void run_speed_loop(motor_instance_t *m)
                       m->foc->state.v_alpha, m->foc->state.v_beta,
                       m->foc->state.i_alpha, m->foc->state.i_beta);
 
+        /* Only allow BEMF integration when motor is actually spinning.
+         * During early ramp (low speed), current transients corrupt E_hat. */
+        if (ramp_speed < 100.0f) {
+            m->obs->e_alpha = 0.0f;
+            m->obs->e_beta = 0.0f;
+        }
+
         /* During START: force observer theta to track forced angle.
          * This keeps BEMF estimation aligned with actual rotor position.
          * PLL only takes over after switchover to RUN. */
@@ -277,13 +284,17 @@ static void run_speed_loop(motor_instance_t *m)
     case MOTOR_STATE_RUN: {
         foc_isr_set_observer_override(true);  /* ISR owns theta from observer */
 
-        /* Run observer at 1kHz (backward Euler) */
+        /* Run observer at 1kHz (voltage model BEMF + PLL) */
         observer_step(m->obs,
                       m->foc->state.v_alpha, m->foc->state.v_beta,
                       m->foc->state.i_alpha, m->foc->state.i_beta);
 
-        float speed_meas = foc_rads_to_rpm(
+        /* Low-pass filter on speed measurement (alpha=0.1 → ~16Hz BW) */
+        float speed_raw = foc_rads_to_rpm(
             __builtin_fabsf(m->obs->omega_elec), m->foc->config->pole_pairs);
+        m->obs->speed_rpm_filt = 0.9f * m->obs->speed_rpm_filt
+                               + 0.1f * speed_raw;
+        float speed_meas = m->obs->speed_rpm_filt;
 
         float iq_ref = pid_calculate(&m->speed_pid,
                                      m->target_speed_rpm, speed_meas, 0.0f,
@@ -311,8 +322,7 @@ static void publish_state(motor_instance_t *m)
     motor_state_t state = {
         .motor_id = m->motor_id,
         .state = (uint8_t)m->state,
-        .speed_rpm = foc_rads_to_rpm(
-            __builtin_fabsf(m->obs->omega_elec), m->foc->config->pole_pairs),
+        .speed_rpm = m->obs->speed_rpm_filt,
         .i_d = m->foc->state.i_d,
         .i_q = m->foc->state.i_q,
         .v_bus = m->foc->state.v_bus,

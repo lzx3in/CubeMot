@@ -35,6 +35,7 @@ enum {
 };
 
 void scope_start(void);
+void scope_start_decim(uint8_t decimation);  /* record every N ticks */
 void scope_stop(void);
 bool scope_is_active(void);
 void scope_record(int8_t motor_state);  /* call from motor_ctrl thread each tick */

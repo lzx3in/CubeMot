@@ -352,10 +352,12 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_adc,
 
 static int cmd_scope_start(const struct shell *sh, size_t argc, char **argv)
 {
-    ARG_UNUSED(argc);
-    ARG_UNUSED(argv);
-    scope_start();
-    shell_print(sh, "Scope STARTED (128 samples @ 1kHz = 128ms window)");
+    uint8_t decim = 1;
+    if (argc > 1) decim = (uint8_t)atoi(argv[1]);
+    if (decim < 1) decim = 1;
+    scope_start_decim(decim);
+    shell_print(sh, "Scope STARTED (decim=%u, %ums window)",
+                decim, SCOPE_DEPTH * decim);
     return 0;
 }
 
@@ -378,20 +380,23 @@ static int cmd_scope_dump(const struct shell *sh, size_t argc, char **argv)
     uint16_t count = scope_get_count();
     const scope_sample_t *buf = scope_get_buf();
 
-    shell_print(sh, "th_foc,th_obs,omega,id,iq,iq_ref,rpm,bemf,state");
+    /* Use printk directly (faster than shell_print, no prompt overhead) */
+    printk("th_foc,th_obs,omega,id,iq,iq_ref,rpm,bemf,state\n");
+    k_msleep(5);  /* let header flush */
 
     for (uint16_t i = 0; i < count; i++) {
         const scope_sample_t *s = &buf[i];
-        shell_print(sh, "%d,%d,%d,%d,%d,%d,%d,%d,%d",
-                    s->ch[SC_THETA_FOC], s->ch[SC_THETA_OBS],
-                    s->ch[SC_OMEGA], s->ch[SC_ID_MA],
-                    s->ch[SC_IQ_MA], s->ch[SC_IQ_REF_MA],
-                    s->ch[SC_RPM], s->ch[SC_BEMF_CV],
-                    s->ch[SC_STATE]);
-        if ((i & 15) == 15) k_msleep(1);  /* yield every 16 lines */
+        printk("%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
+               s->ch[SC_THETA_FOC], s->ch[SC_THETA_OBS],
+               s->ch[SC_OMEGA], s->ch[SC_ID_MA],
+               s->ch[SC_IQ_MA], s->ch[SC_IQ_REF_MA],
+               s->ch[SC_RPM], s->ch[SC_BEMF_CV],
+               s->ch[SC_STATE]);
+        if ((i & 7) == 7) k_msleep(2);  /* yield every 8 lines for UART flush */
     }
 
-    shell_print(sh, "# %u samples dumped", count);
+    k_msleep(5);
+    printk("# %u samples\n", count);
     return 0;
 }
 
@@ -406,7 +411,8 @@ static int cmd_scope_status(const struct shell *sh, size_t argc, char **argv)
 }
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_scope,
-    SHELL_CMD(start, NULL, "Start capture (clears buffer)", cmd_scope_start),
+    SHELL_CMD_ARG(start, NULL, "Start capture [decimation] (default=1)",
+                  cmd_scope_start, 1, 1),
     SHELL_CMD(stop, NULL, "Stop capture", cmd_scope_stop),
     SHELL_CMD(dump, NULL, "Dump buffer as CSV", cmd_scope_dump),
     SHELL_CMD(status, NULL, "Show scope status", cmd_scope_status),

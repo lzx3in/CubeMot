@@ -18,14 +18,22 @@ static scope_sample_t g_buf[SCOPE_DEPTH];
 static volatile bool  g_active = false;
 static uint16_t       g_head = 0;
 static uint16_t       g_count = 0;
+static uint8_t        g_decim = 1;   /* record every N ticks */
+static uint8_t        g_decim_cnt = 0;
 
 /* ── API ──────────────────────────────────────────────── */
 
 void scope_start(void)
 {
+    scope_start_decim(1);
+}
+
+void scope_start_decim(uint8_t decimation)
+{
     g_head = 0;
     g_count = 0;
-    memset(g_buf, 0, sizeof(g_buf));
+    g_decim = (decimation < 1) ? 1 : decimation;
+    g_decim_cnt = 0;
     g_active = true;
 }
 
@@ -42,6 +50,8 @@ bool scope_is_active(void)
 void scope_record(int8_t motor_state)
 {
     if (!g_active) return;
+    if (++g_decim_cnt < g_decim) return;
+    g_decim_cnt = 0;
 
     foc_t *foc = foc_isr_get_foc();
     observer_t *obs = foc_isr_get_observer();

@@ -81,8 +81,8 @@ static void foc_tim1_isr(void *arg)
         }
     }
 
-    /* Observer runs in motor_ctrl thread (1kHz), not here.
-     * ISR only does current loop + PWM update. */
+    /* Observer runs in motor_ctrl thread (1kHz, backward Euler = stable).
+     * ISR only does current loop + overcurrent protection. */
 
     /* Update FOC angle from observer only if converged and not overridden */
     if (g_observer_override && observer_is_converged(&g_motor_observer)) {
@@ -112,11 +112,11 @@ void foc_isr_init(void)
     g_motor_foc.state.adc_ib_offset = ib_off;
     g_motor_foc.state.adc_ic_offset = ic_off;
 
-    /* Initialize observer with Workbench gains */
+    /* Initialize observer — runs at 1kHz in motor_ctrl (backward Euler) */
     observer_init(&g_motor_observer,
                   g_motor_params.rs,
                   g_motor_params.ls,
-                  1.0f / FOC_PWM_FREQ_HZ,
+                  1.0f / 1000.0f,   /* dt = 1ms (speed loop rate) */
                   g_motor_params.observer_gain1,
                   g_motor_params.observer_gain2,
                   g_motor_params.pll_kp,

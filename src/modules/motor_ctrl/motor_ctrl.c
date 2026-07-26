@@ -44,7 +44,7 @@ typedef struct {
 static const startup_config_t g_startup_config = {
     .phase1_duration_ms  = 1000,
     .phase1_align_current = 0.8f,
-    .phase2_duration_ms  = 2000,   /* longer ramp for observer convergence */
+    .phase2_duration_ms  = 4000,   /* 4s ramp for observer convergence */
     .phase2_final_speed  = 582.0f,
     .phase2_current      = 0.8f,
     .obs_min_speed_rpm   = 200.0f, /* relaxed: was 524 */
@@ -144,8 +144,8 @@ static void start_phase2(motor_instance_t *m)
     m->phase_elapsed_ms = 0;
     m->phase_duration_ms = g_startup_config.phase2_duration_ms;
 
-    /* Full observer reset: clear all accumulated state from ALIGN phase */
-    observer_force_angle(m->obs, 0.0f);
+    /* Sync observer to current forced angle (not zero!) */
+    observer_force_angle(m->obs, m->foc->state.theta_elec);
     m->obs->i_alpha_hat = 0.0f;
     m->obs->i_beta_hat = 0.0f;
     m->obs->e_alpha = 0.0f;
@@ -232,7 +232,11 @@ static void run_speed_loop(motor_instance_t *m)
         m->foc->state.i_d_ref = 0.0f;
         m->foc->state.i_q_ref = g_startup_config.phase2_current;
 
-        /* Observer runs in ISR (30kHz). Just read its output here. */
+        /* Run observer at 1kHz (backward Euler, unconditionally stable) */
+        observer_step(m->obs,
+                      m->foc->state.v_alpha, m->foc->state.v_beta,
+                      m->foc->state.i_alpha, m->foc->state.i_beta);
+
         float est_speed = foc_rads_to_rpm(
             __builtin_fabsf(m->obs->omega_elec), m->foc->config->pole_pairs);
 
@@ -263,6 +267,12 @@ static void run_speed_loop(motor_instance_t *m)
 
     case MOTOR_STATE_RUN: {
         foc_isr_set_observer_override(true);  /* ISR owns theta from observer */
+
+        /* Run observer at 1kHz (backward Euler) */
+        observer_step(m->obs,
+                      m->foc->state.v_alpha, m->foc->state.v_beta,
+                      m->foc->state.i_alpha, m->foc->state.i_beta);
+
         float speed_meas = foc_rads_to_rpm(
             __builtin_fabsf(m->obs->omega_elec), m->foc->config->pole_pairs);
 

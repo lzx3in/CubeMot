@@ -54,46 +54,47 @@ void observer_step(observer_t *obs,
                    float v_alpha, float v_beta,
                    float i_alpha, float i_beta)
 {
-    /* ── Luenberger State Observer (floating-point) ────────
+    /* ── Luenberger Observer (Backward Euler discretization) ──
      *
-     * Motor model: dI/dt = 1/Ls * (V - R*I - E)
+     * Continuous: dI_hat/dt = 1/Ls*(V - R*I_hat - E_hat) + L1*(I - I_hat)
      *
-     * Observer:
-     *   dI_hat/dt = 1/Ls * (V - R*I_hat - E_hat) + L1 * (I - I_hat)
-     *   dE_hat/dt = L2 * (I - I_hat)
+     * Let a = Rs/Ls + L1 (self-feedback coefficient)
+     * Let b = 1/Ls*(V - E_hat) + L1*I (forcing term)
      *
-     * Discrete (forward Euler):
-     *   I_hat += dt * [1/Ls*(V - R*I_hat - E_hat) + L1*(I - I_hat)]
+     * Backward Euler: I_hat[k+1] = (I_hat[k] + dt*b) / (1 + dt*a)
+     * Unconditionally stable for any dt > 0 and a > 0.
+     *
+     * E_hat update (pure integrator, no self-feedback):
      *   E_hat += dt * L2 * (I - I_hat)
-     *
-     * Gains L1, L2 from pole placement at -omega_obs:
-     *   L1 = 2*omega_obs + Rs/Ls
-     *   L2 = Ls * omega_obs^2
      */
 
-    /* Current estimation error (I - I_hat) for correction */
-    float i_alpha_err = i_alpha - obs->i_alpha_hat;
-    float i_beta_err  = i_beta  - obs->i_beta_hat;
+    float a = obs->rs_inv_ls + obs->gain1;  /* ~10628 for our motor */
+    float denom = 1.0f + obs->dt * a;       /* ~11.6 at 1kHz, ~1.35 at 30kHz */
+    float inv_denom = 1.0f / denom;
 
-    /* Current estimate update */
-    obs->i_alpha_hat += obs->dt * (obs->inv_ls
-        * (v_alpha - obs->rs_inv_ls * obs->i_alpha_hat - obs->e_alpha)
-        + obs->gain1 * i_alpha_err);
-    obs->i_beta_hat  += obs->dt * (obs->inv_ls
-        * (v_beta  - obs->rs_inv_ls * obs->i_beta_hat  - obs->e_beta)
-        + obs->gain1 * i_beta_err);
+    /* Forcing terms */
+    float b_alpha = obs->inv_ls * (v_alpha - obs->e_alpha) + obs->gain1 * i_alpha;
+    float b_beta  = obs->inv_ls * (v_beta  - obs->e_beta)  + obs->gain1 * i_beta;
 
-    /* Clamp I_hat to prevent divergence (max 5A) */
+    /* Backward Euler update for I_hat */
+    obs->i_alpha_hat = (obs->i_alpha_hat + obs->dt * b_alpha) * inv_denom;
+    obs->i_beta_hat  = (obs->i_beta_hat  + obs->dt * b_beta)  * inv_denom;
+
+    /* Clamp I_hat (max 5A) */
     if (obs->i_alpha_hat > 5.0f) obs->i_alpha_hat = 5.0f;
     if (obs->i_alpha_hat < -5.0f) obs->i_alpha_hat = -5.0f;
     if (obs->i_beta_hat > 5.0f) obs->i_beta_hat = 5.0f;
     if (obs->i_beta_hat < -5.0f) obs->i_beta_hat = -5.0f;
 
+    /* Current estimation error (using updated I_hat) */
+    float i_alpha_err = i_alpha - obs->i_alpha_hat;
+    float i_beta_err  = i_beta  - obs->i_beta_hat;
+
     /* BEMF estimate update (integrator) */
     obs->e_alpha += obs->dt * obs->gain2 * i_alpha_err;
     obs->e_beta  += obs->dt * obs->gain2 * i_beta_err;
 
-    /* Clamp BEMF estimate to prevent integrator windup (max ~24V) */
+    /* Clamp BEMF (max 30V) */
     if (obs->e_alpha > 30.0f) obs->e_alpha = 30.0f;
     if (obs->e_alpha < -30.0f) obs->e_alpha = -30.0f;
     if (obs->e_beta > 30.0f) obs->e_beta = 30.0f;
@@ -123,8 +124,8 @@ void observer_step(observer_t *obs,
     /* PLL integrator */
     obs->pll_integral += obs->pll_ki * theta_error * obs->dt;
 
-    /* PLL integrator anti-windup */
-    float omega_max = 2000.0f; // ~19000 RPM electrical
+    /* PLL integrator anti-windup (max ~700 RPM mechanical for 7pp) */
+    float omega_max = 500.0f;
     if (obs->pll_integral >  omega_max) obs->pll_integral =  omega_max;
     if (obs->pll_integral < -omega_max) obs->pll_integral = -omega_max;
 

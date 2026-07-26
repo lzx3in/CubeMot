@@ -32,10 +32,12 @@ static const foc_motor_config_t g_motor_params = {
      * Observer bandwidth: 50Hz → omega_obs=314 rad/s
      * L1 = 2*omega_obs + Rs/Ls = 5628
      * L2 = Ls * omega_obs^2 = 104
-     * PLL bandwidth: 5Hz → pll_kp=31, pll_ki=100 */
+     * PLL bandwidth: 20Hz → wn=126, zeta=0.7
+     *   pll_kp = 2*zeta*wn = 176
+     *   pll_ki = wn^2 = 15876 */
     .observer_gain1     = 5628.0f,    /* L1: current correction gain */
     .observer_gain2     = 104.0f,     /* L2: BEMF integrator gain */
-    .pll_kp             = 31.0f,      /* PLL proportional */
-    .pll_ki             = 100.0f,     /* PLL integral */
+    .pll_kp             = 176.0f,     /* PLL proportional */
+    .pll_ki             = 15876.0f,   /* PLL integral */
     .observer_min_speed_rpm = 50,
 };

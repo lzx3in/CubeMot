@@ -139,6 +139,12 @@ static const float sin_table[257] = {
 
 static inline void fast_sincos(float theta, float *sin_out, float *cos_out)
 {
+    /* NaN/Inf guard: prevents dead-loop in while() below */
+    if (__builtin_isnan(theta) || __builtin_isinf(theta)) {
+        *sin_out = 0.0f;
+        *cos_out = 1.0f;
+        return;
+    }
     const float two_pi = 6.283185307f;
     while (theta >= two_pi) theta -= two_pi;
     while (theta < 0.0f)     theta += two_pi;

@@ -211,8 +211,10 @@ static void process_command(const parsed_frame_t *frame)
     }
 
     case CMD_ID_PING: {
-        uint8_t pong_payload = 0x00;
-        send_response(RSP_ID_PONG, &pong_payload, 1);
+        /* PONG: [proto_ver, fw_major, fw_minor, fw_patch] */
+        uint8_t pong[4] = { ESC_PROTOCOL_VERSION, ESC_FW_VERSION_MAJOR,
+                            ESC_FW_VERSION_MINOR, ESC_FW_VERSION_PATCH };
+        send_response(RSP_ID_PONG, pong, 4);
         break;
     }
 

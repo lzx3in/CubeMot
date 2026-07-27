@@ -34,6 +34,12 @@ extern "C" {
 
 /* Protocol constants are defined in serial_protocol.h (SP_*) */
 
+/* Protocol & firmware version (reported in PONG) */
+#define ESC_PROTOCOL_VERSION    1
+#define ESC_FW_VERSION_MAJOR    0
+#define ESC_FW_VERSION_MINOR    2
+#define ESC_FW_VERSION_PATCH    0
+
 /* Command IDs (host → device) */
 #define CMD_ID_VEL              0x01
 #define CMD_ID_ARM              0x02

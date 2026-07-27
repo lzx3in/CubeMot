@@ -24,11 +24,16 @@
 };
 
 /*
- * USART1 on PC4(TX)/PC5(RX) — NOT bridged by ST-Link V3 VCP.
- * Available for board-level UART communication (e.g. VCU link).
- * NOTE: PC5 conflicts with ADC2_IN11 (Vbus). Restore PB6/PB7 remap
- * when VCU link is added.
+ * USART1 on PB6(TX)/PB7(RX) — NOT bridged by ST-Link V3 VCP.
+ * Used for VCU↔ESC serial link (serial_cmd module).
+ * Remapped from default PC4/PC5 (PC5 conflicts with ADC2_IN11 Vbus).
  */
+&usart1 {
+	pinctrl-0 = <&usart1_tx_pb6 &usart1_rx_pb7>;
+	pinctrl-names = "default";
+	current-speed = <115200>;
+	status = "okay";
+};
 
 /*
  * Disable SPI2: PB13/PB14/PB15 needed by TIM1_CH1N/CH2N/CH3N

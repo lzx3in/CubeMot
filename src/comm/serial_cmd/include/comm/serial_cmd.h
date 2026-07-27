@@ -56,8 +56,15 @@ extern "C" {
 #define RSP_ID_STATUS           0x80
 #define RSP_ID_TELEMETRY        0x81
 #define RSP_ID_MOTOR            0x82
+#define RSP_ID_CMD_ACK          0x83  /* Command acknowledgment */
 #define RSP_ID_PONG             0x86
 #define RSP_ID_DIAG             0x87  /* FOC debug diagnostics */
+
+/* ACK result codes (payload[1] of RSP_ID_CMD_ACK) */
+#define ACK_ACCEPTED            0x00
+#define ACK_REJECTED            0x01  /* Safety state does not permit */
+#define ACK_INVALID_CMD         0x02
+#define ACK_INVALID_PARAM       0x03
 
 /* Thread priority */
 #define SERIAL_CMD_THREAD_PRIORITY  K_PRIO_COOP(8)

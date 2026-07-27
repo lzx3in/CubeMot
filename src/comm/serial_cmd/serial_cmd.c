@@ -40,6 +40,11 @@ static const struct device *uart_dev;
 static struct k_mutex tx_mutex;  /* protects tx_buf + uart_poll_out */
 static struct k_sem rx_sem;      /* signaled by ISR callback */
 
+/* System safety state machine */
+typedef enum { SYS_DISARMED = 0, SYS_ARMED = 1, SYS_ESTOPPED = 2 } sys_safety_state_t;
+static sys_safety_state_t g_sys_state = SYS_DISARMED;
+static uint8_t g_fault_code = 0;
+
 /* RX ring buffer */
 #define RX_RING_SIZE 128
 static uint8_t rx_ring[RX_RING_SIZE];
@@ -162,14 +167,92 @@ static void send_response(uint8_t cmd_id, const uint8_t *payload, uint8_t len)
     k_mutex_unlock(&tx_mutex);
 }
 
+static void send_cmd_ack(uint8_t cmd_id, uint8_t result)
+{
+    uint8_t payload[2] = { cmd_id, result };
+    send_response(RSP_ID_CMD_ACK, payload, 2);
+}
+
+static void send_status(void)
+{
+    uint8_t sp[2] = { (uint8_t)g_sys_state, g_fault_code };
+    send_response(RSP_ID_STATUS, sp, 2);
+}
+
 /* ── Command processing ──────────────────────────────── */
 
 static void process_command(const parsed_frame_t *frame)
 {
     switch (frame->cmd_id) {
+    case CMD_ID_VEL: {
+        /* VEL: vehicle-level velocity command — not supported on ESC.
+         * Kinematics inverse belongs to VCU. */
+        LOG_WRN("VEL: not supported (no vehicle model)");
+        send_cmd_ack(CMD_ID_VEL, ACK_INVALID_CMD);
+        break;
+    }
+
+    case CMD_ID_ARM: {
+        if (g_sys_state == SYS_DISARMED) {
+            g_sys_state = SYS_ARMED;
+            LOG_INF("ARMED");
+            send_cmd_ack(CMD_ID_ARM, ACK_ACCEPTED);
+            send_status();
+        } else {
+            LOG_WRN("ARM rejected (state=%d)", g_sys_state);
+            send_cmd_ack(CMD_ID_ARM, ACK_REJECTED);
+        }
+        break;
+    }
+
+    case CMD_ID_DISARM: {
+        g_sys_state = SYS_DISARMED;
+        /* Ensure motor stops */
+        motor_cmd_t cmd = {0};
+        cmd.motor_id = 0;
+        cmd.cmd = MOTOR_CMD_STOP;
+        msghub_publish(g_motor_cmd_pub, &cmd);
+        LOG_INF("DISARMED + MOTOR_STOP");
+        send_cmd_ack(CMD_ID_DISARM, ACK_ACCEPTED);
+        send_status();
+        break;
+    }
+
+    case CMD_ID_ESTOP: {
+        g_sys_state = SYS_ESTOPPED;
+        motor_cmd_t cmd = {0};
+        cmd.motor_id = 0;
+        cmd.cmd = MOTOR_CMD_EMERGENCY;
+        msghub_publish(g_motor_cmd_pub, &cmd);
+        LOG_ERR("ESTOP → EMERGENCY");
+        send_cmd_ack(CMD_ID_ESTOP, ACK_ACCEPTED);
+        send_status();
+        break;
+    }
+
+    case CMD_ID_RESET: {
+        if (g_sys_state == SYS_ESTOPPED) {
+            g_sys_state = SYS_DISARMED;
+            g_fault_code = 0;
+            LOG_INF("RESET → DISARMED");
+            send_cmd_ack(CMD_ID_RESET, ACK_ACCEPTED);
+            send_status();
+        } else {
+            LOG_WRN("RESET rejected (state=%d, not ESTOPPED)", g_sys_state);
+            send_cmd_ack(CMD_ID_RESET, ACK_REJECTED);
+        }
+        break;
+    }
+
     case CMD_ID_MOTOR_START: {
+        if (g_sys_state != SYS_ARMED) {
+            LOG_WRN("MOTOR_START rejected: not armed (state=%d)", g_sys_state);
+            send_cmd_ack(CMD_ID_MOTOR_START, ACK_REJECTED);
+            break;
+        }
         if (frame->len < 5) {
             LOG_WRN("CMD_MOTOR_START: invalid length %u", frame->len);
+            send_cmd_ack(CMD_ID_MOTOR_START, ACK_INVALID_PARAM);
             break;
         }
         motor_cmd_t cmd = {0};
@@ -179,12 +262,14 @@ static void process_command(const parsed_frame_t *frame)
         msghub_publish(g_motor_cmd_pub, &cmd);
         LOG_INF("MOTOR START: id=%u speed=%.0f RPM",
                 cmd.motor_id, (double)cmd.target_speed_rpm);
+        send_cmd_ack(CMD_ID_MOTOR_START, ACK_ACCEPTED);
         break;
     }
 
     case CMD_ID_MOTOR_STOP: {
         if (frame->len < 1) {
             LOG_WRN("CMD_MOTOR_STOP: invalid length %u", frame->len);
+            send_cmd_ack(CMD_ID_MOTOR_STOP, ACK_INVALID_PARAM);
             break;
         }
         motor_cmd_t cmd = {0};
@@ -192,12 +277,19 @@ static void process_command(const parsed_frame_t *frame)
         cmd.cmd = MOTOR_CMD_STOP;
         msghub_publish(g_motor_cmd_pub, &cmd);
         LOG_INF("MOTOR STOP: id=%u", cmd.motor_id);
+        send_cmd_ack(CMD_ID_MOTOR_STOP, ACK_ACCEPTED);
         break;
     }
 
     case CMD_ID_MOTOR_SPEED: {
+        if (g_sys_state != SYS_ARMED) {
+            LOG_WRN("MOTOR_SPEED rejected: not armed (state=%d)", g_sys_state);
+            send_cmd_ack(CMD_ID_MOTOR_SPEED, ACK_REJECTED);
+            break;
+        }
         if (frame->len < 5) {
             LOG_WRN("CMD_MOTOR_SPEED: invalid length %u", frame->len);
+            send_cmd_ack(CMD_ID_MOTOR_SPEED, ACK_INVALID_PARAM);
             break;
         }
         motor_cmd_t cmd = {0};
@@ -207,6 +299,7 @@ static void process_command(const parsed_frame_t *frame)
         msghub_publish(g_motor_cmd_pub, &cmd);
         LOG_INF("MOTOR SPEED: id=%u target=%.0f RPM",
                 cmd.motor_id, (double)cmd.target_speed_rpm);
+        send_cmd_ack(CMD_ID_MOTOR_SPEED, ACK_ACCEPTED);
         break;
     }
 
@@ -313,6 +406,7 @@ void serial_cmd_thread(void *arg1, void *arg2, void *arg3)
     LOG_INF("Serial thread started (IRQ RX + periodic TX)");
 
     uint32_t diag_counter = 0;
+    uint32_t status_counter = 0;
 
     while (1) {
         /* ── RX: parse frames signaled by ISR ─────────── */
@@ -324,6 +418,12 @@ void serial_cmd_thread(void *arg1, void *arg2, void *arg3)
         }
 
         /* ── TX: periodic telemetry ───────────────────── */
+
+        /* STATUS heartbeat @ 2Hz (50 × 10ms) */
+        if (++status_counter >= 50) {
+            status_counter = 0;
+            send_status();
+        }
 
         /* MOTOR state (on change) */
         motor_state_t mstate;

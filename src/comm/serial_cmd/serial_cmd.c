@@ -50,13 +50,7 @@ static size_t rx_tail = 0;
 static uint8_t tx_buf[SP_MAX_FRAME];
 
 /* msghub subscribers/publishers */
-static msghub_subscriber_t g_cmd_vel_sub;
-static msghub_subscriber_t g_vehicle_state_sub;
 static msghub_subscriber_t g_motor_state_sub;
-static msghub_subscriber_t g_commander_status_sub;
-
-static msghub_publisher_t g_cmd_vel_pub;
-static msghub_publisher_t g_commander_cmd_pub;
 static msghub_publisher_t g_motor_cmd_pub;
 
 /* ── Ring buffer helpers ─────────────────────────────── */
@@ -173,43 +167,6 @@ static void send_response(uint8_t cmd_id, const uint8_t *payload, uint8_t len)
 static void process_command(const parsed_frame_t *frame)
 {
     switch (frame->cmd_id) {
-    case CMD_ID_VEL: {
-        if (frame->len != 8) {
-            LOG_WRN("CMD_VEL: invalid length %u", frame->len);
-            break;
-        }
-        cmd_vel_t vel;
-        memcpy(&vel.linear_x, &frame->payload[0], 4);
-        memcpy(&vel.angular_z, &frame->payload[4], 4);
-        vel.timestamp = common_get_timestamp_ms();
-        msghub_publish(g_cmd_vel_pub, &vel);
-        break;
-    }
-
-    case CMD_ID_ARM: {
-        commander_cmd_t cmd = { .op = CMD_OP_ARM, .timestamp = common_get_timestamp_ms() };
-        msghub_publish(g_commander_cmd_pub, &cmd);
-        break;
-    }
-
-    case CMD_ID_DISARM: {
-        commander_cmd_t cmd = { .op = CMD_OP_DISARM, .timestamp = common_get_timestamp_ms() };
-        msghub_publish(g_commander_cmd_pub, &cmd);
-        break;
-    }
-
-    case CMD_ID_ESTOP: {
-        commander_cmd_t cmd = { .op = CMD_OP_ESTOP, .timestamp = common_get_timestamp_ms() };
-        msghub_publish(g_commander_cmd_pub, &cmd);
-        break;
-    }
-
-    case CMD_ID_RESET: {
-        commander_cmd_t cmd = { .op = CMD_OP_RESET_FAULT, .timestamp = common_get_timestamp_ms() };
-        msghub_publish(g_commander_cmd_pub, &cmd);
-        break;
-    }
-
     case CMD_ID_MOTOR_START: {
         if (frame->len < 5) {
             LOG_WRN("CMD_MOTOR_START: invalid length %u", frame->len);
@@ -291,17 +248,13 @@ static void process_command(const parsed_frame_t *frame)
             extern void foc_adc_get_sw_diag(int16_t *ia, int16_t *ib, int16_t *ic,
                                             int16_t *vbus_raw, float *vbus_v, bool *valid);
 
-            /* Read COMMON_CCR for CKMODE */
             uint32_t common_ccr = ADC12_COMMON->CCR;
-
-            /* Read ADC state BEFORE SW trigger */
             uint32_t adc1_isr_before = ADC1->ISR;
             uint32_t adc1_jsqr = ADC1->JSQR;
             int16_t jdr1_before = (int16_t)LL_ADC_INJ_ReadConversionData12(ADC1, LL_ADC_INJ_RANK_1);
             int16_t jdr2_before = (int16_t)LL_ADC_INJ_ReadConversionData12(ADC1, LL_ADC_INJ_RANK_2);
             int16_t adc2_jdr1_before = (int16_t)LL_ADC_INJ_ReadConversionData12(ADC2, LL_ADC_INJ_RANK_1);
 
-            /* Run SW trigger test */
             foc_adc_sw_trigger_test();
 
             int16_t sw_ia, sw_ib, sw_ic, sw_vbus_raw;
@@ -310,12 +263,10 @@ static void process_command(const parsed_frame_t *frame)
             foc_adc_get_sw_diag(&sw_ia, &sw_ib, &sw_ic,
                                 &sw_vbus_raw, &sw_vbus_v, &sw_valid);
 
-            /* Read ADC state AFTER SW trigger */
             uint32_t adc1_isr_after = ADC1->ISR;
             uint16_t adc2_isr_low = (uint16_t)(ADC2->ISR & 0xFFFF);
             int16_t adc2_jdr2_after = (int16_t)LL_ADC_INJ_ReadConversionData12(ADC2, LL_ADC_INJ_RANK_2);
 
-            /* Pack RSP_DIAG (32 bytes) — ADC diagnostic v2 */
             uint8_t dpayload[32];
             memcpy(&dpayload[0],  &adc1_isr_before, 4);
             memcpy(&dpayload[4],  &adc1_jsqr, 2);
@@ -359,8 +310,6 @@ void serial_cmd_thread(void *arg1, void *arg2, void *arg3)
     k_sleep(K_MSEC(300));
     LOG_INF("Serial thread started (IRQ RX + periodic TX)");
 
-    uint32_t status_counter = 0;
-    uint32_t telemetry_counter = 0;
     uint32_t diag_counter = 0;
 
     while (1) {
@@ -373,35 +322,6 @@ void serial_cmd_thread(void *arg1, void *arg2, void *arg3)
         }
 
         /* ── TX: periodic telemetry ───────────────────── */
-
-        /* STATUS @ 10 Hz (every 10th iteration) */
-        if (++status_counter >= 10) {
-            status_counter = 0;
-            commander_status_t status;
-            bool updated = false;
-            msghub_subscriber_update(g_commander_status_sub, &status, &updated);
-            if (updated) {
-                uint8_t payload[2] = { (uint8_t)status.state, (uint8_t)status.fault_code };
-                send_response(RSP_ID_STATUS, payload, 2);
-            }
-        }
-
-        /* TELEMETRY @ 20 Hz (every 5th iteration) */
-        if (++telemetry_counter >= 5) {
-            telemetry_counter = 0;
-            vehicle_state_t state;
-            bool updated = false;
-            msghub_subscriber_update(g_vehicle_state_sub, &state, &updated);
-            if (updated) {
-                uint8_t payload[20];
-                memcpy(&payload[0],  &state.x, 4);
-                memcpy(&payload[4],  &state.y, 4);
-                memcpy(&payload[8],  &state.yaw, 4);
-                memcpy(&payload[12], &state.linear_x, 4);
-                memcpy(&payload[16], &state.angular_z, 4);
-                send_response(RSP_ID_TELEMETRY, payload, 20);
-            }
-        }
 
         /* MOTOR state (on change) */
         motor_state_t mstate;
@@ -459,13 +379,7 @@ int serial_cmd_init(void)
     uart_irq_rx_enable(uart_dev);
 
     /* Initialize msghub */
-    g_cmd_vel_sub = msghub_create_subscriber(MSGHUB_TOPIC(cmd_vel), 0);
-    g_vehicle_state_sub = msghub_create_subscriber(MSGHUB_TOPIC(vehicle_state), 0);
     g_motor_state_sub = msghub_create_subscriber(MSGHUB_TOPIC(motor_state), 0);
-    g_commander_status_sub = msghub_create_subscriber(MSGHUB_TOPIC(commander_status), 0);
-
-    g_cmd_vel_pub = msghub_create_publisher(MSGHUB_TOPIC(cmd_vel));
-    g_commander_cmd_pub = msghub_create_publisher(MSGHUB_TOPIC(commander_cmd));
     g_motor_cmd_pub = msghub_create_publisher(MSGHUB_TOPIC(motor_cmd));
 
     LOG_INF("Serial command init: USART1 @ 115200 baud (IRQ RX)");

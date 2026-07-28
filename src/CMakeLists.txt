@@ -13,7 +13,9 @@ target_include_directories(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_include_directories(app PRIVATE
     common/include
-    msghub/include
+    ${CMAKE_SOURCE_DIR}/../shared/msghub/include
+    ${CMAKE_SOURCE_DIR}/../shared/msghub/src
+    ${CMAKE_SOURCE_DIR}/../shared/msghub/port
     topics/include
     drivers/foc
     libs/pid
@@ -32,11 +34,11 @@ target_sources(app PRIVATE
     app/app_init.c
     # Common utilities
     common/common_time.c
-    # Message hub (pub/sub bus)
-    msghub/msghub_state.c
-    msghub/msghub_topic.c
-    msghub/msghub_pub.c
-    msghub/msghub_sub.c
+    # Message hub (pub/sub bus) — shared component
+    ${CMAKE_SOURCE_DIR}/../shared/msghub/src/msghub_state.c
+    ${CMAKE_SOURCE_DIR}/../shared/msghub/src/msghub_topic.c
+    ${CMAKE_SOURCE_DIR}/../shared/msghub/src/msghub_pub.c
+    ${CMAKE_SOURCE_DIR}/../shared/msghub/src/msghub_sub.c
     # Topic definitions
     topics/topics.c
     # Math / data processing

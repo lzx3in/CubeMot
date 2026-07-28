@@ -3,8 +3,9 @@ add_executable(msghub_test
 )
 
 target_include_directories(msghub_test PRIVATE
-    ${CMAKE_SOURCE_DIR}/src/msghub/include
-    ${CMAKE_SOURCE_DIR}/src/msghub
+    ${CMAKE_SOURCE_DIR}/../shared/msghub/include
+    ${CMAKE_SOURCE_DIR}/../shared/msghub/src
+    ${CMAKE_SOURCE_DIR}/../shared/msghub/port
 )
 
 # Enable PC unit test mode

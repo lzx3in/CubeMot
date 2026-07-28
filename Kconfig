@@ -3,7 +3,7 @@ mainmenu "CubeMot Application"
 source "Kconfig.zephyr"
 
 # Core infrastructure
-rsource "src/msghub/Kconfig"
+rsource "../shared/msghub/Kconfig"
 
 # CubeMot application modules (rsource = relative to this Kconfig file)
 rsource "src/modules/blink/Kconfig"

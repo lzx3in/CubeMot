@@ -2,8 +2,38 @@ mainmenu "CubeMot Application"
 
 source "Kconfig.zephyr"
 
-# Core infrastructure
-rsource "../shared/msghub/Kconfig"
+# Core infrastructure — msghub capacity configuration (consumer-side glue)
+menu "Message Hub Configuration"
+
+config MSGHUB_MAX_TOPICS
+	int "Maximum number of topics"
+	default 8
+	range 4 32
+	help
+	  Maximum number of unique topics that can be registered.
+
+config MSGHUB_MAX_INSTANCES
+	int "Maximum instances per topic"
+	default 4
+	range 1 16
+	help
+	  Maximum number of publisher instances per topic.
+
+config MSGHUB_MAX_SUBSCRIBERS
+	int "Maximum number of subscribers"
+	default 16
+	range 8 64
+	help
+	  Maximum total number of subscriber handles.
+
+config MSGHUB_MAX_MSG_SIZE
+	int "Maximum message size (bytes)"
+	default 128
+	range 16 1024
+	help
+	  Size of the per-topic last-value data buffer.
+
+endmenu
 
 # CubeMot application modules (rsource = relative to this Kconfig file)
 rsource "src/modules/blink/Kconfig"

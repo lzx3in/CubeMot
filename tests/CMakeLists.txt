@@ -11,5 +11,5 @@ add_subdirectory(mocks/zephyr)
 # Apply Zephyr mock headers for common library in test builds
 target_link_libraries(common PUBLIC zephyr_mocks)
 
+# msghub host unit tests moved into the msghub repo (shared/msghub/tests)
 add_subdirectory(lib)
-add_subdirectory(msghub)

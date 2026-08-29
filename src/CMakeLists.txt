@@ -1,12 +1,15 @@
 # CubeMot Zephyr Application
-# ZEPHYR_ENV is defined so app code knows it's on Zephyr
 #
 # Architecture:
 #   Core modules are always compiled. Optional modules are Kconfig-gated
 #   (CONFIG_MODULE_*_ENABLE), keeping the build modular while respecting
 #   Zephyr's requirement that app target receives direct target_sources().
+#
+# msghub integration (framework glue lives here, not in the msghub repo):
+#   - portable core sources from ../shared/msghub/src (excluding msghub_port.c)
+#   - Zephyr adapter: src/msghub_port_zephyr.c (strong msghub_port_* impls)
+#   - capacity: CONFIG_MSGHUB_MAX_* (Kconfig) mapped to MSGHUB_MAX_* macros
 
-target_compile_definitions(app PRIVATE ZEPHYR_ENV=1)
 target_include_directories(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 # ── Include paths ────────────────────────────────────────
@@ -15,7 +18,6 @@ target_include_directories(app PRIVATE
     common/include
     ${CMAKE_SOURCE_DIR}/../shared/msghub/include
     ${CMAKE_SOURCE_DIR}/../shared/msghub/src
-    ${CMAKE_SOURCE_DIR}/../shared/msghub/port
     topics/include
     drivers/foc
     libs/pid
@@ -34,11 +36,12 @@ target_sources(app PRIVATE
     app/app_init.c
     # Common utilities
     common/common_time.c
-    # Message hub (pub/sub bus) — shared component
+    # Message hub (pub/sub bus) — portable core + Zephyr adapter
     ${CMAKE_SOURCE_DIR}/../shared/msghub/src/msghub_state.c
     ${CMAKE_SOURCE_DIR}/../shared/msghub/src/msghub_topic.c
     ${CMAKE_SOURCE_DIR}/../shared/msghub/src/msghub_pub.c
     ${CMAKE_SOURCE_DIR}/../shared/msghub/src/msghub_sub.c
+    msghub_port_zephyr.c
     # Topic definitions
     topics/topics.c
     # Math / data processing
@@ -110,6 +113,22 @@ if(CONFIG_MODULE_SERIAL_CMD_ENABLE)
         comm/serial_cmd/serial_cmd.c
         libs/serial_protocol/serial_protocol.c
     )
+endif()
+
+
+# ── msghub capacity: map Zephyr Kconfig to msghub compile-time macros ─────────
+
+if(CONFIG_MSGHUB_MAX_TOPICS)
+    target_compile_definitions(app PRIVATE MSGHUB_MAX_TOPICS=${CONFIG_MSGHUB_MAX_TOPICS})
+endif()
+if(CONFIG_MSGHUB_MAX_INSTANCES)
+    target_compile_definitions(app PRIVATE MSGHUB_MAX_INSTANCES=${CONFIG_MSGHUB_MAX_INSTANCES})
+endif()
+if(CONFIG_MSGHUB_MAX_SUBSCRIBERS)
+    target_compile_definitions(app PRIVATE MSGHUB_MAX_SUBSCRIBERS=${CONFIG_MSGHUB_MAX_SUBSCRIBERS})
+endif()
+if(CONFIG_MSGHUB_MAX_MSG_SIZE)
+    target_compile_definitions(app PRIVATE MSGHUB_MAX_MSG_SIZE=${CONFIG_MSGHUB_MAX_MSG_SIZE})
 endif()
 
 

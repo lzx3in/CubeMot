@@ -1,4 +1,5 @@
 #include "app.h"
+#include "msghub/msghub.h"
 
 #if CONFIG_MODULE_BLINK_ENABLE
 #include "modules/blink/blink.h"
@@ -105,6 +106,14 @@ static void start_threads(void)
 int app_init(void)
 {
     g_app_state = APP_STATE_INITIALIZING;
+
+    /* msghub event bus is infrastructure: must be initialized before any
+     * create_publisher / create_subscriber call in init_modules(). */
+    if (msghub_init() != MSGHUB_OK) {
+        LOG_ERR("msghub_init failed");
+        g_app_state = APP_STATE_ERROR;
+        return -1;
+    }
 
     int ret = init_modules();
     if (ret != 0) {

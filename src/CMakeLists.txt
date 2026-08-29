@@ -6,7 +6,7 @@
 #   Zephyr's requirement that app target receives direct target_sources().
 #
 # msghub integration (framework glue lives here, not in the msghub repo):
-#   - portable core sources from ../shared/msghub/src (excluding msghub_port.c)
+#   - portable core sources from ${MSGHUB_DIR}/src (excluding msghub_port.c)
 #   - Zephyr adapter: src/msghub_port_zephyr.c (strong msghub_port_* impls)
 #   - capacity: CONFIG_MSGHUB_MAX_* (Kconfig) mapped to MSGHUB_MAX_* macros
 
@@ -16,8 +16,8 @@ target_include_directories(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_include_directories(app PRIVATE
     common/include
-    ${CMAKE_SOURCE_DIR}/../shared/msghub/include
-    ${CMAKE_SOURCE_DIR}/../shared/msghub/src
+    ${MSGHUB_DIR}/include
+    ${MSGHUB_DIR}/src
     topics/include
     drivers/foc
     libs/pid
@@ -37,10 +37,10 @@ target_sources(app PRIVATE
     # Common utilities
     common/common_time.c
     # Message hub (pub/sub bus) — portable core + Zephyr adapter
-    ${CMAKE_SOURCE_DIR}/../shared/msghub/src/msghub_state.c
-    ${CMAKE_SOURCE_DIR}/../shared/msghub/src/msghub_topic.c
-    ${CMAKE_SOURCE_DIR}/../shared/msghub/src/msghub_pub.c
-    ${CMAKE_SOURCE_DIR}/../shared/msghub/src/msghub_sub.c
+    ${MSGHUB_DIR}/src/msghub_state.c
+    ${MSGHUB_DIR}/src/msghub_topic.c
+    ${MSGHUB_DIR}/src/msghub_pub.c
+    ${MSGHUB_DIR}/src/msghub_sub.c
     msghub_port_zephyr.c
     # Topic definitions
     topics/topics.c
